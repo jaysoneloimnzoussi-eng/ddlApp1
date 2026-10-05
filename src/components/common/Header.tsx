@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   Lock,
+  Crown,
+  LogOut as LogOutIcon,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -23,6 +25,10 @@ export const Header: React.FC = () => {
     setCurrentUserRole,
     currentAgentId,
     setCurrentAgentId,
+    authenticatedUser,
+    logoutAgentSession,
+    visibleEstablishments,
+    establishments,
     staff,
     theme,
     toggleTheme,
@@ -72,34 +78,57 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Center: Agent Silo Selector (Select your field identity) */}
+      {/* Center: Authenticated Session Identity & Siloing */}
       <div className="hidden lg:flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-1 rounded-lg border bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-xs">
-          <Lock className="w-3.5 h-3.5 text-blue-600" />
-          <span className="text-slate-500 font-medium">Session Agent :</span>
-          <select
-            value={currentAgentId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setCurrentAgentId(val);
-              const found = staff.find((s) => s.id === val);
-              showNotification(
-                'info',
-                val === 'all'
-                  ? 'Vue globale administrateur activée (Tous les établissements).'
-                  : `Session isolée activée pour l'inspecteur : ${found?.nomComplet}. Seuls ses dossiers assignés sont visibles.`
-              );
-            }}
-            className="font-bold text-slate-800 dark:text-slate-200 bg-transparent focus:outline-none cursor-pointer"
-          >
-            <option value="all">Direction / Super-Admin (Tous les dossiers)</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nomComplet} ({s.fonction})
-              </option>
-            ))}
-          </select>
-        </div>
+        {currentUserRole === 'directeur' || currentUserRole === 'administrateur' ? (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-amber-500/10 border-amber-500/30 text-xs">
+            <Crown className="w-4 h-4 text-amber-500 shrink-0" />
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-amber-700 dark:text-amber-300">
+                Super-Admin ({authenticatedUser?.nomComplet || 'Direction'})
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">
+                {establishments.length} dossiers au total
+              </span>
+            </div>
+
+            {/* Optional Filter for Admin */}
+            <select
+              value={currentAgentId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCurrentAgentId(val);
+                const found = staff.find((s) => s.id === val);
+                showNotification(
+                  'info',
+                  val === 'all'
+                    ? 'Vue globale : Tous les établissements affichés.'
+                    : `Filtre actif : Établissements de l'agent ${found?.nomComplet}.`
+                );
+              }}
+              className="ml-2 font-medium text-[11px] text-slate-800 dark:text-slate-200 bg-transparent border-l border-amber-500/30 pl-2 focus:outline-none cursor-pointer"
+            >
+              <option value="all">Vue globale (Tous les 6 arrondissements)</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Filtrer : {s.nomComplet} ({s.matricule})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-emerald-500/10 border-emerald-500/30 text-xs">
+            <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                Agent de Terrain : {authenticatedUser?.nomComplet || 'Enquêteur SAA'}
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold shadow-sm">
+                Mes Recensements : {visibleEstablishments.length}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Offline Queue Badge */}
         {offlineQueueCount > 0 && isOnline && (
@@ -111,6 +140,16 @@ export const Header: React.FC = () => {
             Sync ({offlineQueueCount})
           </button>
         )}
+
+        {/* Quick Logout Button */}
+        <button
+          onClick={logoutAgentSession}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-rose-500/10 hover:border-rose-500/30 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-semibold transition"
+          title="Fermer la session et retourner à la console d'authentification"
+        >
+          <LogOutIcon className="w-3.5 h-3.5" />
+          <span>Déconnexion</span>
+        </button>
       </div>
 
       {/* Right Controls: Theme Switcher (Fond Blanc / Sombre) + Google Workspace Sign-In */}

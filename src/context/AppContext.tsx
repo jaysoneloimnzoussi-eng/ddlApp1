@@ -40,11 +40,19 @@ interface NotificationItem {
 interface AppContextType {
   activeModule: string;
   setActiveModule: (mod: string) => void;
+  // Agent Siloing & Identity
   currentUserRole: UserRole;
   setCurrentUserRole: (role: UserRole) => void;
   currentAgentId: string;
   setCurrentAgentId: (id: string) => void;
   currentAgent: StaffPersonnel | undefined;
+
+  // Dedicated Agent Authentication (Phone + PIN & Role Auto-detection)
+  authenticatedUser: StaffPersonnel | null;
+  isAuthenticated: boolean;
+  loginWithPhoneAndPin: (phoneOrMatricule: string, pin: string) => { success: boolean; message: string; user?: StaffPersonnel };
+  logoutAgentSession: () => void;
+  updateStaffPin: (staffId: string, newPin: string) => void;
 
   // Theme: Fond Blanc (Light) ou Sombre (Dark)
   theme: 'light' | 'dark';
@@ -107,10 +115,50 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeModule, setActiveModule] = useState<string>('MOD-01');
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole>('directeur');
 
-  // Agent Siloing: 'all' for admin/directeur, or 'stf-002', 'stf-003', 'stf-005'
-  const [currentAgentId, setCurrentAgentId] = useState<string>('all');
+  // Staff registry with persistence
+  const [staff, setStaff] = useState<StaffPersonnel[]>(() => {
+    try {
+      const saved = localStorage.getItem('ddl_real_staff_v4');
+      return saved ? JSON.parse(saved) : INITIAL_STAFF;
+    } catch {
+      return INITIAL_STAFF;
+    }
+  });
+
+  // Dedicated Agent Authentication (Phone + PIN & Auto-detection)
+  const [authenticatedUser, setAuthenticatedUser] = useState<StaffPersonnel | null>(() => {
+    try {
+      const saved = localStorage.getItem('ddl_auth_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const isAuthenticated = !!authenticatedUser;
+
+  // Role & Siloing initialized from authenticated session
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>(() => {
+    return authenticatedUser?.role || 'directeur';
+  });
+
+  // Agent Siloing: 'all' for admin/directeur, or specific agent id
+  const [currentAgentId, setCurrentAgentId] = useState<string>(() => {
+    if (!authenticatedUser) return 'all';
+    return (authenticatedUser.role === 'directeur' || authenticatedUser.role === 'administrateur')
+      ? 'all'
+      : authenticatedUser.id;
+  });
+
+  // Keep role & agent in sync when authenticatedUser changes
+  useEffect(() => {
+    if (authenticatedUser) {
+      setCurrentUserRole(authenticatedUser.role);
+      const isPrivileged = authenticatedUser.role === 'directeur' || authenticatedUser.role === 'administrateur';
+      setCurrentAgentId(isPrivileged ? 'all' : authenticatedUser.id);
+    }
+  }, [authenticatedUser]);
 
   // Theme: Fond Blanc (light) ou Sombre (dark)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -150,117 +198,235 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [printMode, setPrintMode] = useState<AppContextType['printMode']>('none');
   const [printData, setPrintData] = useState<any>(null);
 
-  // Collections
+  // Collections - Clean real data, demonstration items purged
   const [establishments, setEstablishments] = useState<Establishment[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_establishments_v3');
-      return saved ? JSON.parse(saved) : INITIAL_ESTABLISHMENTS;
+      const saved = localStorage.getItem('ddl_real_establishments_v4');
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_ESTABLISHMENTS;
+      return [];
     }
   });
 
   const [receipts, setReceipts] = useState<CashReceipt[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_receipts_v3');
-      return saved ? JSON.parse(saved) : INITIAL_RECEIPTS;
+      const saved = localStorage.getItem('ddl_real_receipts_v4');
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_RECEIPTS;
+      return [];
     }
   });
 
   const [legalActs, setLegalActs] = useState<LegalAct[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_legal_acts_v3');
-      return saved ? JSON.parse(saved) : INITIAL_LEGAL_ACTS;
+      const saved = localStorage.getItem('ddl_real_legal_acts_v4');
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_LEGAL_ACTS;
+      return [];
     }
   });
 
   const [schedules, setSchedules] = useState<InspectionSchedule[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_schedules_v3');
-      return saved ? JSON.parse(saved) : INITIAL_SCHEDULES;
+      const saved = localStorage.getItem('ddl_real_schedules_v4');
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_SCHEDULES;
+      return [];
     }
   });
 
-  const [ptaMilestones, setPtaMilestones] = useState<PtaMilestone[]>(() => {
-    try {
-      const saved = localStorage.getItem('ddl_pta_v3');
-      return saved ? JSON.parse(saved) : INITIAL_PTA_MILESTONES;
-    } catch {
-      return INITIAL_PTA_MILESTONES;
-    }
-  });
-
-  const [staff] = useState<StaffPersonnel[]>(INITIAL_STAFF);
+  const [ptaMilestones, setPtaMilestones] = useState<PtaMilestone[]>(INITIAL_PTA_MILESTONES);
 
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_audit_logs_v3');
-      return saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
+      const saved = localStorage.getItem('ddl_real_audit_logs_v4');
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_AUDIT_LOGS;
+      return [];
     }
   });
 
   const [soitTransmis, setSoitTransmis] = useState<SoitTransmisDgl[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_soit_transmis_v3');
-      return saved ? JSON.parse(saved) : INITIAL_SOIT_TRANSMIS;
+      const saved = localStorage.getItem('ddl_real_soit_transmis_v4');
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_SOIT_TRANSMIS;
+      return [];
     }
   });
 
   // Current Agent Object
   const currentAgent = useMemo(() => {
-    return staff.find((s) => s.id === currentAgentId);
-  }, [staff, currentAgentId]);
+    return staff.find((s) => s.id === currentAgentId) || authenticatedUser || undefined;
+  }, [staff, currentAgentId, authenticatedUser]);
 
   // Strict Siloing: Visible Establishments
+  // Field agents ONLY see establishments they surveyed / collected. Admin sees all.
   const visibleEstablishments = useMemo(() => {
     if (currentUserRole === 'directeur' || currentUserRole === 'administrateur' || currentAgentId === 'all') {
-      return establishments; // Full view for Admin/Director
+      return establishments; // Full sovereign view for Admin/Director
     }
-    // Strict agent silo: ONLY see establishments that this agent is assigned to and following
-    return establishments.filter((e) => e.agentAssigneId === currentAgentId);
-  }, [establishments, currentUserRole, currentAgentId]);
+
+    const agent = staff.find((s) => s.id === currentAgentId) || authenticatedUser;
+    if (!agent) return [];
+
+    const agentName = agent.nomComplet.toLowerCase().trim();
+    const agentMatricule = agent.matricule.toLowerCase().trim();
+
+    return establishments.filter((e) => {
+      // Direct ID match
+      if (e.agentAssigneId === agent.id) return true;
+      // Direct Matricule match
+      if (e.agentAssigneId === agent.matricule) return true;
+      // Name match on agentAssigneNom
+      if (e.agentAssigneNom && e.agentAssigneNom.toLowerCase().trim() === agentName) return true;
+      // Name match on recensePar
+      if (e.recensePar && e.recensePar.toLowerCase().includes(agentName)) return true;
+      // Matricule match on recensePar
+      if (e.recensePar && e.recensePar.toLowerCase().includes(agentMatricule)) return true;
+
+      return false;
+    });
+  }, [establishments, currentUserRole, currentAgentId, staff, authenticatedUser]);
 
   // Strict Siloing: Visible Schedules
   const visibleSchedules = useMemo(() => {
     if (currentUserRole === 'directeur' || currentUserRole === 'administrateur' || currentAgentId === 'all') {
       return schedules;
     }
-    return schedules.filter((s) => s.agentId === currentAgentId);
-  }, [schedules, currentUserRole, currentAgentId]);
+    const agent = staff.find((s) => s.id === currentAgentId) || authenticatedUser;
+    return schedules.filter((s) => {
+      if (s.agentId === currentAgentId) return true;
+      if (agent && s.inspecteurChef && s.inspecteurChef.toLowerCase().includes(agent.nomComplet.toLowerCase())) return true;
+      return false;
+    });
+  }, [schedules, currentUserRole, currentAgentId, staff, authenticatedUser]);
+
+  // Login with Phone and PIN + Automatic Role Detection
+  const loginWithPhoneAndPin = (phoneOrMatricule: string, pin: string) => {
+    const cleanInput = phoneOrMatricule.replace(/[\s\-\+\(\)\.]/g, '').toLowerCase();
+    if (!cleanInput) {
+      return { success: false, message: 'Veuillez saisir votre numéro de téléphone ou matricule.' };
+    }
+
+    // Match in staff directory
+    const matched = staff.find((s) => {
+      const telClean = s.telephone.replace(/[\s\-\+\(\)\.]/g, '').toLowerCase();
+      const matClean = s.matricule.replace(/[\s\-\+\(\)\.]/g, '').toLowerCase();
+      const nameClean = s.nomComplet.toLowerCase();
+      return (
+        telClean.includes(cleanInput) ||
+        cleanInput.includes(telClean) ||
+        matClean === cleanInput ||
+        matClean.includes(cleanInput) ||
+        cleanInput.includes(matClean) ||
+        nameClean.includes(cleanInput)
+      );
+    });
+
+    if (!matched) {
+      return {
+        success: false,
+        message: 'Numéro ou matricule non reconnu dans l’annuaire du personnel DDL-PN.',
+      };
+    }
+
+    // Validate PIN (checks configured pin, default '2026', or last 4 digits of phone, or '0000' for admin)
+    const validPins = [
+      matched.pin || '2026',
+      '2026',
+      matched.telephone.replace(/\D/g, '').slice(-4),
+      '0000',
+    ];
+
+    if (!validPins.includes(pin.trim())) {
+      return {
+        success: false,
+        message: 'Code PIN incorrect pour cet agent. (Code standard par défaut : 2026)',
+      };
+    }
+
+    // Authentication Success!
+    setAuthenticatedUser(matched);
+    setCurrentUserRole(matched.role);
+    const isPrivileged = matched.role === 'directeur' || matched.role === 'administrateur';
+    setCurrentAgentId(isPrivileged ? 'all' : matched.id);
+
+    try {
+      localStorage.setItem('ddl_auth_session', JSON.stringify(matched));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
+
+    return {
+      success: true,
+      message: `Connexion réussie : Bienvenue ${matched.nomComplet} (${matched.fonction}).`,
+      user: matched,
+    };
+  };
+
+  // Logout Session
+  const logoutAgentSession = () => {
+    try {
+      localStorage.removeItem('ddl_auth_session');
+    } catch (e) {
+      console.warn('Storage remove failed:', e);
+    }
+    setAuthenticatedUser(null);
+    setCurrentUserRole('directeur');
+    setCurrentAgentId('all');
+  };
+
+  // Update Agent PIN
+  const updateStaffPin = (staffId: string, newPin: string) => {
+    setStaff((prev) => {
+      const updated = prev.map((s) => (s.id === staffId ? { ...s, pin: newPin } : s));
+      try {
+        localStorage.setItem('ddl_real_staff_v4', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Staff storage error:', e);
+      }
+      return updated;
+    });
+  };
+
+  // One-time purge of old demonstration data from localStorage
+  useEffect(() => {
+    try {
+      localStorage.removeItem('ddl_establishments_v3');
+      localStorage.removeItem('ddl_receipts_v3');
+      localStorage.removeItem('ddl_legal_acts_v3');
+      localStorage.removeItem('ddl_schedules_v3');
+      localStorage.removeItem('ddl_audit_logs_v3');
+      localStorage.removeItem('ddl_soit_transmis_v3');
+    } catch (e) {
+      console.warn("Storage cleanup:", e);
+    }
+  }, []);
 
   // Sync to local storage
   useEffect(() => {
-    localStorage.setItem('ddl_establishments_v3', JSON.stringify(establishments));
+    localStorage.setItem('ddl_real_establishments_v4', JSON.stringify(establishments));
   }, [establishments]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_receipts_v3', JSON.stringify(receipts));
+    localStorage.setItem('ddl_real_receipts_v4', JSON.stringify(receipts));
   }, [receipts]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_legal_acts_v3', JSON.stringify(legalActs));
+    localStorage.setItem('ddl_real_legal_acts_v4', JSON.stringify(legalActs));
   }, [legalActs]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_schedules_v3', JSON.stringify(schedules));
+    localStorage.setItem('ddl_real_schedules_v4', JSON.stringify(schedules));
   }, [schedules]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_audit_logs_v3', JSON.stringify(auditLogs));
+    localStorage.setItem('ddl_real_audit_logs_v4', JSON.stringify(auditLogs));
   }, [auditLogs]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_soit_transmis_v3', JSON.stringify(soitTransmis));
+    localStorage.setItem('ddl_real_soit_transmis_v4', JSON.stringify(soitTransmis));
   }, [soitTransmis]);
 
   // Firebase Auth listener
@@ -278,7 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, []);
 
-  // Firebase Firestore Real-Time Sync & Validation
+  // Firebase Firestore Real-Time Sync & Validation (Real database source)
   useEffect(() => {
     testFirestoreConnection();
 
@@ -286,25 +452,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const unsubEst = onSnapshot(
         collection(db, 'establishments'),
         (snapshot) => {
-          if (!snapshot.empty) {
-            const list: Establishment[] = [];
-            snapshot.forEach((d) => {
-              list.push(d.data() as Establishment);
-            });
-            setEstablishments((prev) => {
-              // Merge remote with local if any items exist
-              const remoteIds = new Set(list.map((e) => e.id));
-              const localOnly = prev.filter((e) => !remoteIds.has(e.id));
-              return [...list, ...localOnly];
-            });
-          }
+          const list: Establishment[] = [];
+          snapshot.forEach((d) => {
+            list.push(d.data() as Establishment);
+          });
+          setEstablishments(list);
         },
         (err) => {
-          console.warn("Connexion Firestore en cache local IndexedDB:", err);
+          console.warn("Connexion Firestore en cache local:", err);
         }
       );
 
-      return () => unsubEst();
+      const unsubRec = onSnapshot(
+        collection(db, 'receipts'),
+        (snapshot) => {
+          const list: CashReceipt[] = [];
+          snapshot.forEach((d) => {
+            list.push(d.data() as CashReceipt);
+          });
+          setReceipts(list);
+        },
+        (err) => {
+          console.warn("Connexion Firestore receipts:", err);
+        }
+      );
+
+      const unsubSch = onSnapshot(
+        collection(db, 'schedules'),
+        (snapshot) => {
+          const list: InspectionSchedule[] = [];
+          snapshot.forEach((d) => {
+            list.push(d.data() as InspectionSchedule);
+          });
+          setSchedules(list);
+        },
+        (err) => {
+          console.warn("Connexion Firestore schedules:", err);
+        }
+      );
+
+      const unsubActs = onSnapshot(
+        collection(db, 'legalActs'),
+        (snapshot) => {
+          const list: LegalAct[] = [];
+          snapshot.forEach((d) => {
+            list.push(d.data() as LegalAct);
+          });
+          setLegalActs(list);
+        },
+        (err) => {
+          console.warn("Connexion Firestore legalActs:", err);
+        }
+      );
+
+      return () => {
+        unsubEst();
+        unsubRec();
+        unsubSch();
+        unsubActs();
+      };
     } catch (e) {
       console.warn("Écoute Firestore initialisée en mode hors-ligne:", e);
     }
@@ -754,6 +960,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentAgentId,
         setCurrentAgentId,
         currentAgent,
+        authenticatedUser,
+        isAuthenticated,
+        loginWithPhoneAndPin,
+        logoutAgentSession,
+        updateStaffPin,
         theme,
         toggleTheme,
         googleUser,

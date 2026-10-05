@@ -19,6 +19,10 @@ import {
   Building,
   Smartphone,
   ChevronRight,
+  Database,
+  LogOut,
+  UserCheck,
+  Crown,
 } from 'lucide-react';
 
 interface ModuleItem {
@@ -31,7 +35,17 @@ interface ModuleItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { activeModule, setActiveModule, offlineQueueCount, isOnline, theme } = useApp();
+  const {
+    activeModule,
+    setActiveModule,
+    authenticatedUser,
+    logoutAgentSession,
+    visibleEstablishments,
+    currentUserRole,
+    offlineQueueCount,
+    isOnline,
+    theme,
+  } = useApp();
 
   const MODULES: ModuleItem[] = [
     // 1. Pilotage & Stratégie
@@ -163,10 +177,40 @@ export const Sidebar: React.FC = () => {
       icon: Lock,
       section: 'Administration & Système',
     },
+    {
+      code: 'MOD-18',
+      nomCourt: 'Import Supabase / Données',
+      nomComplet: 'Passerelle Cloud & Migration Firestore',
+      icon: Database,
+      badge: 'Nouveau',
+      section: 'Administration & Système',
+    },
   ];
 
   // Group by section
-  const sections = Array.from(new Set(MODULES.map((m) => m.section)));
+  const isFieldAgent = currentUserRole !== 'directeur' && currentUserRole !== 'administrateur';
+
+  // For Field Agents: Strictly and exclusively allow MOD-01 and MOD-02
+  const visibleModules: ModuleItem[] = isFieldAgent
+    ? [
+        {
+          code: 'MOD-01',
+          nomCourt: 'Mon Dashboard Personnel',
+          nomComplet: 'Suivi Exclusif de mes Dossiers',
+          icon: LayoutDashboard,
+          section: 'Mon Espace Terrain (Agent)',
+        },
+        {
+          code: 'MOD-02',
+          nomCourt: 'Recensement de Terrain',
+          nomComplet: 'Enregistrement In Situ & Mes Fiches',
+          icon: MapPinPlus,
+          section: 'Mon Espace Terrain (Agent)',
+        },
+      ]
+    : MODULES;
+
+  const sections = Array.from(new Set(visibleModules.map((m) => m.section)));
 
   return (
     <aside className={`w-72 border-r flex flex-col h-[calc(100vh-4.5rem)] shrink-0 select-none overflow-y-auto transition-colors duration-200 ${
@@ -175,10 +219,17 @@ export const Sidebar: React.FC = () => {
         : 'bg-slate-900 border-slate-800 text-slate-100'
     }`}>
       <div className="p-3">
-        <div className={`text-[11px] font-semibold uppercase tracking-wider px-3 mb-2 ${
+        <div className={`text-[11px] font-semibold uppercase tracking-wider px-3 mb-2 flex items-center justify-between ${
           theme === 'light' ? 'text-slate-500' : 'text-slate-400'
         }`}>
-          17 Modules Métier Intégrés
+          <span>
+            {isFieldAgent ? '2 Modules Terrain Autorisés' : '18 Modules Métier Intégrés'}
+          </span>
+          {isFieldAgent && (
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30">
+              Accès Restreint
+            </span>
+          )}
         </div>
         <div className="space-y-4">
           {sections.map((sectionName) => (
@@ -191,7 +242,7 @@ export const Sidebar: React.FC = () => {
                 {sectionName}
               </div>
               <div className="space-y-0.5 pt-1">
-                {MODULES.filter((m) => m.section === sectionName).map((mod) => {
+                {visibleModules.filter((m) => m.section === sectionName).map((mod) => {
                   const Icon = mod.icon;
                   const isActive = activeModule === mod.code;
                   return (
@@ -258,6 +309,57 @@ export const Sidebar: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Authenticated User Session Card in Sidebar Footer */}
+      {authenticatedUser && (
+        <div className={`p-3 mt-auto border-t shrink-0 ${
+          theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+        }`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {authenticatedUser.photoUrl ? (
+                <img
+                  src={authenticatedUser.photoUrl}
+                  alt={authenticatedUser.nomComplet}
+                  className="w-9 h-9 rounded-full object-cover border border-emerald-500 shrink-0"
+                />
+              ) : (
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  currentUserRole === 'directeur' || currentUserRole === 'administrateur'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-emerald-600 text-white'
+                }`}>
+                  {authenticatedUser.nomComplet.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-bold truncate">
+                  {authenticatedUser.nomComplet}
+                </p>
+                <div className="flex items-center gap-1 text-[10px]">
+                  {currentUserRole === 'directeur' || currentUserRole === 'administrateur' ? (
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5">
+                      <Crown className="w-2.5 h-2.5" /> Super-Admin
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                      <UserCheck className="w-2.5 h-2.5" /> Agent ({visibleEstablishments.length})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={logoutAgentSession}
+              title="Se déconnecter"
+              className="p-1.5 rounded-lg hover:bg-rose-500/10 hover:text-rose-600 text-slate-400 transition"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 };

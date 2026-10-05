@@ -174,6 +174,7 @@ export interface StaffPersonnel {
   statut: 'actif' | 'en_mission' | 'conge';
   photoUrl?: string;
   calendarColor?: string; // Couleur agenda Google
+  pin?: string;           // Code PIN confidentiel (ex: '2026')
 }
 
 export interface AuditRecord {

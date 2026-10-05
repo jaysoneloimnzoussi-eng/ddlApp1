@@ -31,15 +31,20 @@ import {
   CalendarCheck,
   RefreshCw,
   SlidersHorizontal,
+  Database,
+  UserCheck,
+  Crown,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { Arrondissement, ComplianceStatus } from '../../types';
 import { D3ArrondissementChart } from '../dashboard/D3ArrondissementChart';
 import { CountdownTimer72h } from '../common/CountdownTimer72h';
+import { FieldAgentExclusiveDashboard } from './FieldAgentExclusiveDashboard';
 
 export const DashboardModule: React.FC = () => {
   const {
     establishments,
+    visibleEstablishments,
     receipts,
     legalActs,
     schedules,
@@ -49,8 +54,13 @@ export const DashboardModule: React.FC = () => {
     setActiveModule,
     currentAgentId,
     setCurrentAgentId,
+    currentUserRole,
+    authenticatedUser,
     theme,
   } = useApp();
+
+  const isFieldAgent = currentUserRole !== 'directeur' && currentUserRole !== 'administrateur';
+  const baseEstablishments = isFieldAgent ? visibleEstablishments : establishments;
 
   // Filters for dynamic diagrams
   const [selectedArrondissement, setSelectedArrondissement] = useState<string>('all');
@@ -61,22 +71,30 @@ export const DashboardModule: React.FC = () => {
 
   // Centralized filtered establishments based on dynamic toolbar
   const filteredEstablishments = useMemo(() => {
-    return establishments.filter((est) => {
+    return baseEstablishments.filter((est) => {
       const matchArr = selectedArrondissement === 'all' || est.arrondissement === selectedArrondissement;
       const matchAgent = selectedAgent === 'all' || est.agentAssigneId === selectedAgent;
       const matchStatut = selectedStatut === 'all' || est.statut === selectedStatut;
       return matchArr && matchAgent && matchStatut;
     });
-  }, [establishments, selectedArrondissement, selectedAgent, selectedStatut]);
+  }, [baseEstablishments, selectedArrondissement, selectedAgent, selectedStatut]);
 
   // Centralized filtered receipts
   const filteredReceipts = useMemo(() => {
-    return receipts.filter((rec) => {
+    const baseReceipts = isFieldAgent
+      ? receipts.filter(
+          (r) =>
+            r.agentId === currentAgentId ||
+            (authenticatedUser && r.inspecteurOuCaissier?.toLowerCase().includes(authenticatedUser.nomComplet.toLowerCase()))
+        )
+      : receipts;
+
+    return baseReceipts.filter((rec) => {
       const matchArr = selectedArrondissement === 'all' || rec.arrondissement === selectedArrondissement;
       const matchAgent = selectedAgent === 'all' || rec.agentId === selectedAgent;
       return matchArr && matchAgent;
     });
-  }, [receipts, selectedArrondissement, selectedAgent]);
+  }, [receipts, selectedArrondissement, selectedAgent, isFieldAgent, currentAgentId, authenticatedUser]);
 
   // Dynamic Metrics
   const totalRecettes = filteredReceipts.reduce((acc, r) => acc + r.montantVerse, 0);
@@ -182,7 +200,19 @@ export const DashboardModule: React.FC = () => {
     { code: 'MOD-15', title: 'Coffre SHA-256', count: 'Audit Trail', icon: Lock, color: 'text-slate-500' },
     { code: 'MOD-16', title: 'Contrôle Conjoint', count: 'Mixte Inter-services', icon: ShieldAlert, color: 'text-yellow-500' },
     { code: 'MOD-17', title: 'Portail Télépaiement', count: 'MoMo / Airtel', icon: Smartphone, color: 'text-emerald-500' },
+    { code: 'MOD-18', title: 'Import Supabase', count: 'Migration Cloud', icon: Database, color: 'text-teal-500' },
   ];
+
+  // STRICT USER CONSTRAINT:
+  // If the active user is a Field Agent, they ONLY see their dedicated personal dashboard:
+  // - Establishments they summoned / put under notice
+  // - Those who paid
+  // - Those who gave advances
+  // - Their next appointment dates
+  // - And strictly NOTHING from other agents!
+  if (isFieldAgent) {
+    return <FieldAgentExclusiveDashboard />;
+  }
 
   return (
     <div className={`p-4 md:p-6 space-y-6 max-w-7xl mx-auto transition-colors duration-200 ${
@@ -239,6 +269,80 @@ export const DashboardModule: React.FC = () => {
         </div>
       </div>
 
+      {/* Role Detection & Establishments Scope Notification Banner */}
+      <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+        isFieldAgent
+          ? isLight
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+            : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+          : isLight
+          ? 'bg-amber-50 border-amber-300 text-amber-950'
+          : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          {isFieldAgent ? (
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <UserCheck className="w-4 h-4" />
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center shrink-0">
+              <Crown className="w-4 h-4" />
+            </div>
+          )}
+          <div>
+            <p className="font-bold">
+              {isFieldAgent
+                ? `Session Agent de Terrain : ${authenticatedUser?.nomComplet || 'Agent SAA'} (${authenticatedUser?.matricule || 'DDL-PN'})`
+                : `Supervision Souveraine : ${authenticatedUser?.nomComplet || 'Direction Générale'} (Vue Globale)`}
+            </p>
+            <p className="text-[11px] opacity-90">
+              {isFieldAgent
+                ? `Filtrage strict actif : Vous ne visualisez que les ${visibleEstablishments.length} établissements que vous avez collectés et recensés sur le terrain.`
+                : `Accès administrateur complet : L'ensemble des ${establishments.length} établissements du département de Pointe-Noire est affiché.`}
+            </p>
+          </div>
+        </div>
+
+        {isFieldAgent ? (
+          <button
+            onClick={() => setActiveModule('MOD-02')}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shrink-0 transition"
+          >
+            Nouveau Recensement (+1)
+          </button>
+        ) : (
+          <span className="font-mono font-bold px-2.5 py-1 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
+            6 Arrondissements
+          </span>
+        )}
+      </div>
+
+      {/* Zero Data Alert & Supabase Import Call-to-Action */}
+      {establishments.length === 0 && (
+        <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-sm font-bold">Données de démonstration purgées</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Votre base Firestore est prête pour vos données réelles. Vous pouvez importer vos tables Supabase directement.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveModule('MOD-18')}
+            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+          >
+            <span>Passerelle d'Import Supabase</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* 2. RACCOURCI DE TOUS LES MODULES (MODULES HUB / QUICK LAUNCHPAD) */}
       <div className={`rounded-xl border p-4 shadow-sm transition ${
         isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
@@ -247,7 +351,7 @@ export const DashboardModule: React.FC = () => {
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <h2 className="text-xs md:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Raccourci Intégré de Tous les 17 Modules (Communication Inter-Modules)
+              Raccourci Intégré de Tous les 18 Modules (Communication Inter-Modules)
             </h2>
           </div>
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">

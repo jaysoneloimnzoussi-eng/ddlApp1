@@ -10,13 +10,17 @@ import {
   Phone,
   Award,
   Lock,
+  KeyRound,
+  Check,
 } from 'lucide-react';
 import { StaffPersonnel } from '../../types';
 
 export const AdminPersonnelModule: React.FC = () => {
-  const { staff, openPrintModal, currentUserRole, setCurrentUserRole, showNotification } = useApp();
+  const { staff, updateStaffPin, openPrintModal, currentUserRole, setCurrentUserRole, showNotification } = useApp();
 
   const [selectedStaff, setSelectedStaff] = useState<StaffPersonnel>(staff[0] || null);
+  const [editingPinAgentId, setEditingPinAgentId] = useState<string | null>(null);
+  const [newPinValue, setNewPinValue] = useState<string>('');
 
   const handlePrintBadge = (agent: StaffPersonnel) => {
     openPrintModal('staff_badge', agent);
@@ -73,7 +77,7 @@ export const AdminPersonnelModule: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
                   <div>
                     <span className="text-slate-500 block text-[10px]">Affectation :</span>
                     <span className="text-slate-200 font-medium truncate block">
@@ -86,7 +90,51 @@ export const AdminPersonnelModule: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[10px]">Téléphone :</span>
-                    <span className="text-slate-200">{agent.telephone}</span>
+                    <span className="text-slate-200 font-mono">{agent.telephone}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Code PIN Connexion :</span>
+                    {editingPinAgentId === agent.id ? (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={newPinValue}
+                          onChange={(e) => setNewPinValue(e.target.value)}
+                          className="w-16 px-1.5 py-0.5 rounded bg-slate-900 border border-emerald-500 text-emerald-300 font-mono text-[11px]"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => {
+                            if (newPinValue.trim()) {
+                              updateStaffPin(agent.id, newPinValue.trim());
+                              showNotification('success', `Nouveau PIN enregistré pour ${agent.nomComplet}`);
+                            }
+                            setEditingPinAgentId(null);
+                          }}
+                          className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+                          title="Enregistrer le PIN"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="font-mono font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                          {agent.pin || '2026'}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setEditingPinAgentId(agent.id);
+                            setNewPinValue(agent.pin || '2026');
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-emerald-400 underline"
+                          title="Modifier le code PIN"
+                        >
+                          Modifier
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -18,7 +18,10 @@ import {
 import { ComplianceStatus, Arrondissement, Establishment } from '../../types';
 
 export const SigMapModule: React.FC = () => {
-  const { establishments, openPrintModal, setActiveModule } = useApp();
+  const { visibleEstablishments, establishments, openPrintModal, setActiveModule, currentUserRole, authenticatedUser } = useApp();
+
+  const isFieldAgent = currentUserRole !== 'directeur' && currentUserRole !== 'administrateur';
+  const scopedEstablishments = isFieldAgent ? visibleEstablishments : establishments;
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -33,9 +36,9 @@ export const SigMapModule: React.FC = () => {
   // Itinerary calculation state
   const [isItineraryMode, setIsItineraryMode] = useState<boolean>(false);
   const [selectedWaypoints, setSelectedWaypoints] = useState<string[]>([
-    establishments[0]?.id || '',
-    establishments[1]?.id || '',
-    establishments[2]?.id || '',
+    scopedEstablishments[0]?.id || '',
+    scopedEstablishments[1]?.id || '',
+    scopedEstablishments[2]?.id || '',
   ]);
   const [itineraryStats, setItineraryStats] = useState<{ distanceKm: number; etaMinutes: number } | null>(null);
 
@@ -82,7 +85,7 @@ export const SigMapModule: React.FC = () => {
       routeLayerRef.current = null;
     }
 
-    const filtered = establishments.filter((est) => {
+    const filtered = scopedEstablishments.filter((est) => {
       const matchStatus = selectedStatus === 'all' || est.statut === selectedStatus;
       const matchArr = selectedArr === 'all' || est.arrondissement === selectedArr;
       return matchStatus && matchArr;
@@ -184,7 +187,7 @@ export const SigMapModule: React.FC = () => {
     if (isItineraryMode && selectedWaypoints.length >= 2) {
       const points: [number, number][] = [];
       selectedWaypoints.forEach((id) => {
-        const item = establishments.find((e) => e.id === id);
+        const item = scopedEstablishments.find((e) => e.id === id);
         if (item) points.push([item.latitude, item.longitude]);
       });
 
@@ -211,7 +214,7 @@ export const SigMapModule: React.FC = () => {
     } else {
       setItineraryStats(null);
     }
-  }, [establishments, selectedStatus, selectedArr, showAcousticHeatmap, isItineraryMode, selectedWaypoints]);
+  }, [scopedEstablishments, selectedStatus, selectedArr, showAcousticHeatmap, isItineraryMode, selectedWaypoints]);
 
   const handleToggleWaypoint = (id: string) => {
     setSelectedWaypoints((prev) =>
@@ -325,7 +328,7 @@ export const SigMapModule: React.FC = () => {
             </span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {establishments.map((est) => {
+            {scopedEstablishments.map((est) => {
               const isChecked = selectedWaypoints.includes(est.id);
               const orderIdx = selectedWaypoints.indexOf(est.id);
               return (

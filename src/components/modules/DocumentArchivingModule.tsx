@@ -10,11 +10,12 @@ import {
   Key,
   ShieldAlert,
   Hash,
+  Database,
 } from 'lucide-react';
 import { computeSha256 } from '../../services/crypto';
 
 export const DocumentArchivingModule: React.FC = () => {
-  const { auditLogs, receipts, legalActs, establishments, showNotification } = useApp();
+  const { auditLogs, receipts, legalActs, establishments, showNotification, setActiveModule } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [verifyInput, setVerifyInput] = useState('');
@@ -91,6 +92,14 @@ export const DocumentArchivingModule: React.FC = () => {
             Conservation souveraine des actes, scellement cryptographique SHA-256 et piste d'audit immuable
           </p>
         </div>
+
+        <button
+          onClick={() => setActiveModule('MOD-18')}
+          className="px-3.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-2 transition-all shadow-xs self-start md:self-auto"
+        >
+          <Database className="w-4 h-4 text-emerald-400" />
+          <span>Passerelle d'Import Supabase ➔ Firestore</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

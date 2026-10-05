@@ -669,11 +669,11 @@ export const FieldRecensementModule: React.FC = () => {
 
                   <div className="flex justify-end items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/60">
                     <button
-                      onClick={() => setActiveModule('MOD-03')}
+                      onClick={() => setActiveModule('MOD-01')}
                       className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 text-[11px] font-semibold flex items-center gap-1 transition"
                     >
                       <CalendarCheck className="w-3 h-3 text-blue-600" />
-                      Planifier RDV SAA
+                      Gérer RDV & Acomptes
                     </button>
                     <button
                       onClick={() => openPrintModal('a4_attestation', est)}
