@@ -190,22 +190,52 @@ export const Sidebar: React.FC = () => {
   // Group by section
   const isFieldAgent = currentUserRole !== 'directeur' && currentUserRole !== 'administrateur';
 
-  // For Field Agents: Strictly and exclusively allow MOD-01 and MOD-02
+  // For Field Agents: Dedicated operational suite with Google Agenda, Recensement, SIG and Workspace
   const visibleModules: ModuleItem[] = isFieldAgent
     ? [
         {
           code: 'MOD-01',
           nomCourt: 'Mon Dashboard Personnel',
-          nomComplet: 'Suivi Exclusif de mes Dossiers',
+          nomComplet: 'Suivi Exclusif de mes Dossiers & RDV',
           icon: LayoutDashboard,
-          section: 'Mon Espace Terrain (Agent)',
+          section: 'Mon Espace Terrain (Agent SAA)',
+        },
+        {
+          code: 'MOD-03',
+          nomCourt: 'Google Agenda & Tournées SAA',
+          nomComplet: 'Planning, RDV 2026 & Import Google Calendar',
+          icon: CalendarCheck,
+          badge: 'Google Agenda',
+          section: 'Mon Espace Terrain (Agent SAA)',
         },
         {
           code: 'MOD-02',
           nomCourt: 'Recensement de Terrain',
-          nomComplet: 'Enregistrement In Situ & Mes Fiches',
+          nomComplet: 'Enregistrement In Situ & Mes Fiches SAA',
           icon: MapPinPlus,
-          section: 'Mon Espace Terrain (Agent)',
+          badge: !isOnline || offlineQueueCount > 0 ? `${offlineQueueCount} PWA` : undefined,
+          section: 'Mon Espace Terrain (Agent SAA)',
+        },
+        {
+          code: 'MOD-07',
+          nomCourt: 'SIG & Cartographie Terrain',
+          nomComplet: 'Cartographie Décibels & Itinéraires',
+          icon: Map,
+          section: 'Outils Mobiles & Passerelles',
+        },
+        {
+          code: 'MOD-04',
+          nomCourt: 'Google Workspace Cloud',
+          nomComplet: 'Synchronisation Agenda, Gmail & Docs',
+          icon: CloudCog,
+          section: 'Outils Mobiles & Passerelles',
+        },
+        {
+          code: 'MOD-11',
+          nomCourt: 'Titres & Reçus POS 58mm',
+          nomComplet: 'Délivrance Quittances Immédiates',
+          icon: FileCheck2,
+          section: 'Outils Mobiles & Passerelles',
         },
       ]
     : MODULES;
@@ -223,11 +253,11 @@ export const Sidebar: React.FC = () => {
           theme === 'light' ? 'text-slate-500' : 'text-slate-400'
         }`}>
           <span>
-            {isFieldAgent ? '2 Modules Terrain Autorisés' : '18 Modules Métier Intégrés'}
+            {isFieldAgent ? 'Modules Opérationnels Terrain' : '18 Modules Métier Intégrés'}
           </span>
           {isFieldAgent && (
-            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30">
-              Accès Restreint
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/30">
+              Agent SAA
             </span>
           )}
         </div>

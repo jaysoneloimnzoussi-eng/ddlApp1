@@ -23,6 +23,7 @@ import {
   TrendingUp,
   Sparkles,
   Scale,
+  Ban,
 } from 'lucide-react';
 import { Establishment, CashReceipt } from '../../types';
 import { formatCfa } from '../../services/crypto';
@@ -35,6 +36,7 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
     currentAgent,
     authenticatedUser,
     recordPaymentAndScheduleNext,
+    reportEstablishmentClosed,
     setActiveModule,
     theme,
     showNotification,
@@ -57,6 +59,19 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
   const [nextRdvHeure, setNextRdvHeure] = useState<string>('10:30');
   const [nextRdvMotif, setNextRdvMotif] = useState<string>('Versement de la tranche suivante de redevance');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reporting closed / extinct establishment modal state
+  const [reportingClosedEst, setReportingClosedEst] = useState<Establishment | null>(null);
+  const [closedMotif, setClosedMotif] = useState<string>('Cessation d\'activité définitive / Rideau baissé');
+  const [closedObservations, setClosedObservations] = useState<string>('');
+  const [isSubmittingClose, setIsSubmittingClose] = useState<boolean>(false);
+
+  // Upcoming RDV count
+  const upcomingAgentRdvCount = useMemo(() => {
+    return schedules.filter(
+      (s) => s.statut === 'planifie' && (s.agentId === agent?.id || (agent && s.inspecteurChef?.toLowerCase().includes(agent.nomComplet.toLowerCase())))
+    ).length;
+  }, [schedules, agent]);
 
   // 1. ÉTABLISSEMENTS CONVOQUÉS / SOUS MISE EN DEMEURE / EN CONTENTIEUX
   const etablissementsConvoques = useMemo(() => {
@@ -247,6 +262,41 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
           <div className="flex-1 bg-yellow-400" />
           <div className="flex-1 bg-red-600" />
         </div>
+      </div>
+
+      {/* Google Agenda & RDV 2026 Direct Access Banner */}
+      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md transition ${
+        isLight
+          ? 'bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border-blue-200 text-slate-800'
+          : 'bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-slate-900 border-blue-900/60 text-slate-100'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex flex-col items-center justify-center font-bold shadow-md shrink-0">
+            <CalendarCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                Mon Google Agenda de Terrain (MOD-03)
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-300 font-bold border border-blue-500/30">
+                {upcomingAgentRdvCount} RDV Programmés
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Consultez vos tournées de recouvrement, importez des événements depuis Google Agenda et synchronisez vos acomptes.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setActiveModule('MOD-03')}
+          className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition flex items-center gap-2 shrink-0 cursor-pointer"
+        >
+          <Calendar className="w-4 h-4" />
+          <span>Ouvrir mon Google Agenda 2026</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Strict Isolation Notice */}
@@ -544,7 +594,19 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        onClick={() => {
+                          setReportingClosedEst(est);
+                          setClosedMotif("Cessation d'activité / Rideau de fer baissé");
+                          setClosedObservations("Constaté in situ lors de la convocation/tournée");
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 font-bold text-xs border border-rose-200 dark:border-rose-800 transition flex items-center gap-1.5 cursor-pointer"
+                        title="Signaler cet établissement comme fermé ou éteint"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Signaler Fermé</span>
+                      </button>
                       <button
                         onClick={() => handleOpenPaymentModal(est)}
                         className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
@@ -600,6 +662,12 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono">
                           Soldé • Conforme
                         </span>
+                        {est.estEteintOuFerme && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white font-mono flex items-center gap-1">
+                            <Ban className="w-3 h-3" />
+                            Éteint / Fermé
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
@@ -611,11 +679,25 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <span className="text-[11px] text-slate-500 block">Renouvellement Exercice N+1 :</span>
-                      <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {est.renouvellementAnnuelDate || 'Janvier 2027'}
-                      </span>
+                    <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                      <button
+                        onClick={() => {
+                          setReportingClosedEst(est);
+                          setClosedMotif("Cessation d'activité / Local abandonné");
+                          setClosedObservations("Constaté in situ : bien que soldé, l'établissement a cessé son activité");
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs border border-rose-200 dark:border-rose-800 transition flex items-center gap-1 cursor-pointer"
+                        title="Signaler la fermeture définitive"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Signaler Fermé</span>
+                      </button>
+                      <div className="text-right">
+                        <span className="text-[11px] text-slate-500 block">Renouvellement Exercice N+1 :</span>
+                        <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {est.renouvellementAnnuelDate || 'Janvier 2027'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -721,6 +803,28 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                           </div>
                         </div>
                       )}
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                        <button
+                          onClick={() => {
+                            setReportingClosedEst(est);
+                            setClosedMotif("Cessation d'activité / Local fermé");
+                            setClosedObservations("Constaté in situ lors du suivi d'acompte : portes closes, inoccupé.");
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs border border-rose-200 dark:border-rose-800 transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          <span>Signaler Fermé</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenPaymentModal(est)}
+                          className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Coins className="w-3.5 h-3.5" />
+                          <span>Encaisser Tranche Suivante</span>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -776,6 +880,12 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                             RDV Échu à régulariser
                           </span>
                         )}
+                        {est.estEteintOuFerme && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white font-mono flex items-center gap-1">
+                            <Ban className="w-3 h-3" />
+                            Éteint / Fermé
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400 flex-wrap">
@@ -792,7 +902,19 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        onClick={() => {
+                          setReportingClosedEst(est);
+                          setClosedMotif("Établissement constaté fermé au rendez-vous");
+                          setClosedObservations(`Visite du ${date} à ${heure} : local éteint/rideau de fer baissé`);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs border border-rose-200 dark:border-rose-800 transition flex items-center gap-1 cursor-pointer"
+                        title="Signaler la fermeture constatée lors du rendez-vous"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Signaler Fermé</span>
+                      </button>
                       <button
                         onClick={() => handleOpenPaymentModal(est)}
                         className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
@@ -875,7 +997,19 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        onClick={() => {
+                          setReportingClosedEst(est);
+                          setClosedMotif("Cessation d'activité définitive / Rideau baissé");
+                          setClosedObservations("Constaté in situ : établissement inactif");
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs border border-rose-200 dark:border-rose-800 transition flex items-center gap-1 cursor-pointer"
+                        title="Signaler la fermeture définitive"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Signaler Fermé</span>
+                      </button>
                       <button
                         onClick={() => handleOpenPaymentModal(est)}
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
@@ -1055,6 +1189,107 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL: SIGNALEMENT ÉTABLISSEMENT FERMÉ / ÉTEINT */}
+      {reportingClosedEst && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl relative space-y-4 ${
+            isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600">
+                  <Ban className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Constat : Établissement Fermé / Éteint
+                  </h3>
+                  <p className="text-xs text-slate-500">{reportingClosedEst.nomCommercial}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReportingClosedEst(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300 space-y-1">
+              <span className="font-bold">Actualisation Statistique Instantanée :</span>
+              <p className="text-[11px] leading-relaxed">
+                Le signalement reclassera ce dossier en contentieux/fermé, mettra à jour les diagrammes d'exploitation du cockpit et retirera la créance du prévisionnel actif.
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold block mb-1">Motif de la fermeture :</label>
+                <select
+                  value={closedMotif}
+                  onChange={(e) => setClosedMotif(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-xl border font-medium ${
+                    isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700'
+                  }`}
+                >
+                  <option value="Cessation d'activité définitive / Rideau baissé">Cessation d'activité définitive / Rideau baissé</option>
+                  <option value="Établissement éteint / Local inoccupé ou abandonné">Établissement éteint / Local inoccupé ou abandonné</option>
+                  <option value="Faillite ou insolvabilité du promoteur">Faillite ou insolvabilité du promoteur</option>
+                  <option value="Changement d'activité (hors secteur loisirs)">Changement d'activité (hors secteur loisirs)</option>
+                  <option value="Fermeture administrative par arrêté de police">Fermeture administrative par arrêté de police</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold block mb-1">Observations terrain de l'agent :</label>
+                <textarea
+                  value={closedObservations}
+                  onChange={(e) => setClosedObservations(e.target.value)}
+                  placeholder="Ex : Constaté in situ : enseigne déposée, local fermé, cadenas posé..."
+                  rows={3}
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setReportingClosedEst(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingClose}
+                  onClick={async () => {
+                    if (!reportingClosedEst) return;
+                    setIsSubmittingClose(true);
+                    try {
+                      await reportEstablishmentClosed({
+                        establishmentId: reportingClosedEst.id,
+                        motif: closedMotif,
+                        observations: closedObservations,
+                      });
+                      setReportingClosedEst(null);
+                    } catch (err: any) {
+                      showNotification('error', `Erreur: ${err.message}`);
+                    } finally {
+                      setIsSubmittingClose(false);
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isSubmittingClose ? 'Enregistrement...' : 'Confirmer Signalement (Fermé)'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

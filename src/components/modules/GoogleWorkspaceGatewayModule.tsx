@@ -26,6 +26,7 @@ export const GoogleWorkspaceGatewayModule: React.FC = () => {
     googleUser,
     googleAccessToken,
     handleGoogleSignIn,
+    setShowDomainAuthModal,
     establishments,
     receipts,
     schedules,
@@ -196,19 +197,28 @@ Pour le Directeur Départemental des Loisirs.`;
           </p>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
           {googleAccessToken ? (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs font-semibold">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>Connecté en tant que {googleUser?.email}</span>
             </div>
           ) : (
-            <button
-              onClick={handleGoogleSignIn}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg transition"
-            >
-              <span>Se connecter à Google Workspace</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleGoogleSignIn}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg transition cursor-pointer"
+              >
+                <span>Se connecter à Google Workspace</span>
+              </button>
+              <button
+                onClick={() => setShowDomainAuthModal(true)}
+                className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
+                title="Aide configuration domaine Firebase Authentication"
+              >
+                Aide Domaine Firebase
+              </button>
+            </div>
           )}
         </div>
       </div>

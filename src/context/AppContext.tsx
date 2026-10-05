@@ -9,6 +9,7 @@ import {
   AuditRecord,
   SoitTransmisDgl,
   UserRole,
+  ComplianceStatus,
 } from '../types';
 import {
   INITIAL_ESTABLISHMENTS,
@@ -21,6 +22,7 @@ import {
   INITIAL_SOIT_TRANSMIS,
 } from '../data/seedData';
 import { computeSha256, formatCfa } from '../services/crypto';
+import { parseGoogleCalendarEvent } from '../services/googleWorkspace';
 import {
   initAuth,
   googleSignIn,
@@ -63,6 +65,8 @@ interface AppContextType {
   handleGoogleSignIn: () => Promise<void>;
   handleLogout: () => Promise<void>;
   isSigningIn: boolean;
+  showDomainAuthModal: boolean;
+  setShowDomainAuthModal: (show: boolean) => void;
 
   // Centralized Master Collections
   establishments: Establishment[];
@@ -95,6 +99,19 @@ interface AppContextType {
 
   addAuditLog: (action: string, typeEntite: string, referenceId: string, details: string) => Promise<void>;
   createSoitTransmis: (bordereau: Omit<SoitTransmisDgl, 'id' | 'numeroBordereau'>) => Promise<SoitTransmisDgl>;
+
+  // Signalement Établissement Fermé / Éteint & Import Google Calendar
+  reportEstablishmentClosed: (params: {
+    establishmentId: string;
+    motif: string;
+    observations?: string;
+  }) => Promise<void>;
+  importFromGoogleCalendar: (rawEvents: any[]) => Promise<{
+    importedCount: number;
+    updatedCount: number;
+    acomptesCount: number;
+    totalEstablishmentsAfter: number;
+  }>;
 
   // Offline status & alerts
   isOnline: boolean;
@@ -182,6 +199,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState<boolean>(false);
+  const [showDomainAuthModal, setShowDomainAuthModal] = useState<boolean>(false);
+
+  // Helper to identify and purge any fictional demonstration data
+  const isFictionalItem = (name?: string, id?: string): boolean => {
+    if (!name && !id) return false;
+    const n = (name || '').toLowerCase();
+    const i = (id || '').toLowerCase();
+    return (
+      n.includes('le must vip lounge') ||
+      n.includes('symphonie des étoiles') ||
+      n.includes('privilège night') ||
+      n.includes('le belvédère') ||
+      n.includes('les palétuviers') ||
+      n.includes('oxygène parc') ||
+      n.includes('le corail') ||
+      i.startsWith('gcal-pn-2026-')
+    );
+  };
 
   // Network State
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
@@ -202,7 +237,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [establishments, setEstablishments] = useState<Establishment[]>(() => {
     try {
       const saved = localStorage.getItem('ddl_real_establishments_v4');
-      return saved ? JSON.parse(saved) : [];
+      const list: Establishment[] = saved ? JSON.parse(saved) : [];
+      return list.filter((e) => !isFictionalItem(e.nomCommercial, e.id));
     } catch {
       return [];
     }
@@ -211,7 +247,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [receipts, setReceipts] = useState<CashReceipt[]>(() => {
     try {
       const saved = localStorage.getItem('ddl_real_receipts_v4');
-      return saved ? JSON.parse(saved) : [];
+      const list: CashReceipt[] = saved ? JSON.parse(saved) : [];
+      return list.filter((r) => !isFictionalItem(r.etablissementNom, r.etablissementId));
     } catch {
       return [];
     }
@@ -229,7 +266,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [schedules, setSchedules] = useState<InspectionSchedule[]>(() => {
     try {
       const saved = localStorage.getItem('ddl_real_schedules_v4');
-      return saved ? JSON.parse(saved) : [];
+      const list: InspectionSchedule[] = saved ? JSON.parse(saved) : [];
+      return list.filter((s) => !isFictionalItem(s.etablissementNom, s.etablissementId));
     } catch {
       return [];
     }
@@ -390,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // One-time purge of old demonstration data from localStorage
+  // One-time purge of old demonstration data and fictional examples from localStorage
   useEffect(() => {
     try {
       localStorage.removeItem('ddl_establishments_v3');
@@ -399,6 +437,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('ddl_schedules_v3');
       localStorage.removeItem('ddl_audit_logs_v3');
       localStorage.removeItem('ddl_soit_transmis_v3');
+
+      // Purge any fictional sample establishments
+      setEstablishments((prev) => {
+        const clean = prev.filter((e) => !isFictionalItem(e.nomCommercial, e.id));
+        localStorage.setItem('ddl_real_establishments_v4', JSON.stringify(clean));
+        return clean;
+      });
+
+      // Purge any fictional receipts
+      setReceipts((prev) => {
+        const clean = prev.filter((r) => !isFictionalItem(r.etablissementNom, r.etablissementId));
+        localStorage.setItem('ddl_real_receipts_v4', JSON.stringify(clean));
+        return clean;
+      });
+
+      // Purge any fictional schedules
+      setSchedules((prev) => {
+        const clean = prev.filter((s) => !isFictionalItem(s.etablissementNom, s.etablissementId));
+        localStorage.setItem('ddl_real_schedules_v4', JSON.stringify(clean));
+        return clean;
+      });
     } catch (e) {
       console.warn("Storage cleanup:", e);
     }
@@ -538,7 +597,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showNotification('success', `Connecté avec succès : ${res.user.displayName || res.user.email}`);
       }
     } catch (err: any) {
-      showNotification('error', `Échec d'authentification Google: ${err.message || 'Erreur inconnue'}`);
+      console.error('Erreur Google Auth:', err);
+      const isUnauthorizedDomain =
+        err?.code === 'auth/unauthorized-domain' ||
+        err?.message?.includes('auth/unauthorized-domain') ||
+        err?.message?.includes('unauthorized-domain');
+
+      if (isUnauthorizedDomain) {
+        setShowDomainAuthModal(true);
+        showNotification(
+          'warning',
+          `Domaine non autorisé dans Firebase Auth (${typeof window !== 'undefined' ? window.location.hostname : 'Cloud'}). Consultez les instructions ou activez la session démo.`
+        );
+      } else {
+        showNotification('error', `Échec d'authentification Google: ${err.message || 'Erreur inconnue'}`);
+      }
     } finally {
       setIsSigningIn(false);
     }
@@ -931,6 +1004,219 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBT;
   };
 
+  const reportEstablishmentClosed = async (params: {
+    establishmentId: string;
+    motif: string;
+    observations?: string;
+  }) => {
+    const est = establishments.find((e) => e.id === params.establishmentId);
+    if (!est) return;
+
+    const dateToday = new Date().toISOString().substring(0, 10);
+    const agentName = currentAgent?.nomComplet || authenticatedUser?.nomComplet || 'Agent SAA';
+
+    const updates: Partial<Establishment> = {
+      statut: 'ferme_contentieux',
+      estEteintOuFerme: true,
+      dateConstatFermeture: dateToday,
+      motifFermeture: params.motif,
+      constateParAgentNom: agentName,
+      observationsFermeture: params.observations || 'Établissement constaté éteint lors de la mission de terrain',
+    };
+
+    await updateEstablishment(est.id, updates);
+
+    // Cancel pending schedules for this establishment
+    setSchedules((prev) =>
+      prev.map((s) =>
+        s.etablissementId === est.id && s.statut === 'planifie'
+          ? { ...s, statut: 'annule' as const, observations: `Constat de fermeture: ${params.motif}` }
+          : s
+      )
+    );
+
+    await addAuditLog(
+      'CONSTAT_ETABLISSEMENT_FERME_ETEINT',
+      'ESTABLISHMENT',
+      est.codeDossier,
+      `Signalement par ${agentName} : ${est.nomCommercial} (${est.arrondissement}) éteint/fermé (${params.motif}). Actualisation des statistiques d'exploitation.`
+    );
+
+    showNotification(
+      'warning',
+      `Établissement ${est.nomCommercial} signalé FERMÉ / ÉTEINT. Statut et statistiques actualisés.`
+    );
+  };
+
+  const importFromGoogleCalendar = async (rawEvents: any[]) => {
+    if (!rawEvents || rawEvents.length === 0) {
+      showNotification('warning', 'Aucun événement Google Calendar trouvé à importer.');
+      return { importedCount: 0, updatedCount: 0, acomptesCount: 0, totalEstablishmentsAfter: establishments.length };
+    }
+
+    let importedCount = 0;
+    let updatedCount = 0;
+    let acomptesCount = 0;
+
+    const agent = currentAgent || authenticatedUser;
+    const assignedAgentId = agent ? agent.id : (currentAgentId !== 'all' ? currentAgentId : 'stf-002');
+    const assignedAgentNom = agent ? agent.nomComplet : 'Jacques MATOKO';
+
+    for (const rawEvt of rawEvents) {
+      const parsed = parseGoogleCalendarEvent(rawEvt);
+      const cleanNom = parsed.nomCommercial.trim().toLowerCase();
+
+      // Check if already in database
+      const existing = establishments.find((e) =>
+        e.nomCommercial.trim().toLowerCase() === cleanNom ||
+        (cleanNom.length > 5 && e.nomCommercial.trim().toLowerCase().includes(cleanNom)) ||
+        (cleanNom.length > 5 && cleanNom.includes(e.nomCommercial.trim().toLowerCase()))
+      );
+
+      if (existing) {
+        // Update existing establishment with new appointment or advance
+        const updates: Partial<Establishment> = {
+          prochainRdvDate: parsed.prochainRdvDate,
+          prochainRdvHeure: parsed.prochainRdvHeure,
+          prochainRdvMotif: parsed.prochainRdvMotif,
+          derniereInspectionDate: parsed.prochainRdvDate,
+        };
+
+        if (parsed.estFerme) {
+          updates.estEteintOuFerme = true;
+          updates.statut = 'ferme_contentieux';
+          updates.motifFermeture = 'Signalé éteint via Google Agenda';
+          updates.dateConstatFermeture = parsed.prochainRdvDate;
+          updates.constateParAgentNom = assignedAgentNom;
+        }
+
+        if (parsed.montantAcompte > 0 && parsed.montantAcompte > (existing.montantEncaisse || 0)) {
+          const delta = parsed.montantAcompte - (existing.montantEncaisse || 0);
+          const newEncaisse = parsed.montantAcompte;
+          const newSolde = Math.max(0, existing.montantRedevanceAnnuelle - newEncaisse);
+          updates.montantEncaisse = newEncaisse;
+          updates.soldeRestantDu = newSolde;
+          updates.statut = newSolde === 0 ? 'en_regle' : 'attestation_provisoire';
+
+          // Add receipt
+          await addReceipt({
+            datePaiement: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
+            etablissementId: existing.id,
+            etablissementNom: existing.nomCommercial,
+            promoteurNom: existing.promoteurNom,
+            arrondissement: existing.arrondissement,
+            montantVerse: delta,
+            resteAPayer: newSolde,
+            modePaiement: 'especes',
+            inspecteurOuCaissier: assignedAgentNom,
+            agentId: assignedAgentId,
+            natureRecette: 'Forfait Informel SAA',
+          });
+          acomptesCount++;
+        }
+
+        await updateEstablishment(existing.id, updates);
+        updatedCount++;
+      } else {
+        // Create NEW Establishment -> GROWS THE GENERAL DATABASE!
+        const status: ComplianceStatus = parsed.estFerme
+          ? 'ferme_contentieux'
+          : (parsed.soldeRestantDu === 0 && parsed.montantAcompte > 0
+              ? 'en_regle'
+              : (parsed.montantAcompte > 0 ? 'attestation_provisoire' : 'mise_en_demeure'));
+
+        const newEst = await addEstablishment({
+          nomCommercial: parsed.nomCommercial,
+          promoteurNom: parsed.promoteurNom,
+          promoteurTelephone: parsed.promoteurTelephone,
+          promoteurEmail: '',
+          arrondissement: parsed.arrondissement,
+          quartier: parsed.quartier,
+          adresseExacte: parsed.adresseExacte,
+          categorie: parsed.categorie,
+          regimeFiscal: 'informel_forfaitaire',
+          surfaceM2: 80,
+          montantRedevanceAnnuelle: parsed.montantRedevanceAnnuelle,
+          montantEncaisse: parsed.montantAcompte,
+          soldeRestantDu: parsed.soldeRestantDu,
+          statut: status,
+          latitude: -4.78 + (Math.random() - 0.5) * 0.05,
+          longitude: 11.87 + (Math.random() - 0.5) * 0.05,
+          niveauDecibelsMoyen: 68,
+          limiteurInstalle: status === 'en_regle',
+          dateRecensement: parsed.prochainRdvDate,
+          recensePar: assignedAgentNom,
+          agentAssigneId: assignedAgentId,
+          agentAssigneNom: assignedAgentNom,
+          derniereInspectionDate: parsed.prochainRdvDate,
+          prochainRdvDate: parsed.prochainRdvDate,
+          prochainRdvHeure: parsed.prochainRdvHeure,
+          prochainRdvMotif: parsed.prochainRdvMotif,
+          estEteintOuFerme: parsed.estFerme,
+          motifFermeture: parsed.estFerme ? 'Constaté fermé lors de l\'import Google Agenda' : undefined,
+          dateConstatFermeture: parsed.estFerme ? parsed.prochainRdvDate : undefined,
+          constateParAgentNom: parsed.estFerme ? assignedAgentNom : undefined,
+        });
+
+        // Add receipt if acompte was recorded
+        if (parsed.montantAcompte > 0) {
+          await addReceipt({
+            datePaiement: parsed.prochainRdvDate,
+            etablissementId: newEst.id,
+            etablissementNom: newEst.nomCommercial,
+            promoteurNom: newEst.promoteurNom,
+            arrondissement: newEst.arrondissement,
+            montantVerse: parsed.montantAcompte,
+            resteAPayer: parsed.soldeRestantDu,
+            modePaiement: 'especes',
+            inspecteurOuCaissier: assignedAgentNom,
+            agentId: assignedAgentId,
+            natureRecette: 'Forfait Informel SAA',
+          });
+          acomptesCount++;
+        }
+
+        // Add schedule for field tour
+        await addSchedule({
+          etablissementId: newEst.id,
+          etablissementNom: newEst.nomCommercial,
+          arrondissement: newEst.arrondissement,
+          brigadeAssignee: `Brigade SAA - ${newEst.arrondissement}`,
+          dateTournee: parsed.prochainRdvDate,
+          heure: parsed.prochainRdvHeure,
+          typeMission: 'Recouvrement',
+          inspecteurChef: assignedAgentNom,
+          agentId: assignedAgentId,
+          statut: parsed.estFerme ? 'annule' : 'planifie',
+          notes: parsed.notes,
+        });
+
+        importedCount++;
+      }
+    }
+
+    const totalAfter = establishments.length + importedCount;
+
+    showNotification(
+      'success',
+      `Synchronisation Google Calendar réussie : ${importedCount} nouveaux établissements ajoutés, ${updatedCount} actualisés, ${acomptesCount} acomptes enregistrés.`
+    );
+
+    await addAuditLog(
+      'IMPORT_GOOGLE_CALENDAR_2026',
+      'CALENDAR',
+      `GCAL-${Date.now()}`,
+      `Importation et enrichissement de la base générale : +${importedCount} établissements, ${updatedCount} actualisés, ${acomptesCount} acomptes.`
+    );
+
+    return {
+      importedCount,
+      updatedCount,
+      acomptesCount,
+      totalEstablishmentsAfter: totalAfter,
+    };
+  };
+
   const syncOfflineQueue = () => {
     if (offlineQueue.length === 0) return;
     setEstablishments((prev) =>
@@ -972,6 +1258,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         handleGoogleSignIn,
         handleLogout,
         isSigningIn,
+        showDomainAuthModal,
+        setShowDomainAuthModal,
         establishments,
         visibleEstablishments,
         receipts,
@@ -989,6 +1277,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addSchedule,
         updateSchedule,
         recordPaymentAndScheduleNext,
+        reportEstablishmentClosed,
+        importFromGoogleCalendar,
         addAuditLog,
         createSoitTransmis,
         isOnline,

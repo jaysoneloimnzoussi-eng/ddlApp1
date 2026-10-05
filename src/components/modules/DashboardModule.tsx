@@ -38,6 +38,7 @@ import {
 import { formatCfa } from '../../services/crypto';
 import { Arrondissement, ComplianceStatus } from '../../types';
 import { D3ArrondissementChart } from '../dashboard/D3ArrondissementChart';
+import { AdvancedAdminAnalytics } from '../dashboard/AdvancedAdminAnalytics';
 import { CountdownTimer72h } from '../common/CountdownTimer72h';
 import { FieldAgentExclusiveDashboard } from './FieldAgentExclusiveDashboard';
 
@@ -576,6 +577,9 @@ export const DashboardModule: React.FC = () => {
           <div className="text-[11px] text-slate-500 mt-1">4 axes stratégiques sous contrôle</div>
         </div>
       </div>
+
+      {/* 4.B VISUALISATION ANALYTIQUE 3D DYNAMIQUE & DIAGRAMMES COMPLEXES */}
+      <AdvancedAdminAnalytics establishments={filteredEstablishments} receipts={filteredReceipts} />
 
       {/* 5. DIAGRAMMES DIVERS ET VARIABLES (LIGNE 1 : D3 ARRONDISSEMENTS + SUIVI PAR AGENT EXCLUSIF) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

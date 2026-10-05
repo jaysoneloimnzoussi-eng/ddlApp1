@@ -31,24 +31,38 @@ import {
   HelpCircle,
   Settings,
   MoreVertical,
+  Download,
+  CloudDownload,
+  Ban,
+  AlertOctagon,
+  Flame,
 } from 'lucide-react';
 import { InspectionSchedule, Establishment, CashReceipt } from '../../types';
-import { createGoogleCalendarEvent } from '../../services/googleWorkspace';
+import {
+  createGoogleCalendarEvent,
+  listGoogleCalendarEvents,
+  parseGoogleCalendarEvent,
+  ParsedGoogleCalendarEstablishment,
+} from '../../services/googleWorkspace';
 import { formatCfa } from '../../services/crypto';
 
 export const MobileAgentCalendarModule: React.FC = () => {
   const {
     visibleSchedules,
     visibleEstablishments,
+    establishments,
     currentAgent,
     currentAgentId,
     setCurrentAgentId,
     currentUserRole,
     staff,
     recordPaymentAndScheduleNext,
+    reportEstablishmentClosed,
+    importFromGoogleCalendar,
     googleUser,
     googleAccessToken,
     handleGoogleSignIn,
+    setShowDomainAuthModal,
     openPrintModal,
     showNotification,
     theme,
@@ -83,6 +97,19 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [createHeure, setCreateHeure] = useState<string>('10:00');
   const [createMotif, setCreateMotif] = useState<InspectionSchedule['typeMission']>('Recouvrement');
   const [createNotes, setCreateNotes] = useState<string>('Tournée de recouvrement SAA');
+
+  // Google Calendar 2026 Import Modal States
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [isLoadingImport, setIsLoadingImport] = useState<boolean>(false);
+  const [rawCalendarEvents, setRawCalendarEvents] = useState<any[]>([]);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [isExecutingImport, setIsExecutingImport] = useState<boolean>(false);
+
+  // Report Closed / Extinct Establishment Modal
+  const [reportingClosedEst, setReportingClosedEst] = useState<Establishment | null>(null);
+  const [closedMotif, setClosedMotif] = useState<string>('Cessation d\'activité définitive / Rideau baissé');
+  const [closedObservations, setClosedObservations] = useState<string>('');
+  const [isSubmittingClose, setIsSubmittingClose] = useState<boolean>(false);
 
   // Mini calendar helpers
   const monthNames = [
@@ -221,6 +248,110 @@ export const MobileAgentCalendarModule: React.FC = () => {
       showNotification('success', `Descente synchronisée avec succès dans votre Google Agenda officiel !`);
     } catch (err: any) {
       showNotification('error', `Erreur de synchronisation Google: ${err.message}`);
+    }
+  };
+
+  // Google Calendar 2026 Import Actions (Real Data ONLY)
+  const handleOpenImportModal = async () => {
+    if (!googleAccessToken) {
+      showNotification(
+        'warning',
+        'Veuillez d\'abord connecter votre compte Google pour importer vos événements réels depuis Google Agenda.'
+      );
+      handleGoogleSignIn();
+      return;
+    }
+
+    setIsImportModalOpen(true);
+    setIsLoadingImport(true);
+
+    try {
+      const events = await listGoogleCalendarEvents(googleAccessToken, {
+        timeMin: '2026-01-01T00:00:00Z',
+        timeMax: '2026-12-31T23:59:59Z',
+        maxResults: 250,
+      });
+
+      const validEvents = events || [];
+      setRawCalendarEvents(validEvents);
+      setSelectedIndices(new Set(validEvents.map((_, i) => i)));
+
+      if (validEvents.length === 0) {
+        showNotification(
+          'info',
+          'Aucun événement 2026 trouvé dans votre agenda Google réel. Vous pouvez créer vos tournées dans Google Agenda pour les importer.'
+        );
+      }
+    } catch (err: any) {
+      showNotification('error', `Erreur de chargement Google Agenda: ${err.message}`);
+      setRawCalendarEvents([]);
+      setSelectedIndices(new Set());
+    } finally {
+      setIsLoadingImport(false);
+    }
+  };
+
+  const handleToggleSelectIndex = (idx: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const handleSelectAllIndices = () => {
+    if (selectedIndices.size === rawCalendarEvents.length) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(rawCalendarEvents.map((_, i) => i)));
+    }
+  };
+
+  const handleExecuteImport = async () => {
+    if (selectedIndices.size === 0) {
+      showNotification('warning', 'Veuillez sélectionner au moins un événement à importer.');
+      return;
+    }
+
+    setIsExecutingImport(true);
+    try {
+      const eventsToImport = rawCalendarEvents.filter((_, i) => selectedIndices.has(i));
+      await importFromGoogleCalendar(eventsToImport);
+      setIsImportModalOpen(false);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de l'importation: ${err.message}`);
+    } finally {
+      setIsExecutingImport(false);
+    }
+  };
+
+  // Report Closed / Extinct Establishment
+  const handleReportClosedFromSchedule = (sch: InspectionSchedule) => {
+    const est = establishments.find((e) => e.id === sch.etablissementId) ||
+                visibleEstablishments.find((e) => e.id === sch.etablissementId);
+    if (est) {
+      setReportingClosedEst(est);
+      setClosedMotif('Cessation d\'activité constatée lors du rendez-vous');
+      setClosedObservations(`Rendez-vous du ${sch.dateTournee} : établissement constaté éteint/rideau de fer baissé.`);
+    }
+  };
+
+  const handleConfirmReportClosed = async () => {
+    if (!reportingClosedEst) return;
+    setIsSubmittingClose(true);
+    try {
+      await reportEstablishmentClosed({
+        establishmentId: reportingClosedEst.id,
+        motif: closedMotif,
+        observations: closedObservations,
+      });
+      setReportingClosedEst(null);
+      setSelectedSchedule(null);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors du signalement: ${err.message}`);
+    } finally {
+      setIsSubmittingClose(false);
     }
   };
 
@@ -436,19 +567,39 @@ export const MobileAgentCalendarModule: React.FC = () => {
               <span className="font-semibold truncate max-w-[140px]">{googleUser.email}</span>
             </div>
           ) : (
-            <button
-              onClick={handleGoogleSignIn}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow shadow-sm text-slate-700 dark:text-slate-200 transition"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-              </svg>
-              <span>Connecter mon Google Agenda</span>
-            </button>
+            <div className="hidden sm:flex items-center gap-1.5">
+              <button
+                onClick={handleGoogleSignIn}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow shadow-sm text-slate-700 dark:text-slate-200 transition cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                </svg>
+                <span>Connecter mon Google Agenda</span>
+              </button>
+              <button
+                onClick={() => setShowDomainAuthModal(true)}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-200 border border-slate-200 dark:border-slate-700 transition"
+                title="Aide domaine Firebase ou Mode Démo Google"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
+
+          {/* Import Google Calendar 2026 Button */}
+          <button
+            onClick={handleOpenImportModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md hover:shadow-lg transition cursor-pointer"
+            title="Importer les événements, établissements et acomptes de Google Agenda"
+          >
+            <CloudDownload className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Importer Google Agenda 2026</span>
+            <span className="sm:hidden">Import G-Agenda</span>
+          </button>
 
           {/* View switcher dropdown */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold">
@@ -490,6 +641,15 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 </svg>
               </div>
               <span>Programmer une descente</span>
+            </button>
+
+            {/* Quick Import Google Calendar 2026 */}
+            <button
+              onClick={handleOpenImportModal}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold text-xs hover:bg-blue-100 dark:hover:bg-blue-900/40 transition w-full shadow-sm cursor-pointer"
+            >
+              <CloudDownload className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span>Importer Google Agenda (+Base)</span>
             </button>
 
             {/* Mini Calendar Month Picker */}
@@ -1074,26 +1234,38 @@ export const MobileAgentCalendarModule: React.FC = () => {
               })()}
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-800 flex-wrap">
                 <button
-                  onClick={() => handleSyncSingleEventToGoogle(selectedSchedule)}
-                  className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => handleReportClosedFromSchedule(selectedSchedule)}
+                  className="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                  title="Signaler la fermeture ou la cessation d'activité de cet établissement"
                 >
-                  <Cloud className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Sync Google</span>
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Signaler Établissement Fermé / Éteint</span>
                 </button>
 
-                {selectedSchedule.statut !== 'effectue' && (
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      handleOpenPaymentFromSchedule(selectedSchedule);
-                    }}
-                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5"
+                    onClick={() => handleSyncSingleEventToGoogle(selectedSchedule)}
+                    className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"
                   >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Encaisser & Reprogrammer</span>
+                    <Cloud className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Sync Google</span>
                   </button>
-                )}
+
+                  {selectedSchedule.statut !== 'effectue' && (
+                    <button
+                      onClick={() => {
+                        handleOpenPaymentFromSchedule(selectedSchedule);
+                      }}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>Encaisser & Reprogrammer</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1350,6 +1522,267 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. MODAL: IMPORT GOOGLE AGENDA 2026 (ENRICHISSEMENT DE LA BASE GÉNÉRALE) */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 p-4 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  <CloudDownload className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Passerelle Google Agenda ➔ Base Générale Souveraine</h3>
+                  <p className="text-xs text-blue-100">
+                    Importation automatique des établissements, acomptes perçus et prochains RDV 2026
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1 rounded-full hover:bg-white/20 text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-slate-700 dark:text-slate-300 space-y-1">
+                <div className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Enrichissement de la base territoriale :</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  L'importation de ces événements analyse vos fiches d'agenda, détecte les versements d'acomptes et crée automatiquement de nouveaux dossiers d'établissements dans la base générale départementale si ceux-ci n'existent pas encore.
+                </p>
+              </div>
+
+              {/* Status bar */}
+              <div className="flex items-center justify-between py-1 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">
+                    {rawCalendarEvents.length} Événement(s) Détecté(s)
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold">
+                    {selectedIndices.size} sélectionné(s)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSelectAllIndices}
+                  className="text-xs text-blue-600 hover:underline font-semibold"
+                >
+                  {selectedIndices.size === rawCalendarEvents.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </button>
+              </div>
+
+              {/* List of events to import */}
+              {isLoadingImport ? (
+                <div className="p-8 text-center space-y-2">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-xs text-slate-500">Interrogation de Google Agenda en cours...</p>
+                </div>
+              ) : rawCalendarEvents.length === 0 ? (
+                <div className="p-8 text-center space-y-2">
+                  <Calendar className="w-8 h-8 text-slate-400 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Aucun événement 2026 trouvé dans votre Google Agenda réel ({googleUser?.email || 'compte connecté'}).
+                  </p>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                    Créez des événements ou rendez-vous dans votre Google Agenda officiel, puis relancez l'importation pour actualiser automatiquement la base générale.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {rawCalendarEvents.map((evt, idx) => {
+                    const parsed = parseGoogleCalendarEvent(evt);
+                    const isSelected = selectedIndices.has(idx);
+
+                    return (
+                      <div
+                        key={evt.id || idx}
+                        onClick={() => handleToggleSelectIndex(idx)}
+                        className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? isLight
+                              ? 'bg-blue-50/70 border-blue-300'
+                              : 'bg-blue-950/30 border-blue-600'
+                            : isLight
+                            ? 'bg-slate-50 border-slate-200 opacity-60'
+                            : 'bg-slate-900 border-slate-800 opacity-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded accent-blue-600 w-4 h-4"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                                {parsed.nomCommercial}
+                              </span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
+                                {parsed.arrondissement}
+                              </span>
+                              {parsed.estFerme ? (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-500">
+                                  Constaté Éteint / Fermé
+                                </span>
+                              ) : parsed.montantAcompte > 0 ? (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600">
+                                  Acompte Versé : {formatCfa(parsed.montantAcompte)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-3">
+                              <span>Promoteur: {parsed.promoteurNom}</span>
+                              <span>•</span>
+                              <span>Prochain RDV : <strong>{parsed.prochainRdvDate} ({parsed.prochainRdvHeure})</strong></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {formatCfa(parsed.montantRedevanceAnnuelle)}
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            Reliquat : {formatCfa(parsed.soldeRestantDu)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950 shrink-0">
+              <span className="text-xs text-slate-500 font-mono">
+                Base actuelle : {establishments.length} établissements recensés
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Fermer
+                </button>
+                <button
+                  type="button"
+                  disabled={isExecutingImport || selectedIndices.size === 0}
+                  onClick={handleExecuteImport}
+                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isExecutingImport ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Synchronisation de la base...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CloudDownload className="w-4 h-4" />
+                      <span>Intégrer à la Base Générale ({selectedIndices.size})</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL: SIGNALER ÉTABLISSEMENT FERMÉ / ÉTEINT (STATISTIQUES DE TERRAIN) */}
+      {reportingClosedEst && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+            isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            <div className="bg-rose-600 p-4 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Ban className="w-5 h-5 text-white" />
+                <div>
+                  <h3 className="font-bold text-sm">Constat de Cessation / Établissement Éteint</h3>
+                  <p className="text-xs text-rose-100 truncate">{reportingClosedEst.nomCommercial}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReportingClosedEst(null)}
+                className="p-1 rounded-full hover:bg-rose-700 text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-slate-700 dark:text-slate-300 space-y-1">
+                <span className="font-bold text-rose-700 dark:text-rose-400">Impact Statistique & Juridique :</span>
+                <p className="text-[11px] leading-relaxed">
+                  Cet établissement sera immédiatement classé comme <strong>inactif / éteint</strong> dans le dashboard de l'administrateur, annulant les convocations en cours et retirant la redevance du prévisionnel actif.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  Motif du constat de fermeture :
+                </label>
+                <select
+                  value={closedMotif}
+                  onChange={(e) => setClosedMotif(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
+                >
+                  <option value="Cessation d'activité définitive / Rideau baissé">Cessation d'activité définitive / Rideau baissé</option>
+                  <option value="Établissement éteint / Local inoccupé ou abandonné">Établissement éteint / Local inoccupé ou abandonné</option>
+                  <option value="Faillite ou insolvabilité avérée du promoteur">Faillite ou insolvabilité avérée du promoteur</option>
+                  <option value="Changement d'activité non déclaré (hors secteur loisirs)">Changement d'activité non déclaré (hors secteur loisirs)</option>
+                  <option value="Fermeture administrative par arrêté de police">Fermeture administrative par arrêté de police</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  Observations de terrain de l'agent :
+                </label>
+                <textarea
+                  value={closedObservations}
+                  onChange={(e) => setClosedObservations(e.target.value)}
+                  placeholder="Ex : Constaté in situ lors de la tournée : enseigne déposée, portes cadenassées, promoteur injoignable..."
+                  rows={3}
+                  className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReportingClosedEst(null)}
+                  className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingClose}
+                  onClick={handleConfirmReportClosed}
+                  className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-1.5"
+                >
+                  {isSubmittingClose ? 'Enregistrement...' : 'Valider le Signalement (Fermé)'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

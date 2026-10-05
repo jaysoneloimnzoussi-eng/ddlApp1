@@ -84,6 +84,13 @@ export interface Establishment {
   premierAcompteDate?: string;
   renouvellementAnnuelDate?: string;
   anneeExercice: number;
+
+  // Signalement Fermeture / Établissement Éteint
+  estEteintOuFerme?: boolean;
+  dateConstatFermeture?: string;
+  motifFermeture?: string;
+  constateParAgentNom?: string;
+  observationsFermeture?: string;
 }
 
 export interface CashReceipt {
