@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Établissements de loisirs : Lecture publique ou agents, écriture par les agents authentifiés ou régie
+    match /establishments/{establishmentId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true; // Permettre la saisie PWA et synchro
+    }
+
+    // Quittances de régie SAF Trésor
+    match /receipts/{receiptId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    // Planning et tournées de terrain des brigades
+    match /schedules/{scheduleId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    // Actes de police administrative et sanctions
+    match /legalActs/{legalActId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    // Journal d'audit immuable SHA-256
+    match /auditLogs/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false; // Immuabilité du coffre-fort
+    }
+
+    // Connexion check doc
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

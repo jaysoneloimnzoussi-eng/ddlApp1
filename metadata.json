@@ -1,0 +1,8 @@
+{
+  "name": "DDL-PN Sovereign Enterprise v3.0",
+  "description": "Direction Départementale des Loisirs de Pointe-Noire (MCAPNIT / DGL) - Système Souverain de Gestion Territoriale, Recensement Mobile, Régie Financière, Police Administrative et Cartographie SIG.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "Establishment": {
+      "title": "Establishment",
+      "description": "Fiche technique d'un établissement de loisirs recensé dans le département de Pointe-Noire",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "codeDossier": { "type": "string" },
+        "nomCommercial": { "type": "string" },
+        "promoteurNom": { "type": "string" },
+        "promoteurTelephone": { "type": "string" },
+        "promoteurEmail": { "type": "string" },
+        "arrondissement": {
+          "type": "string",
+          "enum": ["Lumumba", "Mvou-Mvou", "Tié-Tié", "Loandjili", "Mongo-Mpoukou", "Ngoyo"]
+        },
+        "quartier": { "type": "string" },
+        "adresseExacte": { "type": "string" },
+        "categorie": { "type": "string" },
+        "regimeFiscal": { "type": "string", "enum": ["informel_forfaitaire", "formel_proportionnel"] },
+        "surfaceM2": { "type": "number" },
+        "montantRedevanceAnnuelle": { "type": "number" },
+        "montantEncaisse": { "type": "number" },
+        "soldeRestantDu": { "type": "number" },
+        "statut": {
+          "type": "string",
+          "enum": ["en_regle", "attestation_provisoire", "mise_en_demeure", "ferme_contentieux"]
+        },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "niveauDecibelsMoyen": { "type": "number" },
+        "limiteurInstalle": { "type": "boolean" },
+        "dateRecensement": { "type": "string" },
+        "recensePar": { "type": "string" },
+        "agentAssigneId": { "type": "string" },
+        "agentAssigneNom": { "type": "string" },
+        "premierAcompteDate": { "type": "string" },
+        "renouvellementAnnuelDate": { "type": "string" },
+        "anneeExercice": { "type": "number" }
+      },
+      "required": ["nomCommercial", "promoteurNom", "arrondissement", "montantRedevanceAnnuelle", "agentAssigneId"]
+    },
+    "CashReceipt": {
+      "title": "CashReceipt",
+      "description": "Quittance officielle de versement au Trésor Public",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "numeroQuittance": { "type": "string" },
+        "datePaiement": { "type": "string" },
+        "etablissementId": { "type": "string" },
+        "etablissementNom": { "type": "string" },
+        "promoteurNom": { "type": "string" },
+        "arrondissement": { "type": "string" },
+        "montantVerse": { "type": "number" },
+        "resteAPayer": { "type": "number" },
+        "modePaiement": { "type": "string" },
+        "referenceTransaction": { "type": "string" },
+        "inspecteurOuCaissier": { "type": "string" },
+        "agentId": { "type": "string" },
+        "natureRecette": { "type": "string" },
+        "quittanceHash": { "type": "string" }
+      },
+      "required": ["numeroQuittance", "datePaiement", "etablissementId", "montantVerse"]
+    },
+    "InspectionSchedule": {
+      "title": "InspectionSchedule",
+      "description": "Rendez-vous et tournée d'inspection planifiée sur le terrain",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "dateTournee": { "type": "string" },
+        "heure": { "type": "string" },
+        "etablissementId": { "type": "string" },
+        "etablissementNom": { "type": "string" },
+        "arrondissement": { "type": "string" },
+        "brigadeAssignee": { "type": "string" },
+        "inspecteurChef": { "type": "string" },
+        "agentId": { "type": "string" },
+        "typeMission": { "type": "string" },
+        "statut": { "type": "string", "enum": ["planifie", "en_cours", "effectue", "annule"] },
+        "notes": { "type": "string" },
+        "montantAcompteAttendu": { "type": "number" }
+      },
+      "required": ["dateTournee", "heure", "etablissementId", "agentId", "typeMission", "statut"]
+    },
+    "LegalAct": {
+      "title": "LegalAct",
+      "description": "Acte solennel d'autorité administrative ou sanction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["mise_en_demeure", "arrete_fermeture", "pv_sonometrie", "ordre_mission"] },
+        "referenceNumero": { "type": "string" },
+        "dateEmission": { "type": "string" },
+        "etablissementId": { "type": "string" },
+        "etablissementNom": { "type": "string" },
+        "motifs": { "type": "string" },
+        "delaiHeures": { "type": "number" },
+        "expireAt": { "type": "string" },
+        "statutExecution": { "type": "string" },
+        "documentHash": { "type": "string" }
+      },
+      "required": ["type", "referenceNumero", "etablissementId", "motifs"]
+    },
+    "AuditRecord": {
+      "title": "AuditRecord",
+      "description": "Journal d'audit certifié SHA-256",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "agentNom": { "type": "string" },
+        "action": { "type": "string" },
+        "typeEntite": { "type": "string" },
+        "referenceId": { "type": "string" },
+        "details": { "type": "string" },
+        "hashSha256": { "type": "string" }
+      },
+      "required": ["timestamp", "agentNom", "action", "hashSha256"]
+    }
+  },
+  "firestore": {
+    "/establishments/{establishmentId}": {
+      "schema": { "$ref": "#/entities/Establishment" },
+      "description": "Collection centrale des établissements recensés à Pointe-Noire"
+    },
+    "/receipts/{receiptId}": {
+      "schema": { "$ref": "#/entities/CashReceipt" },
+      "description": "Registre des quittances officielles SAF Trésor Public"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/InspectionSchedule" },
+      "description": "Planning et tournées de recouvrement des inspecteurs SAA"
+    },
+    "/legalActs/{legalActId}": {
+      "schema": { "$ref": "#/entities/LegalAct" },
+      "description": "Actes de police administrative, arrêtés de fermeture et mises en demeure"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditRecord" },
+      "description": "Journal d'audit immuable certifié SHA-256"
+    }
+  }
+}
