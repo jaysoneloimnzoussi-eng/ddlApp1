@@ -36,12 +36,19 @@ const app = !getApps().length ? initializeApp(activeFirebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db: Firestore = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
 
-// Provider with requested Google Workspace scopes
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
-googleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
-googleProvider.addScope('https://www.googleapis.com/auth/documents');
+// Standard Google Provider (Profile & Email - Accessible à tous sans blocage 403)
+export const standardGoogleProvider = new GoogleAuthProvider();
+standardGoogleProvider.addScope('profile');
+standardGoogleProvider.addScope('email');
+
+// Extended Workspace Provider (Agenda, Gmail, Docs - Requiert l'ajout en Test User)
+export const workspaceGoogleProvider = new GoogleAuthProvider();
+workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
+workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
+workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/documents');
+
+export const googleProvider = standardGoogleProvider;
 
 // Test Connection to Firestore
 export enum OperationType {

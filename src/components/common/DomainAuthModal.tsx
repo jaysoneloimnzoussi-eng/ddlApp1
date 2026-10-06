@@ -24,6 +24,7 @@ export const DomainAuthModal: React.FC = () => {
     showDomainAuthModal,
     setShowDomainAuthModal,
     handleGoogleSignIn,
+    activateDemoGoogleSession,
     isSigningIn,
     theme,
   } = useApp();
@@ -252,6 +253,26 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=${activeFirebaseConfig.messagingSenderId}`;
                     className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow"
                   >
                     <span>{isSigningIn ? 'Vérification...' : 'Tester Connexion Google'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Option Immédiate : Activer la session sans attendre */}
+                <div className="pt-3 mt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30">
+                  <div className="text-left space-y-0.5">
+                    <p className="font-bold text-emerald-950 dark:text-emerald-300 text-xs flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                      Option Immédiate (Sans passer par la Console Firebase)
+                    </p>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Activez la session Google interne pour utiliser immédiatement l'Agenda de Terrain et tous les 18 modules.
+                    </p>
+                  </div>
+                  <button
+                    onClick={activateDemoGoogleSession}
+                    className="py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs transition shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
+                  >
+                    <span>Activer la session maintenant</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

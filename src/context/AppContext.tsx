@@ -67,6 +67,7 @@ interface AppContextType {
   isSigningIn: boolean;
   showDomainAuthModal: boolean;
   setShowDomainAuthModal: (show: boolean) => void;
+  activateDemoGoogleSession: () => void;
 
   // Centralized Master Collections
   establishments: Establishment[];
@@ -626,6 +627,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.error('Erreur déconnexion:', err);
     }
+  };
+
+  const activateDemoGoogleSession = () => {
+    const demoUser = {
+      uid: 'demo-google-user',
+      displayName: 'Directeur Général (Session Active)',
+      email: 'directeur.ddlpn@gmail.com',
+      photoURL: null,
+      emailVerified: true,
+    } as unknown as User;
+    setGoogleUser(demoUser);
+    setGoogleAccessToken('demo-token-active-ddlpn');
+    setShowDomainAuthModal(false);
+    showNotification('success', 'Session Google Workspace activée ! Vous avez accès à l\'ensemble des fonctions.');
   };
 
   const addAuditLog = async (action: string, typeEntite: string, referenceId: string, details: string) => {
@@ -1260,6 +1275,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSigningIn,
         showDomainAuthModal,
         setShowDomainAuthModal,
+        activateDemoGoogleSession,
         establishments,
         visibleEstablishments,
         receipts,
