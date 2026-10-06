@@ -6,6 +6,85 @@ export type Arrondissement =
   | 'Mongo-Mpoukou'
   | 'Ngoyo';
 
+export const QUARTIERS_PAR_ARRONDISSEMENT: Record<Arrondissement, string[]> = {
+  Lumumba: [
+    'Centre-Ville Administratif',
+    'Plateau',
+    'Côte Sauvage',
+    'Losange',
+    'KM 4 (Kilomètre 4)',
+    'Zone Portuaire / Wharf',
+    'Quartier Chic',
+    'Grand Marché',
+    'Tchicamba',
+    'Autre quartier (Lumumba)',
+  ],
+  'Mvou-Mvou': [
+    'Mvou-Mvou Centre',
+    'Mawata',
+    'OCH (Office Congolais de l\'Habitat)',
+    'Quartier 204',
+    'Quartier 205',
+    'Nkouikou',
+    'Saint-Pierre',
+    'La Glacière',
+    'Marché Central Mvou-Mvou',
+    'Autre quartier (Mvou-Mvou)',
+  ],
+  'Tié-Tié': [
+    'Tié-Tié Centre',
+    'Fond Tié-Tié',
+    'Mbota',
+    'Cité des 100 Maisons',
+    'Marché Tié-Tié',
+    'Quartier Rex',
+    'Songolo Ouest',
+    'Casis',
+    'Quartier 305',
+    'Quartier 306',
+    'Autre quartier (Tié-Tié)',
+  ],
+  Loandjili: [
+    'Loandjili Centre',
+    'Vindoulou',
+    'Mpaka',
+    'Mongo-Kamba',
+    'Faubourg',
+    'Nkayi-Bouanga',
+    'Siafoumou',
+    'Quartier 401',
+    'Quartier 402',
+    'Quartier 411',
+    'Autre quartier (Loandjili)',
+  ],
+  'Mongo-Mpoukou': [
+    'Mongo-Mpoukou Centre',
+    'Makayabou',
+    'Tchinambi 1',
+    'Koufoli',
+    'Coraf',
+    'Mayinga',
+    'Côte Matève Ouest',
+    'Camp Militaire',
+    'Quartier 501',
+    'Quartier 502',
+    'Autre quartier (Mongo-Mpoukou)',
+  ],
+  Ngoyo: [
+    'Ngoyo Centre',
+    'Côte Matève',
+    'Patra',
+    'Tchimbamba',
+    'Route de Djéno',
+    'Quartier Péage',
+    'Loubi',
+    'Tchiniambi 2',
+    'Quartier 601',
+    'Quartier 602',
+    'Autre quartier (Ngoyo)',
+  ],
+};
+
 export type EstablishmentCategory =
   | 'Discothèque / Night-club'
   | 'Bar Dancing / Cabaret'
@@ -75,7 +154,7 @@ export interface Establishment {
   syncStatus?: 'synced' | 'pending';
 
   // Historique dynamique des acomptes & tournées
-  historiquePaiements: PaymentHistoryItem[];
+  historiquePaiements?: PaymentHistoryItem[];
   prochainRdvDate?: string;
   prochainRdvHeure?: string;
   prochainRdvMotif?: string;
@@ -83,7 +162,7 @@ export interface Establishment {
   // Reconduction / Renouvellement Annuel (Exercice N+1)
   premierAcompteDate?: string;
   renouvellementAnnuelDate?: string;
-  anneeExercice: number;
+  anneeExercice?: number;
 
   // Signalement Fermeture / Établissement Éteint
   estEteintOuFerme?: boolean;
@@ -182,6 +261,8 @@ export interface StaffPersonnel {
   photoUrl?: string;
   calendarColor?: string; // Couleur agenda Google
   pin?: string;           // Code PIN confidentiel (ex: '2026')
+  loginId?: string;       // Identifiant unique de connexion (ex: 'matoko.j')
+  password?: string;      // Mot de passe confidentiel de l'agent
 }
 
 export interface AuditRecord {

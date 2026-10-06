@@ -37,7 +37,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
-import { Arrondissement, ComplianceStatus } from '../../types';
+import { Arrondissement, ComplianceStatus, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
 import { D3ArrondissementChart } from '../dashboard/D3ArrondissementChart';
 import { AdvancedAdminAnalytics } from '../dashboard/AdvancedAdminAnalytics';
 import { CountdownTimer72h } from '../common/CountdownTimer72h';
@@ -66,6 +66,7 @@ export const DashboardModule: React.FC = () => {
 
   // Filters for dynamic diagrams
   const [selectedArrondissement, setSelectedArrondissement] = useState<string>('all');
+  const [selectedQuartier, setSelectedQuartier] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [selectedStatut, setSelectedStatut] = useState<string>('all');
 
@@ -75,11 +76,14 @@ export const DashboardModule: React.FC = () => {
   const filteredEstablishments = useMemo(() => {
     return baseEstablishments.filter((est) => {
       const matchArr = selectedArrondissement === 'all' || est.arrondissement === selectedArrondissement;
+      const matchQuartier =
+        selectedQuartier === 'all' ||
+        (est.quartier && est.quartier.toLowerCase().includes(selectedQuartier.toLowerCase()));
       const matchAgent = selectedAgent === 'all' || est.agentAssigneId === selectedAgent;
       const matchStatut = selectedStatut === 'all' || est.statut === selectedStatut;
-      return matchArr && matchAgent && matchStatut;
+      return matchArr && matchQuartier && matchAgent && matchStatut;
     });
-  }, [baseEstablishments, selectedArrondissement, selectedAgent, selectedStatut]);
+  }, [baseEstablishments, selectedArrondissement, selectedQuartier, selectedAgent, selectedStatut]);
 
   // Centralized filtered receipts
   const filteredReceipts = useMemo(() => {
@@ -94,9 +98,15 @@ export const DashboardModule: React.FC = () => {
     return baseReceipts.filter((rec) => {
       const matchArr = selectedArrondissement === 'all' || rec.arrondissement === selectedArrondissement;
       const matchAgent = selectedAgent === 'all' || rec.agentId === selectedAgent;
-      return matchArr && matchAgent;
+      // Filter by quartier if establishment is linked
+      let matchQuartier = true;
+      if (selectedQuartier !== 'all') {
+        const est = baseEstablishments.find((e) => e.id === rec.etablissementId);
+        matchQuartier = !!(est?.quartier && est.quartier.toLowerCase().includes(selectedQuartier.toLowerCase()));
+      }
+      return matchArr && matchQuartier && matchAgent;
     });
-  }, [receipts, selectedArrondissement, selectedAgent, isFieldAgent, currentAgentId, authenticatedUser]);
+  }, [receipts, selectedArrondissement, selectedQuartier, selectedAgent, isFieldAgent, currentAgentId, authenticatedUser, baseEstablishments]);
 
   // Dynamic Metrics
   const totalRecettes = filteredReceipts.reduce((acc, r) => acc + r.montantVerse, 0);
@@ -121,6 +131,43 @@ export const DashboardModule: React.FC = () => {
     'Mongo-Mpoukou',
     'Ngoyo',
   ];
+
+  // Statistiques locales détaillées par quartier
+  const statsParQuartier = useMemo(() => {
+    const listQuartiers =
+      selectedArrondissement !== 'all'
+        ? QUARTIERS_PAR_ARRONDISSEMENT[selectedArrondissement as Arrondissement] || []
+        : Array.from(new Set(establishments.map((e) => e.quartier).filter(Boolean)));
+
+    return listQuartiers
+      .map((q) => {
+        const etabs = establishments.filter((e) => {
+          const matchArr = selectedArrondissement === 'all' || e.arrondissement === selectedArrondissement;
+          const matchQ = e.quartier && e.quartier.toLowerCase().includes(q.toLowerCase());
+          return matchArr && matchQ;
+        });
+        const enRegle = etabs.filter((e) => e.statut === 'en_regle').length;
+        const infractions = etabs.filter(
+          (e) => e.statut === 'mise_en_demeure' || e.statut === 'ferme_contentieux'
+        ).length;
+        const totalRecettesQuartier = receipts
+          .filter((r) => {
+            const matchedEst = establishments.find((e) => e.id === r.etablissementId);
+            return matchedEst && matchedEst.quartier && matchedEst.quartier.toLowerCase().includes(q.toLowerCase());
+          })
+          .reduce((sum, r) => sum + r.montantVerse, 0);
+
+        return {
+          nom: q,
+          nombreEtabs: etabs.length,
+          enRegle,
+          infractions,
+          totalRecettesQuartier,
+        };
+      })
+      .filter((q) => q.nombreEtabs > 0 || selectedArrondissement !== 'all')
+      .sort((a, b) => b.nombreEtabs - a.nombreEtabs);
+  }, [establishments, receipts, selectedArrondissement]);
 
   const statsParArrondissement = arrondissements.map((arr) => {
     const etabs = establishments.filter((e) => e.arrondissement === arr);
@@ -410,13 +457,17 @@ export const DashboardModule: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1 max-w-3xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1 max-w-4xl">
           {/* Arrondissement */}
           <div className="flex items-center gap-1.5">
             <label className="text-[11px] text-slate-500 shrink-0 font-medium">Arrondissement :</label>
             <select
               value={selectedArrondissement}
-              onChange={(e) => setSelectedArrondissement(e.target.value)}
+              onChange={(e) => {
+                const nextArr = e.target.value;
+                setSelectedArrondissement(nextArr);
+                setSelectedQuartier('all');
+              }}
               className={`w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border focus:outline-none ${
                 isLight
                   ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-emerald-500'
@@ -430,9 +481,33 @@ export const DashboardModule: React.FC = () => {
             </select>
           </div>
 
+          {/* Quartier (Liste déroulante statistique) */}
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] text-slate-500 shrink-0 font-medium">Quartier :</label>
+            <select
+              value={selectedQuartier}
+              onChange={(e) => setSelectedQuartier(e.target.value)}
+              className={`w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border focus:outline-none ${
+                isLight
+                  ? 'bg-slate-50 border-slate-300 text-slate-800 focus:border-emerald-500'
+                  : 'bg-slate-950 border-slate-700 text-slate-200 focus:border-emerald-400'
+              }`}
+            >
+              <option value="all">
+                {selectedArrondissement === 'all' ? 'Tous les quartiers' : `Tous les quartiers (${selectedArrondissement})`}
+              </option>
+              {(selectedArrondissement !== 'all'
+                ? QUARTIERS_PAR_ARRONDISSEMENT[selectedArrondissement as Arrondissement] || []
+                : Array.from(new Set(Object.values(QUARTIERS_PAR_ARRONDISSEMENT).flat()))
+              ).map((q) => (
+                <option key={q} value={q}>{q}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Agent Responsable */}
           <div className="flex items-center gap-1.5">
-            <label className="text-[11px] text-slate-500 shrink-0 font-medium">Agent exclusif :</label>
+            <label className="text-[11px] text-slate-500 shrink-0 font-medium">Agent :</label>
             <select
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
@@ -463,17 +538,18 @@ export const DashboardModule: React.FC = () => {
             >
               <option value="all">Tous les statuts</option>
               <option value="en_regle">En règle (Soldé)</option>
-              <option value="attestation_provisoire">Attestation provisoire (Acompte en cours)</option>
+              <option value="attestation_provisoire">Attestation provisoire (Dépôt validé)</option>
               <option value="mise_en_demeure">Sous mise en demeure (72h)</option>
               <option value="ferme_contentieux">Fermeture administrative</option>
             </select>
           </div>
         </div>
 
-        {(selectedArrondissement !== 'all' || selectedAgent !== 'all' || selectedStatut !== 'all') && (
+        {(selectedArrondissement !== 'all' || selectedQuartier !== 'all' || selectedAgent !== 'all' || selectedStatut !== 'all') && (
           <button
             onClick={() => {
               setSelectedArrondissement('all');
+              setSelectedQuartier('all');
               setSelectedAgent('all');
               setSelectedStatut('all');
             }}
@@ -810,6 +886,60 @@ export const DashboardModule: React.FC = () => {
               ))
             )}
           </div>
+        </div>
+      </div>
+
+      {/* 7. TABLEAU STATISTIQUE DES QUARTIERS DE LA VILLE */}
+      <div className={`border rounded-xl p-5 shadow-sm space-y-4 transition ${
+        isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="text-xs md:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
+              6. Ventilation Statistique par Quartier {selectedArrondissement !== 'all' ? `(${selectedArrondissement})` : '(Vue Globale Pointe-Noire)'}
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-bold">
+            {statsParQuartier.length} Quartier(s) Répertorié(s)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {statsParQuartier.map((q) => (
+            <div
+              key={q.nom}
+              onClick={() => setSelectedQuartier(q.nom)}
+              className={`p-3 rounded-lg border text-xs space-y-1.5 cursor-pointer transition ${
+                selectedQuartier === q.nom
+                  ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 ring-1 ring-emerald-500'
+                  : isLight
+                  ? 'bg-slate-50 border-slate-200 hover:border-emerald-300'
+                  : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <span className="font-bold text-slate-800 dark:text-slate-200 truncate pr-1">
+                  {q.nom}
+                </span>
+                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-300">
+                  {q.nombreEtabs} étab.
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{q.enRegle} régularisés</span>
+                {q.infractions > 0 && (
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">{q.infractions} alertes</span>
+                )}
+              </div>
+
+              <div className="text-[10px] font-mono text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 flex justify-between">
+                <span>Recettes :</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCfa(q.totalRecettesQuartier)}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

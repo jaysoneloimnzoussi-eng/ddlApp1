@@ -124,7 +124,6 @@ export function verifyCredentials(identifier: string, pin: string): {
 
   return {
     success: false,
-    message: 'Code PIN incorrect. Veuillez réessayer.',
-    account, // Still return account so UI can display who is attempting to login
+    message: 'Identifiant ou mot de passe incorrect.',
   };
 }

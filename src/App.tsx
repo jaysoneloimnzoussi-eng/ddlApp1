@@ -57,7 +57,7 @@ const MainContent: React.FC = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { theme, isAuthenticated } = useApp();
+  const { theme, isAuthenticated, activeModule, isCalendarFullScreen } = useApp();
 
   if (!isAuthenticated) {
     return (
@@ -70,13 +70,15 @@ const AppContent: React.FC = () => {
     );
   }
 
+  const isFullScreenCalendar = activeModule === 'MOD-03' && isCalendarFullScreen;
+
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
       theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
     } selection:bg-emerald-500/30 selection:text-emerald-700`}>
       <Header />
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar />
+        {!isFullScreenCalendar && <Sidebar />}
         <MainContent />
       </div>
       <PrintModal />

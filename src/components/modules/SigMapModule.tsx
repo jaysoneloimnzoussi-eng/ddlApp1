@@ -15,7 +15,7 @@ import {
   Compass,
   Car,
 } from 'lucide-react';
-import { ComplianceStatus, Arrondissement, Establishment } from '../../types';
+import { ComplianceStatus, Arrondissement, Establishment, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
 
 export const SigMapModule: React.FC = () => {
   const { visibleEstablishments, establishments, openPrintModal, setActiveModule, currentUserRole, authenticatedUser } = useApp();
@@ -31,6 +31,7 @@ export const SigMapModule: React.FC = () => {
 
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedArr, setSelectedArr] = useState<string>('all');
+  const [selectedQuartier, setSelectedQuartier] = useState<string>('all');
   const [showAcousticHeatmap, setShowAcousticHeatmap] = useState<boolean>(true);
 
   // Itinerary calculation state
@@ -88,7 +89,10 @@ export const SigMapModule: React.FC = () => {
     const filtered = scopedEstablishments.filter((est) => {
       const matchStatus = selectedStatus === 'all' || est.statut === selectedStatus;
       const matchArr = selectedArr === 'all' || est.arrondissement === selectedArr;
-      return matchStatus && matchArr;
+      const matchQuartier =
+        selectedQuartier === 'all' ||
+        (est.quartier && est.quartier.toLowerCase().includes(selectedQuartier.toLowerCase()));
+      return matchStatus && matchArr && matchQuartier;
     });
 
     filtered.forEach((est) => {
@@ -289,7 +293,10 @@ export const SigMapModule: React.FC = () => {
           <span className="text-slate-400 font-semibold ml-2">Arrondissement :</span>
           <select
             value={selectedArr}
-            onChange={(e) => setSelectedArr(e.target.value)}
+            onChange={(e) => {
+              setSelectedArr(e.target.value);
+              setSelectedQuartier('all');
+            }}
             className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-200"
           >
             <option value="all">Tous les 6 Arrondissements</option>
@@ -299,6 +306,23 @@ export const SigMapModule: React.FC = () => {
             <option value="Loandjili">4. Loandjili</option>
             <option value="Mongo-Mpoukou">5. Mongo-Mpoukou</option>
             <option value="Ngoyo">6. Ngoyo</option>
+          </select>
+
+          <span className="text-slate-400 font-semibold ml-2">Quartier :</span>
+          <select
+            value={selectedQuartier}
+            onChange={(e) => setSelectedQuartier(e.target.value)}
+            className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-200"
+          >
+            <option value="all">
+              {selectedArr === 'all' ? 'Tous les Quartiers' : `Quartiers (${selectedArr})`}
+            </option>
+            {(selectedArr !== 'all'
+              ? QUARTIERS_PAR_ARRONDISSEMENT[selectedArr as Arrondissement] || []
+              : Array.from(new Set(Object.values(QUARTIERS_PAR_ARRONDISSEMENT).flat()))
+            ).map((q) => (
+              <option key={q} value={q}>{q}</option>
+            ))}
           </select>
         </div>
 

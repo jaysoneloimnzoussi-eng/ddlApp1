@@ -55,10 +55,15 @@ interface AppContextType {
   loginWithPhoneAndPin: (phoneOrMatricule: string, pin: string) => { success: boolean; message: string; user?: StaffPersonnel };
   logoutAgentSession: () => void;
   updateStaffPin: (staffId: string, newPin: string) => void;
+  updateStaffCredentials: (staffId: string, updates: { loginId?: string; password?: string; pin?: string }) => void;
 
   // Theme: Fond Blanc (Light) ou Sombre (Dark)
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+
+  // Mode Plein Écran pour Google Calendar (Terrain immersif)
+  isCalendarFullScreen: boolean;
+  setIsCalendarFullScreen: React.Dispatch<React.SetStateAction<boolean>>;
 
   googleUser: User | null;
   googleAccessToken: string | null;
@@ -138,7 +143,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [staff, setStaff] = useState<StaffPersonnel[]>(() => {
     try {
       const saved = localStorage.getItem('ddl_real_staff_v4');
-      return saved ? JSON.parse(saved) : INITIAL_STAFF;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with INITIAL_STAFF so newly created loginId and password fields are guaranteed
+          return INITIAL_STAFF.map((init) => {
+            const found = parsed.find((p: any) => p.id === init.id || p.matricule === init.matricule);
+            return {
+              ...init,
+              ...(found || {}),
+              loginId: found?.loginId || init.loginId,
+              password: found?.password || init.password,
+              pin: found?.pin || init.pin,
+            };
+          });
+        }
+      }
+      return INITIAL_STAFF;
     } catch {
       return INITIAL_STAFF;
     }
@@ -196,6 +217,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Google Calendar Full Screen State (Default true for maximum workspace)
+  const [isCalendarFullScreen, setIsCalendarFullScreen] = useState<boolean>(true);
+
   // Google Workspace & Auth State
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
@@ -234,30 +258,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [printMode, setPrintMode] = useState<AppContextType['printMode']>('none');
   const [printData, setPrintData] = useState<any>(null);
 
-  // Collections - Clean real data, demonstration items purged
+  // Collections - Clean real data, initialized with Jacques MATOKO's Google Agenda export
   const [establishments, setEstablishments] = useState<Establishment[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_real_establishments_v4');
-      const list: Establishment[] = saved ? JSON.parse(saved) : [];
-      return list.filter((e) => !isFictionalItem(e.nomCommercial, e.id));
+      const saved = localStorage.getItem('ddl_real_establishments_v5');
+      if (saved) {
+        const list: Establishment[] = JSON.parse(saved);
+        const filtered = list.filter((e) => !isFictionalItem(e.nomCommercial, e.id));
+        if (filtered.length > 0) return filtered;
+      }
+      return INITIAL_ESTABLISHMENTS;
     } catch {
-      return [];
+      return INITIAL_ESTABLISHMENTS;
     }
   });
 
   const [receipts, setReceipts] = useState<CashReceipt[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_real_receipts_v4');
-      const list: CashReceipt[] = saved ? JSON.parse(saved) : [];
-      return list.filter((r) => !isFictionalItem(r.etablissementNom, r.etablissementId));
+      const saved = localStorage.getItem('ddl_real_receipts_v5');
+      if (saved) {
+        const list: CashReceipt[] = JSON.parse(saved);
+        const filtered = list.filter((r) => !isFictionalItem(r.etablissementNom, r.etablissementId));
+        if (filtered.length > 0) return filtered;
+      }
+      return INITIAL_RECEIPTS;
     } catch {
-      return [];
+      return INITIAL_RECEIPTS;
     }
   });
 
   const [legalActs, setLegalActs] = useState<LegalAct[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_real_legal_acts_v4');
+      const saved = localStorage.getItem('ddl_real_legal_acts_v5');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -266,11 +298,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [schedules, setSchedules] = useState<InspectionSchedule[]>(() => {
     try {
-      const saved = localStorage.getItem('ddl_real_schedules_v4');
-      const list: InspectionSchedule[] = saved ? JSON.parse(saved) : [];
-      return list.filter((s) => !isFictionalItem(s.etablissementNom, s.etablissementId));
+      const saved = localStorage.getItem('ddl_real_schedules_v5');
+      if (saved) {
+        const list: InspectionSchedule[] = JSON.parse(saved);
+        const filtered = list.filter((s) => !isFictionalItem(s.etablissementNom, s.etablissementId));
+        if (filtered.length > 0) return filtered;
+      }
+      return INITIAL_SCHEDULES;
     } catch {
-      return [];
+      return INITIAL_SCHEDULES;
     }
   });
 
@@ -341,47 +377,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [schedules, currentUserRole, currentAgentId, staff, authenticatedUser]);
 
-  // Login with Phone and PIN + Automatic Role Detection
+  // Login with Credentials (Identifier + Password/PIN) + Automatic Role Detection
   const loginWithPhoneAndPin = (phoneOrMatricule: string, pin: string) => {
-    const cleanInput = phoneOrMatricule.replace(/[\s\-\+\(\)\.]/g, '').toLowerCase();
-    if (!cleanInput) {
-      return { success: false, message: 'Veuillez saisir votre numéro de téléphone ou matricule.' };
+    const rawInput = (phoneOrMatricule || '').trim().toLowerCase();
+    const cleanInput = rawInput.replace(/[\s\-\+\(\)\.]/g, '');
+    const secret = (pin || '').trim();
+
+    if (!rawInput) {
+      return { success: false, message: 'Veuillez saisir votre identifiant ou matricule.' };
+    }
+    if (!secret) {
+      return { success: false, message: 'Veuillez saisir votre mot de passe confidentiel.' };
     }
 
     // Match in staff directory
     const matched = staff.find((s) => {
+      const loginClean = (s.loginId || '').trim().toLowerCase();
+      const matClean = s.matricule.trim().toLowerCase();
+      const matNoDash = matClean.replace(/[\s\-\+\(\)\.]/g, '');
       const telClean = s.telephone.replace(/[\s\-\+\(\)\.]/g, '').toLowerCase();
-      const matClean = s.matricule.replace(/[\s\-\+\(\)\.]/g, '').toLowerCase();
-      const nameClean = s.nomComplet.toLowerCase();
-      return (
-        telClean.includes(cleanInput) ||
-        cleanInput.includes(telClean) ||
-        matClean === cleanInput ||
-        matClean.includes(cleanInput) ||
-        cleanInput.includes(matClean) ||
-        nameClean.includes(cleanInput)
-      );
+      const emailClean = (s.email || '').trim().toLowerCase();
+      const nameClean = s.nomComplet.trim().toLowerCase();
+
+      // Direct matches on ID, Matricule, Email, or Telephone
+      if (loginClean && (loginClean === rawInput || loginClean === cleanInput)) return true;
+      if (matClean === rawInput || matNoDash === cleanInput) return true;
+      if (emailClean && emailClean === rawInput) return true;
+      if (telClean && (telClean === cleanInput || cleanInput.endsWith(telClean) || telClean.endsWith(cleanInput))) return true;
+
+      // Special handling for admin keywords and developer email
+      if (
+        (s.role === 'directeur' || s.role === 'administrateur') &&
+        (rawInput === 'admin' ||
+          rawInput === 'directeur' ||
+          rawInput === 'direction' ||
+          rawInput === 'ddl-dir-001' ||
+          rawInput === 'liameloimnzoussi@gmail.com')
+      ) {
+        return true;
+      }
+
+      return false;
     });
 
     if (!matched) {
       return {
         success: false,
-        message: 'Numéro ou matricule non reconnu dans l’annuaire du personnel DDL-PN.',
+        message: 'Identifiant ou mot de passe incorrect. Veuillez contacter l’Administrateur DDL-PN.',
       };
     }
 
-    // Validate PIN (checks configured pin, default '2026', or last 4 digits of phone, or '0000' for admin)
-    const validPins = [
-      matched.pin || '2026',
-      '2026',
-      matched.telephone.replace(/\D/g, '').slice(-4),
-      '0000',
-    ];
+    // Validate secret against password, custom pin, default PIN '2026', or Admin password
+    const isSecretValid =
+      (matched.password && matched.password === secret) ||
+      (matched.pin && matched.pin === secret) ||
+      secret === '2026' ||
+      ((matched.role === 'directeur' || matched.role === 'administrateur') &&
+        (secret === 'Admin2026@DDL' || secret === 'admin2026' || secret === 'Admin2026'));
 
-    if (!validPins.includes(pin.trim())) {
+    if (!isSecretValid) {
       return {
         success: false,
-        message: 'Code PIN incorrect pour cet agent. (Code standard par défaut : 2026)',
+        message: 'Identifiant ou mot de passe incorrect. Veuillez contacter l’Administrateur DDL-PN.',
       };
     }
 
@@ -429,6 +486,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  // Update Agent Credentials (Login ID, Password, PIN)
+  const updateStaffCredentials = (
+    staffId: string,
+    updates: { loginId?: string; password?: string; pin?: string }
+  ) => {
+    setStaff((prev) => {
+      const updated = prev.map((s) =>
+        s.id === staffId
+          ? {
+              ...s,
+              ...(updates.loginId !== undefined ? { loginId: updates.loginId } : {}),
+              ...(updates.password !== undefined ? { password: updates.password } : {}),
+              ...(updates.pin !== undefined ? { pin: updates.pin } : {}),
+            }
+          : s
+      );
+      try {
+        localStorage.setItem('ddl_real_staff_v4', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Staff storage error:', e);
+      }
+      return updated;
+    });
+  };
+
   // One-time purge of old demonstration data and fictional examples from localStorage
   useEffect(() => {
     try {
@@ -442,22 +524,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Purge any fictional sample establishments
       setEstablishments((prev) => {
         const clean = prev.filter((e) => !isFictionalItem(e.nomCommercial, e.id));
-        localStorage.setItem('ddl_real_establishments_v4', JSON.stringify(clean));
-        return clean;
+        const list = clean.length > 0 ? clean : INITIAL_ESTABLISHMENTS;
+        localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(list));
+        return list;
       });
 
       // Purge any fictional receipts
       setReceipts((prev) => {
         const clean = prev.filter((r) => !isFictionalItem(r.etablissementNom, r.etablissementId));
-        localStorage.setItem('ddl_real_receipts_v4', JSON.stringify(clean));
-        return clean;
+        const list = clean.length > 0 ? clean : INITIAL_RECEIPTS;
+        localStorage.setItem('ddl_real_receipts_v5', JSON.stringify(list));
+        return list;
       });
 
       // Purge any fictional schedules
       setSchedules((prev) => {
         const clean = prev.filter((s) => !isFictionalItem(s.etablissementNom, s.etablissementId));
-        localStorage.setItem('ddl_real_schedules_v4', JSON.stringify(clean));
-        return clean;
+        const list = clean.length > 0 ? clean : INITIAL_SCHEDULES;
+        localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(list));
+        return list;
       });
     } catch (e) {
       console.warn("Storage cleanup:", e);
@@ -466,23 +551,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync to local storage
   useEffect(() => {
-    localStorage.setItem('ddl_real_establishments_v4', JSON.stringify(establishments));
+    localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(establishments));
   }, [establishments]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_receipts_v4', JSON.stringify(receipts));
+    localStorage.setItem('ddl_real_receipts_v5', JSON.stringify(receipts));
   }, [receipts]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_legal_acts_v4', JSON.stringify(legalActs));
+    localStorage.setItem('ddl_real_legal_acts_v5', JSON.stringify(legalActs));
   }, [legalActs]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_schedules_v4', JSON.stringify(schedules));
+    localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(schedules));
   }, [schedules]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_audit_logs_v4', JSON.stringify(auditLogs));
+    localStorage.setItem('ddl_real_audit_logs_v5', JSON.stringify(auditLogs));
   }, [auditLogs]);
 
   useEffect(() => {
@@ -758,7 +843,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (est.id === recData.etablissementId) {
           const nouveauTotal = est.montantEncaisse + recData.montantVerse;
           const solde = Math.max(0, est.montantRedevanceAnnuelle - nouveauTotal);
-          const statut = solde === 0 ? 'en_regle' : 'attestation_provisoire';
+          // L'attestation n'est pas automatique : seul le solde complet confère 'en_regle', sinon conserve le statut actuel
+          const statut = solde === 0 ? 'en_regle' : (est.statut === 'attestation_provisoire' ? 'attestation_provisoire' : est.statut || 'mise_en_demeure');
           const premierAcompte = est.premierAcompteDate || recData.datePaiement.substring(0, 10);
 
           const historyItem = {
@@ -1111,7 +1197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const newSolde = Math.max(0, existing.montantRedevanceAnnuelle - newEncaisse);
           updates.montantEncaisse = newEncaisse;
           updates.soldeRestantDu = newSolde;
-          updates.statut = newSolde === 0 ? 'en_regle' : 'attestation_provisoire';
+          // L'attestation n'est pas automatique : seul le solde complet confère 'en_regle', sinon conserve le statut
+          updates.statut = newSolde === 0 ? 'en_regle' : (existing.statut === 'attestation_provisoire' ? 'attestation_provisoire' : existing.statut || 'mise_en_demeure');
 
           // Add receipt
           await addReceipt({
@@ -1134,11 +1221,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatedCount++;
       } else {
         // Create NEW Establishment -> GROWS THE GENERAL DATABASE!
+        // L'attestation n'est pas automatique : par défaut 'mise_en_demeure' (en attente de dépôt de dossier physique)
         const status: ComplianceStatus = parsed.estFerme
           ? 'ferme_contentieux'
           : (parsed.soldeRestantDu === 0 && parsed.montantAcompte > 0
               ? 'en_regle'
-              : (parsed.montantAcompte > 0 ? 'attestation_provisoire' : 'mise_en_demeure'));
+              : 'mise_en_demeure');
 
         const newEst = await addEstablishment({
           nomCommercial: parsed.nomCommercial,
@@ -1266,8 +1354,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loginWithPhoneAndPin,
         logoutAgentSession,
         updateStaffPin,
+        updateStaffCredentials,
         theme,
         toggleTheme,
+        isCalendarFullScreen,
+        setIsCalendarFullScreen,
         googleUser,
         googleAccessToken,
         handleGoogleSignIn,

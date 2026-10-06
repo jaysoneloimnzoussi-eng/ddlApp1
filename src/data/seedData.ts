@@ -25,6 +25,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#059669',
     pin: '2026',
+    loginId: 'admin',
+    password: 'Admin2026@DDL',
   },
   {
     id: '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc',
@@ -42,6 +44,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     photoUrl: 'https://nbpcecsnivfggyitpxdn.supabase.co/storage/v1/object/public/agent-photos/agents/50add874-30c6-4dbb-8322-5d7d3a9511db.jpeg',
     calendarColor: '#1a73e8',
     pin: '2026',
+    loginId: 'matoko.j',
+    password: 'Matoko#2026',
   },
   {
     id: '2136e93e-5733-44f9-b9ce-a61bb2538f58',
@@ -59,6 +63,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     photoUrl: 'https://nbpcecsnivfggyitpxdn.supabase.co/storage/v1/object/public/agent-photos/agents/ed87055e-28ec-4f33-bf9f-ff97fef54faf.jpeg',
     calendarColor: '#0d904f',
     pin: '2026',
+    loginId: 'elenga.j',
+    password: 'Elenga#2026',
   },
   {
     id: '9dfdf0dd-0177-4126-89db-335cfaf7c0dc',
@@ -75,6 +81,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#9334e6',
     pin: '2026',
+    loginId: 'mahoua.e',
+    password: 'Mahoua#2026',
   },
   {
     id: 'd016ff2d-7544-466e-98c7-3cc83dbc1203',
@@ -91,6 +99,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#e37400',
     pin: '2026',
+    loginId: 'kiounga.r',
+    password: 'Kiounga#2026',
   },
   {
     id: '60588776-5ed5-424c-8579-9fb599ce1896',
@@ -107,6 +117,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#0284c7',
     pin: '2026',
+    loginId: 'ibara.f',
+    password: 'Ibara#2026',
   },
   {
     id: '4aa6cbd4-7b8d-48cf-adc9-736e8295c9d0',
@@ -123,6 +135,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#db2777',
     pin: '2026',
+    loginId: 'kitsakou.u',
+    password: 'Kitsakou#2026',
   },
   {
     id: 'f42ad6b1-701a-4d8c-81df-504be9b607af',
@@ -139,6 +153,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#4f46e5',
     pin: '2026',
+    loginId: 'obomba.y',
+    password: 'Obomba#2026',
   },
   {
     id: 'b9fb7b59-a262-4751-a25a-e6c10e6472ea',
@@ -155,6 +171,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#16a34a',
     pin: '2026',
+    loginId: 'galoum.h',
+    password: 'Galoum#2026',
   },
   {
     id: '0594a697-48ba-4fb7-b4cb-a979ad46f37c',
@@ -171,6 +189,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#ea580c',
     pin: '2026',
+    loginId: 'ambetos.l',
+    password: 'Ambetos#2026',
   },
   {
     id: '268281cd-3b0c-476f-a99a-0e7f8c41a9e0',
@@ -187,6 +207,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#0891b2',
     pin: '2026',
+    loginId: 'mpemba.j',
+    password: 'Mpemba#2026',
   },
   {
     id: '9b6f4a6e-9557-4e5e-bd4b-9590ec256bca',
@@ -203,6 +225,8 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#65a30d',
     pin: '2026',
+    loginId: 'mpika.f',
+    password: 'Mpika#2026',
   },
   {
     id: '8f0c52a7-7ab4-498c-b67d-273e98583fe4',
@@ -219,14 +243,22 @@ export const INITIAL_STAFF: StaffPersonnel[] = [
     statut: 'actif',
     calendarColor: '#84cc16',
     pin: '2026',
+    loginId: 'ngoma.a',
+    password: 'Ngoma#2026',
   },
 ];
 
-// Pure Real Data Store - Demonstration Info Deleted
-export const INITIAL_ESTABLISHMENTS: Establishment[] = [];
-export const INITIAL_RECEIPTS: CashReceipt[] = [];
+import {
+  CALENDAR_ESTABLISHMENTS,
+  CALENDAR_INSPECTION_SCHEDULES,
+  CALENDAR_RECEIPTS,
+} from './calendarImportedData';
+
+// Pure Real Data Store - Loaded from Jacques MATOKO's Official Google Agenda
+export const INITIAL_ESTABLISHMENTS: Establishment[] = CALENDAR_ESTABLISHMENTS;
+export const INITIAL_RECEIPTS: CashReceipt[] = CALENDAR_RECEIPTS;
 export const INITIAL_LEGAL_ACTS: LegalAct[] = [];
-export const INITIAL_SCHEDULES: InspectionSchedule[] = [];
+export const INITIAL_SCHEDULES: InspectionSchedule[] = CALENDAR_INSPECTION_SCHEDULES;
 export const INITIAL_AUDIT_LOGS: AuditRecord[] = [];
 export const INITIAL_SOIT_TRANSMIS: SoitTransmisDgl[] = [];
 

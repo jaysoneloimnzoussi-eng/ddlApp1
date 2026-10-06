@@ -324,3 +324,149 @@ export async function createOfficialGoogleDoc(
     webViewLink: `https://docs.google.com/document/d/${documentId}/edit`,
   };
 }
+
+/**
+ * Parses a standard .ics (iCalendar) export file from Google Calendar
+ * Unfolds continuation lines, parses VEVENT blocks, and transforms them into standard event objects
+ */
+export function parseICalendarContent(icsText: string): any[] {
+  if (!icsText || !icsText.trim()) return [];
+
+  // 1. Unfold lines (RFC 5545: lines starting with space or tab are continuations)
+  const unfolded = icsText.replace(/\r\n[ \t]|\r[ \t]|\n[ \t]/g, '');
+  const lines = unfolded.split(/\r\n|\r|\n/);
+
+  const events: any[] = [];
+  let inEvent = false;
+  let currentEvent: Record<string, string> = {};
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === 'BEGIN:VEVENT') {
+      inEvent = true;
+      currentEvent = {};
+      continue;
+    }
+    if (trimmed === 'END:VEVENT') {
+      if (inEvent && (currentEvent.SUMMARY || currentEvent.DESCRIPTION)) {
+        // Build Google Calendar-like item
+        const unescapeIcs = (str?: string) =>
+          (str || '')
+            .replace(/\\n|\\N/g, '\n')
+            .replace(/\\,/g, ',')
+            .replace(/\\;/g, ';')
+            .replace(/\\\\/g, '\\');
+
+        const summary = unescapeIcs(currentEvent.SUMMARY);
+        const description = unescapeIcs(currentEvent.DESCRIPTION);
+        const location = unescapeIcs(currentEvent.LOCATION);
+
+        // Parse DTSTART (e.g., 20261012T090000Z or 20261012)
+        let dateTime: string | undefined;
+        let dateOnly: string | undefined;
+        const dtstart = currentEvent.DTSTART || currentEvent['DTSTART;VALUE=DATE'];
+        if (dtstart) {
+          const match = dtstart.match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?/);
+          if (match) {
+            const [, y, m, d, hh, mm] = match;
+            if (hh !== undefined) {
+              dateTime = `${y}-${m}-${d}T${hh}:${mm || '00'}:00Z`;
+            } else {
+              dateOnly = `${y}-${m}-${d}`;
+            }
+          }
+        }
+
+        events.push({
+          id: currentEvent.UID || `ics-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          summary,
+          description,
+          location,
+          start: {
+            dateTime: dateTime || (dateOnly ? `${dateOnly}T10:00:00Z` : undefined),
+            date: dateOnly,
+          },
+          status: currentEvent.STATUS?.toLowerCase() || 'confirmed',
+        });
+      }
+      inEvent = false;
+      continue;
+    }
+
+    if (inEvent) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx > 0) {
+        const rawKey = line.substring(0, colonIdx);
+        const val = line.substring(colonIdx + 1);
+        const key = rawKey.split(';')[0]; // strip parameters like ;VALUE=DATE
+        currentEvent[key] = val;
+      }
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Parses free-form text or list of appointments/notes into event items
+ * Format can be lines with:
+ * "Le Palmier VIP - Tié-Tié, Mbota - Promoteur: M. Jean (06 600 11 22) - Acompte: 50000 FCFA - RDV: 2026-10-15 11:00"
+ */
+export function parsePastedTextEvents(rawText: string): any[] {
+  if (!rawText || !rawText.trim()) return [];
+
+  // Check if it's ICS content
+  if (rawText.includes('BEGIN:VCALENDAR') || rawText.includes('BEGIN:VEVENT')) {
+    return parseICalendarContent(rawText);
+  }
+
+  // Otherwise, split by double newlines or single non-empty lines
+  const rawBlocks = rawText
+    .split(/\n\s*\n/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  const lines = rawBlocks.length > 1
+    ? rawBlocks
+    : rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 5);
+
+  const results: any[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const block = lines[i];
+    // Try to extract date
+    const dateMatch = block.match(/\b(202[5-7]-\d{2}-\d{2}|\d{2}\/\d{2}\/202[5-7]|\d{1,2}\s+(?:janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-z]*\s+202[5-7])/i);
+    let dateStr = '2026-10-14';
+    if (dateMatch) {
+      const rawD = dateMatch[0];
+      if (rawD.includes('/')) {
+        const [d, m, y] = rawD.split('/');
+        dateStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      } else if (rawD.startsWith('202')) {
+        dateStr = rawD;
+      }
+    }
+
+    // Try to extract time
+    const timeMatch = block.match(/\b([01]?\d|2[0-3])[:hH]([0-5]\d)\b/);
+    const timeStr = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : '10:00';
+
+    // Summary line: first line or before first dash/colon
+    const firstLine = block.split('\n')[0];
+    const summaryCandidate = firstLine.split(/ - | – | \| /)[0].replace(/^[0-9\.\-\*\•\s]+/, '').trim();
+
+    results.push({
+      id: `text-imp-${Date.now()}-${i}`,
+      summary: summaryCandidate || `Établissement #${i + 1}`,
+      description: block,
+      location: block,
+      start: {
+        dateTime: `${dateStr}T${timeStr}:00Z`,
+        date: dateStr,
+      },
+      status: 'confirmed',
+    });
+  }
+
+  return results;
+}
