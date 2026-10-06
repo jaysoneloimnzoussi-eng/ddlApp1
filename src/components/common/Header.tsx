@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { DdlLogo } from './DdlLogo';
 import {
   Shield,
   Wifi,
@@ -41,6 +42,7 @@ export const Header: React.FC = () => {
     offlineQueueCount,
     syncOfflineQueue,
     showNotification,
+    setShowDomainAuthModal,
   } = useApp();
 
   const roleLabels: Record<UserRole, { title: string; color: string }> = {
@@ -58,11 +60,7 @@ export const Header: React.FC = () => {
     }`}>
       {/* Brand & Authority */}
       <div className="flex items-center gap-3">
-        <div className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-600 via-yellow-500 to-red-600 p-0.5 shadow-md">
-          <div className={`w-full h-full rounded-[10px] flex items-center justify-center ${theme === 'light' ? 'bg-white' : 'bg-slate-950'}`}>
-            <Shield className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-          </div>
-        </div>
+        <DdlLogo size="sm" rounded="xl" bordered={true} />
         <div>
           <div className="flex items-center gap-2">
             <span className="font-cinzel text-base md:text-lg font-bold tracking-wider flex items-center gap-1.5">
@@ -152,8 +150,19 @@ export const Header: React.FC = () => {
         </button>
       </div>
 
-      {/* Right Controls: Theme Switcher (Fond Blanc / Sombre) + Google Workspace Sign-In */}
-      <div className="flex items-center gap-3">
+      {/* Right Controls: Theme Switcher (Fond Blanc / Sombre) + Vercel/Firebase Liaison + Google Workspace Sign-In */}
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Liaison Vercel & Firebase Button */}
+        <button
+          onClick={() => setShowDomainAuthModal(true)}
+          title="Centre de Liaison Vercel ⚡ Google Firebase & Firestore"
+          className="p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition text-slate-700 dark:text-slate-200 cursor-pointer shadow-sm"
+        >
+          <span className="font-mono text-[11px] font-bold">▲</span>
+          <span className="text-xs text-amber-500">🔥</span>
+          <span className="hidden xl:inline text-[11px]">Vercel ⚡ Firebase</span>
+        </button>
+
         {/* Toggle Fond Blanc / Sombre */}
         <button
           onClick={toggleTheme}

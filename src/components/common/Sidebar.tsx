@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { DdlLogo } from './DdlLogo';
 import {
   LayoutDashboard,
   MapPinPlus,
@@ -249,6 +250,23 @@ export const Sidebar: React.FC = () => {
         : 'bg-slate-900 border-slate-800 text-slate-100'
     }`}>
       <div className="p-3">
+        {/* Institutional Authority Badge */}
+        <div className={`p-2.5 mb-3 rounded-xl border flex items-center gap-2.5 transition ${
+          theme === 'light'
+            ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-slate-800'
+            : 'bg-gradient-to-r from-emerald-950/40 to-slate-900 border-emerald-800/40 text-slate-100'
+        }`}>
+          <DdlLogo size="xs" rounded="lg" bordered={true} className="shrink-0" />
+          <div className="min-w-0">
+            <p className="font-cinzel text-[11px] font-bold truncate leading-tight">
+              DDL Pointe-Noire
+            </p>
+            <p className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
+              MCAPNIT • DGL Brazzaville
+            </p>
+          </div>
+        </div>
+
         <div className={`text-[11px] font-semibold uppercase tracking-wider px-3 mb-2 flex items-center justify-between ${
           theme === 'light' ? 'text-slate-500' : 'text-slate-400'
         }`}>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { DdlLogo } from '../common/DdlLogo';
 import {
   TrendingUp,
   Building2,
@@ -226,22 +227,25 @@ export const DashboardModule: React.FC = () => {
           : 'bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-slate-100 border-emerald-800/40'
       }`}>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                MOD-01 • COCKPIT DÉCISIONNEL STRATÉGIQUE
-              </span>
-              <span className="text-[11px] font-mono text-amber-300 font-semibold flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                République du Congo • MCAPNIT / DGL
-              </span>
+          <div className="flex items-start md:items-center gap-4">
+            <DdlLogo size="lg" rounded="2xl" bordered={true} className="shrink-0 shadow-lg" />
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  MOD-01 • COCKPIT DÉCISIONNEL STRATÉGIQUE
+                </span>
+                <span className="text-[11px] font-mono text-amber-300 font-semibold flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  République du Congo • MCAPNIT / DGL
+                </span>
+              </div>
+              <h1 className="font-cinzel text-xl md:text-2xl lg:text-3xl font-black text-white mt-1.5 tracking-wide">
+                Direction Départementale des Loisirs de Pointe-Noire
+              </h1>
+              <p className="text-xs md:text-sm text-emerald-100/90 mt-1 max-w-3xl leading-relaxed">
+                Base de données centralisée de souveraineté : supervision en direct des 6 arrondissements, pilotage du recouvrement par agent exclusif, gestion des alertes d'infractions et interconnexion de tous les modules.
+              </p>
             </div>
-            <h1 className="font-cinzel text-xl md:text-2xl lg:text-3xl font-black text-white mt-1.5 tracking-wide">
-              Direction Départementale des Loisirs de Pointe-Noire
-            </h1>
-            <p className="text-xs md:text-sm text-emerald-100/90 mt-1 max-w-3xl leading-relaxed">
-              Base de données centralisée de souveraineté : supervision en direct des 6 arrondissements, pilotage du recouvrement par agent exclusif, gestion des alertes d'infractions et interconnexion de tous les modules.
-            </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap shrink-0">

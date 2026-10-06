@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { DdlLogo } from '../common/DdlLogo';
 import {
   Shield,
   Lock,
@@ -114,11 +115,7 @@ export const LoginConsole: React.FC = () => {
               <div>
                 {/* Official Crest */}
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 p-0.5 shadow-lg flex items-center justify-center">
-                    <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center">
-                      <Shield className="w-6 h-6 text-emerald-400" />
-                    </div>
-                  </div>
+                  <DdlLogo size="md" rounded="2xl" bordered={true} />
                   <div>
                     <div className="text-[10px] uppercase font-bold tracking-widest text-emerald-400">
                       République du Congo

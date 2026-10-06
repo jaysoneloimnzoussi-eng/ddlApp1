@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { DdlLogo } from '../common/DdlLogo';
 import {
   Shield,
   Lock,
@@ -131,15 +132,7 @@ export const AgentLoginConsole: React.FC = () => {
         }`}
       >
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-yellow-500 to-red-600 p-0.5 shadow-md">
-            <div
-              className={`w-full h-full rounded-[10px] flex items-center justify-center ${
-                isLight ? 'bg-white' : 'bg-slate-950'
-              }`}
-            >
-              <Shield className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
-          </div>
+          <DdlLogo size="sm" rounded="xl" bordered={true} />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-cinzel text-base font-bold tracking-wider">
@@ -190,16 +183,23 @@ export const AgentLoginConsole: React.FC = () => {
             }`}
           >
             <div>
-              <div className="flex items-center gap-2 text-emerald-400 text-xs font-mono font-bold tracking-widest uppercase mb-3">
-                <Shield className="w-4 h-4" />
-                Console Souveraine DDL-PN
+              <div className="flex items-center justify-between mb-4">
+                <DdlLogo size="lg" rounded="2xl" bordered={true} />
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold uppercase">
+                    MCAPNIT / DGL
+                  </span>
+                  <span className="text-[9px] font-mono text-emerald-300/80 mt-1">
+                    République du Congo
+                  </span>
+                </div>
               </div>
 
-              <h1 className="font-cinzel text-2xl font-bold tracking-wide leading-tight mb-2">
+              <h1 className="font-cinzel text-xl lg:text-2xl font-bold tracking-wide leading-tight mb-1 text-white">
                 Direction Départementale des Loisirs
               </h1>
-              <p className="text-xs text-emerald-200/80 mb-6 font-medium">
-                Pointe-Noire • République du Congo
+              <p className="text-xs text-emerald-300 font-semibold mb-5">
+                Pointe-Noire • Plateforme Souveraine v3.0
               </p>
 
               {/* Strict Siloing Guarantee */}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { DdlLogo } from './DdlLogo';
 import { X, Printer, Download, Shield, FileText, CheckCircle2 } from 'lucide-react';
 import { generateAttestationDocx } from '../../services/docxGenerator';
 import { formatCfa } from '../../services/crypto';
@@ -65,9 +66,9 @@ export const PrintModal: React.FC = () => {
           {/* 1. ATTESTATION DE DÉPÔT A4 OFFICIELLE */}
           {printMode === 'a4_attestation' && (
             <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-serif leading-relaxed text-sm">
-              {/* Header 2 columns */}
-              <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6">
-                <div className="text-left text-xs font-bold text-slate-900 uppercase space-y-0.5 max-w-[50%]">
+              {/* Header with 3 columns: Left Ministry, Center Official DDL-PN Logo, Right Republic of Congo */}
+              <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6 gap-3">
+                <div className="text-left text-xs font-bold text-slate-900 uppercase space-y-0.5 flex-1">
                   <p>Ministère de la Culture, des Arts,</p>
                   <p>du Tourisme et des Loisirs</p>
                   <p className="text-[10px] tracking-widest">------------------------</p>
@@ -83,7 +84,15 @@ export const PrintModal: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="text-right text-xs uppercase space-y-0.5">
+                {/* Official Sceau / Logo */}
+                <div className="flex flex-col items-center justify-center shrink-0 px-2 pt-1">
+                  <DdlLogo size="lg" rounded="xl" bordered={false} className="w-16 h-16 shadow-none ring-1 ring-slate-400" />
+                  <span className="text-[8px] font-mono uppercase tracking-widest text-slate-700 font-bold mt-1">
+                    SCEAU DDL-PN
+                  </span>
+                </div>
+
+                <div className="text-right text-xs uppercase space-y-0.5 flex-1">
                   <p className="font-cinzel font-black text-sm text-slate-950">
                     RÉPUBLIQUE DU CONGO
                   </p>
@@ -186,10 +195,11 @@ export const PrintModal: React.FC = () => {
           {/* 2. REÇU THERMIQUE POS 58MM */}
           {printMode === 'pos_receipt' && (
             <div className="receipt-58mm bg-white text-slate-950 p-4 rounded shadow-2xl w-[58mm] font-mono text-[10px] leading-tight border border-slate-300">
-              <div className="text-center mb-2">
+              <div className="text-center mb-2 flex flex-col items-center">
+                <DdlLogo size="xs" rounded="md" bordered={false} className="w-8 h-8 mb-1" />
                 <p className="font-bold text-xs">RÉPUBLIQUE DU CONGO</p>
                 <p className="text-[8px]">MCAPNIT / DGL / DDL-PN</p>
-                <p className="font-bold text-[9px] mt-1">RÉGIE DES RECETTES SAF</p>
+                <p className="font-bold text-[9px] mt-0.5">RÉGIE DES RECETTES SAF</p>
                 <p className="text-[8px]">BRIGADE MOBILE DE RECOUVREMENT</p>
                 <p className="text-[8px] my-1">==============================</p>
               </div>
@@ -232,12 +242,16 @@ export const PrintModal: React.FC = () => {
           {/* 3. ACTE DE POLICE ADMINISTRATIVE A4 */}
           {printMode === 'a4_legal_act' && (
             <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-serif leading-relaxed text-sm">
-              <div className="flex justify-between items-start border-b-2 border-red-800 pb-3 mb-6">
-                <div>
+              <div className="flex justify-between items-start border-b-2 border-red-800 pb-3 mb-6 gap-3">
+                <div className="flex-1">
                   <p className="font-bold text-xs uppercase">Direction Départementale des Loisirs de Pointe-Noire</p>
                   <p className="font-mono text-xs text-red-800 font-bold">Police Administrative des Loisirs & Contentieux</p>
+                  <p className="text-[10px] text-slate-600 italic">Brigade de Salubrité Acoustique & Contrôle Réglementaire</p>
                 </div>
-                <div className="text-right text-xs">
+                <div className="flex flex-col items-center justify-center shrink-0">
+                  <DdlLogo size="sm" rounded="lg" bordered={false} className="w-12 h-12 shadow-none ring-1 ring-red-800/40" />
+                </div>
+                <div className="text-right text-xs flex-1">
                   <p className="font-black text-xs font-cinzel">RÉPUBLIQUE DU CONGO</p>
                   <p className="italic text-[10px]">Unité - Travail - Progrès</p>
                 </div>
@@ -311,7 +325,7 @@ export const PrintModal: React.FC = () => {
             <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white p-6 rounded-2xl shadow-2xl w-96 border-2 border-emerald-500/50 font-sans">
               <div className="flex justify-between items-center border-b border-emerald-500/30 pb-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-emerald-400" />
+                  <DdlLogo size="xs" rounded="md" bordered={false} className="w-6 h-6" />
                   <span className="font-cinzel text-xs font-bold tracking-wider">DDL-PN</span>
                 </div>
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">

@@ -20,10 +20,21 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Configuration Firebase résolue (supporte les variables Vercel VITE_FIREBASE_* avec fallback automatique)
+export const activeFirebaseConfig = {
+  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || firebaseConfig.projectId || 'gen-lang-client-0446306316',
+  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || firebaseConfig.appId || '1:616288262136:web:008fb6f2d82fe741c2280d',
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || firebaseConfig.apiKey || 'AIzaSyBCtCUx01YDAiRyUTWre-cxme_tXY3C6DU',
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || firebaseConfig.authDomain || 'gen-lang-client-0446306316.firebaseapp.com',
+  firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || firebaseConfig.firestoreDatabaseId || 'ai-studio-ddlpnsovereignen-f4fe3879-a1e8-417a-81fb-f966d65f82fd',
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || firebaseConfig.storageBucket || 'gen-lang-client-0446306316.firebasestorage.app',
+  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || firebaseConfig.messagingSenderId || '616288262136',
+};
+
 // Initialize Firebase App
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = !getApps().length ? initializeApp(activeFirebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db: Firestore = getFirestore(app, 'ai-studio-ddlpnsovereignen-f4fe3879-a1e8-417a-81fb-f966d65f82fd');
+export const db: Firestore = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
 
 // Provider with requested Google Workspace scopes
 export const googleProvider = new GoogleAuthProvider();
