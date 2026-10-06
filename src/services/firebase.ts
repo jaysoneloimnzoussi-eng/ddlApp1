@@ -20,15 +20,15 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Configuration Firebase résolue (supporte les variables Vercel VITE_FIREBASE_* avec fallback automatique)
+// Configuration Firebase résolue (supporte les variables Vercel VITE_FIREBASE_* avec fallback automatique sur firebase-applet-config.json)
 export const activeFirebaseConfig = {
-  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || firebaseConfig.projectId || 'gen-lang-client-0446306316',
-  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || firebaseConfig.appId || '1:616288262136:web:008fb6f2d82fe741c2280d',
-  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || firebaseConfig.apiKey || 'AIzaSyBCtCUx01YDAiRyUTWre-cxme_tXY3C6DU',
-  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || firebaseConfig.authDomain || 'gen-lang-client-0446306316.firebaseapp.com',
-  firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || firebaseConfig.firestoreDatabaseId || 'ai-studio-ddlpnsovereignen-f4fe3879-a1e8-417a-81fb-f966d65f82fd',
-  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || firebaseConfig.storageBucket || 'gen-lang-client-0446306316.firebasestorage.app',
-  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || firebaseConfig.messagingSenderId || '616288262136',
+  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || firebaseConfig.projectId || '',
+  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || firebaseConfig.appId || '',
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || firebaseConfig.apiKey || '',
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || firebaseConfig.authDomain || '',
+  firestoreDatabaseId: (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || firebaseConfig.firestoreDatabaseId || '(default)',
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || firebaseConfig.storageBucket || '',
+  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || firebaseConfig.messagingSenderId || '',
 };
 
 // Initialize Firebase App
