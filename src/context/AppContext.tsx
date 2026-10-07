@@ -67,6 +67,11 @@ interface AppContextType {
   isCalendarFullScreen: boolean;
   setIsCalendarFullScreen: React.Dispatch<React.SetStateAction<boolean>>;
 
+  // Command Palette (Ctrl+K)
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleCommandPalette: () => void;
+
   googleUser: User | null;
   googleAccessToken: string | null;
   handleGoogleSignIn: () => Promise<void>;
@@ -221,6 +226,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Google Calendar Full Screen State (Default true for maximum workspace)
   const [isCalendarFullScreen, setIsCalendarFullScreen] = useState<boolean>(true);
+
+  // Command Palette (Ctrl+K)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const toggleCommandPalette = () => setIsCommandPaletteOpen((prev) => !prev);
 
   // Google Workspace & Auth State
   const [googleUser, setGoogleUser] = useState<User | null>(null);
@@ -1470,6 +1479,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTheme,
         isCalendarFullScreen,
         setIsCalendarFullScreen,
+        isCommandPaletteOpen,
+        setIsCommandPaletteOpen,
+        toggleCommandPalette,
         googleUser,
         googleAccessToken,
         handleGoogleSignIn,

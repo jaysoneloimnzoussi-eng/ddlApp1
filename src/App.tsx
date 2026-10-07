@@ -5,6 +5,7 @@ import { Sidebar } from './components/common/Sidebar';
 import { PrintModal } from './components/common/PrintModal';
 import { NotificationToast } from './components/common/NotificationToast';
 import { DomainAuthModal } from './components/common/DomainAuthModal';
+import { CommandPalette } from './components/common/CommandPalette';
 
 // 17 Module Components
 import { DashboardModule } from './components/modules/DashboardModule';
@@ -83,6 +84,7 @@ const AppContent: React.FC = () => {
       </div>
       <PrintModal />
       <DomainAuthModal />
+      <CommandPalette />
       <NotificationToast />
     </div>
   );
