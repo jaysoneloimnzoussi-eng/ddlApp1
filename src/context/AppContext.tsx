@@ -345,20 +345,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const agent = staff.find((s) => s.id === currentAgentId) || authenticatedUser;
     if (!agent) return [];
 
-    const agentName = agent.nomComplet.toLowerCase().trim();
-    const agentMatricule = agent.matricule.toLowerCase().trim();
+    const agentName = (agent.nomComplet || '').toLowerCase().trim();
+    const agentMatricule = (agent.matricule || '').toLowerCase().trim();
 
     return establishments.filter((e) => {
+      if (!e) return false;
       // Direct ID match
       if (e.agentAssigneId === agent.id) return true;
       // Direct Matricule match
       if (e.agentAssigneId === agent.matricule) return true;
       // Name match on agentAssigneNom
-      if (e.agentAssigneNom && e.agentAssigneNom.toLowerCase().trim() === agentName) return true;
+      if (e.agentAssigneNom && (e.agentAssigneNom || '').toLowerCase().trim() === agentName) return true;
       // Name match on recensePar
-      if (e.recensePar && e.recensePar.toLowerCase().includes(agentName)) return true;
+      if (e.recensePar && (e.recensePar || '').toLowerCase().includes(agentName)) return true;
       // Matricule match on recensePar
-      if (e.recensePar && e.recensePar.toLowerCase().includes(agentMatricule)) return true;
+      if (e.recensePar && (e.recensePar || '').toLowerCase().includes(agentMatricule)) return true;
 
       return false;
     });
@@ -599,7 +600,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (snapshot) => {
           const list: Establishment[] = [];
           snapshot.forEach((d) => {
-            list.push(d.data() as Establishment);
+            const data = d.data();
+            if (data) {
+              list.push({
+                ...data,
+                id: data.id || d.id,
+                nomCommercial: (data.nomCommercial || (data as any).nom || (data as any).nom_commercial || (data as any).name || 'Établissement SAA').toString(),
+              } as Establishment);
+            }
           });
           setEstablishments(list);
         },
@@ -746,11 +754,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addEstablishment = async (
-    estData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'>
+    estData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'>,
+    options?: { silent?: boolean }
   ): Promise<Establishment> => {
-    const id = 'est-' + Date.now();
-    const arrCode = estData.arrondissement.substring(0, 3).toUpperCase();
-    const count = establishments.filter((e) => e.arrondissement === estData.arrondissement).length + 1;
+    const id = 'est-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+    const arr = estData.arrondissement || 'Tié-Tié';
+    const arrCode = (arr || 'TIE').substring(0, 3).toUpperCase();
+    const count = establishments.filter((e) => e && e.arrondissement === arr).length + 1;
     const codeDossier = `DDL-PN-2026-${arrCode}-${count.toString().padStart(4, '0')}`;
 
     // Ensure the establishment is assigned strictly to an agent
@@ -761,8 +771,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...estData,
       id,
       codeDossier,
+      nomCommercial: (estData.nomCommercial || 'Établissement SAA').toString().trim(),
+      arrondissement: arr as any,
       agentAssigneId: assignedAgentId,
-      agentAssigneNom: assignedAgent?.nomComplet || estData.recensePar,
+      agentAssigneNom: assignedAgent?.nomComplet || estData.recensePar || 'Agent SAA',
       syncStatus: isOnline ? 'synced' : 'pending',
       historiquePaiements: [],
       anneeExercice: 2026,
@@ -779,11 +791,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn("Firestore write error:", e);
     }
 
-    if (!isOnline) {
+    if (!options?.silent) {
+      if (!isOnline) {
+        setOfflineQueue((prev) => [...prev, { type: 'ESTABLISHMENT_ADD', data: newEst }]);
+        showNotification('warning', `Établissement enregistré localement en mode Hors-Ligne (Dossier ${codeDossier}).`);
+      } else {
+        showNotification('success', `Nouvel établissement recensé et synchronisé Firestore (Attribué à ${newEst.agentAssigneNom}) : ${newEst.nomCommercial}`);
+      }
+    } else if (!isOnline) {
       setOfflineQueue((prev) => [...prev, { type: 'ESTABLISHMENT_ADD', data: newEst }]);
-      showNotification('warning', `Établissement enregistré localement en mode Hors-Ligne (Dossier ${codeDossier}).`);
-    } else {
-      showNotification('success', `Nouvel établissement recensé et synchronisé Firestore (Attribué à ${newEst.agentAssigneNom}) : ${newEst.nomCommercial}`);
     }
 
     await addAuditLog(
@@ -815,13 +831,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Promise<CashReceipt> => {
     const count = receipts.length + 1;
     const numeroQuittance = `QUIT-2026-${count.toString().padStart(5, '0')}`;
+    const datePaiement = recData.datePaiement || new Date().toISOString().substring(0, 10);
     const hash = await computeSha256(
-      `${numeroQuittance}_${recData.etablissementId}_${recData.montantVerse}_${recData.datePaiement}`
+      `${numeroQuittance}_${recData.etablissementId}_${recData.montantVerse}_${datePaiement}`
     );
 
     const newReceipt: CashReceipt = {
       ...recData,
-      id: 'rec-' + Date.now(),
+      id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+      datePaiement,
       numeroQuittance,
       quittanceHash: hash,
     };
@@ -841,15 +859,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEstablishments((prev) =>
       prev.map((est) => {
         if (est.id === recData.etablissementId) {
-          const nouveauTotal = est.montantEncaisse + recData.montantVerse;
-          const solde = Math.max(0, est.montantRedevanceAnnuelle - nouveauTotal);
+          const nouveauTotal = (est.montantEncaisse || 0) + recData.montantVerse;
+          const redevance = est.montantRedevanceAnnuelle || 60000;
+          const solde = Math.max(0, redevance - nouveauTotal);
           // L'attestation n'est pas automatique : seul le solde complet confère 'en_regle', sinon conserve le statut actuel
           const statut = solde === 0 ? 'en_regle' : (est.statut === 'attestation_provisoire' ? 'attestation_provisoire' : est.statut || 'mise_en_demeure');
-          const premierAcompte = est.premierAcompteDate || recData.datePaiement.substring(0, 10);
+          const premierAcompte = est.premierAcompteDate || (recData.datePaiement ? recData.datePaiement.substring(0, 10) : new Date().toISOString().substring(0, 10));
 
           const historyItem = {
-            id: 'hist-' + Date.now(),
-            date: recData.datePaiement,
+            id: 'hist-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+            date: datePaiement,
             montant: recData.montantVerse,
             quittanceNumero: numeroQuittance,
             modePaiement: recData.modePaiement,
@@ -1165,14 +1184,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     for (const rawEvt of rawEvents) {
       const parsed = parseGoogleCalendarEvent(rawEvt);
-      const cleanNom = parsed.nomCommercial.trim().toLowerCase();
+      const cleanNom = (parsed?.nomCommercial || '').toString().trim().toLowerCase();
 
-      // Check if already in database
-      const existing = establishments.find((e) =>
-        e.nomCommercial.trim().toLowerCase() === cleanNom ||
-        (cleanNom.length > 5 && e.nomCommercial.trim().toLowerCase().includes(cleanNom)) ||
-        (cleanNom.length > 5 && cleanNom.includes(e.nomCommercial.trim().toLowerCase()))
-      );
+      // Check if already in database safely without calling .trim() on undefined properties
+      const existing = establishments.find((e) => {
+        if (!e) return false;
+        const eNom = (e.nomCommercial || (e as any).nom || (e as any).nom_commercial || (e as any).name || '').toString().trim().toLowerCase();
+        if (!eNom) return false;
+        return (
+          eNom === cleanNom ||
+          (cleanNom.length > 5 && eNom.includes(cleanNom)) ||
+          (cleanNom.length > 5 && cleanNom.includes(eNom))
+        );
+      });
 
       if (existing) {
         // Update existing establishment with new appointment or advance
@@ -1194,7 +1218,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.montantAcompte > 0 && parsed.montantAcompte > (existing.montantEncaisse || 0)) {
           const delta = parsed.montantAcompte - (existing.montantEncaisse || 0);
           const newEncaisse = parsed.montantAcompte;
-          const newSolde = Math.max(0, existing.montantRedevanceAnnuelle - newEncaisse);
+          const redevanceAnnuelle = existing.montantRedevanceAnnuelle || 60000;
+          const newSolde = Math.max(0, redevanceAnnuelle - newEncaisse);
           updates.montantEncaisse = newEncaisse;
           updates.soldeRestantDu = newSolde;
           // L'attestation n'est pas automatique : seul le solde complet confère 'en_regle', sinon conserve le statut
@@ -1204,9 +1229,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           await addReceipt({
             datePaiement: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
             etablissementId: existing.id,
-            etablissementNom: existing.nomCommercial,
-            promoteurNom: existing.promoteurNom,
-            arrondissement: existing.arrondissement,
+            etablissementNom: existing.nomCommercial || parsed.nomCommercial || 'Établissement',
+            promoteurNom: existing.promoteurNom || parsed.promoteurNom || 'Promoteur',
+            arrondissement: existing.arrondissement || parsed.arrondissement || 'Tié-Tié',
             montantVerse: delta,
             resteAPayer: newSolde,
             modePaiement: 'especes',
@@ -1229,46 +1254,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               : 'mise_en_demeure');
 
         const newEst = await addEstablishment({
-          nomCommercial: parsed.nomCommercial,
-          promoteurNom: parsed.promoteurNom,
-          promoteurTelephone: parsed.promoteurTelephone,
+          nomCommercial: (parsed.nomCommercial || 'Établissement SAA').toString().trim(),
+          promoteurNom: parsed.promoteurNom || `Promoteur ${(parsed.nomCommercial || 'Établissement').toString().trim()}`,
+          promoteurTelephone: parsed.promoteurTelephone || '+242 06 600 00 00',
           promoteurEmail: '',
-          arrondissement: parsed.arrondissement,
-          quartier: parsed.quartier,
-          adresseExacte: parsed.adresseExacte,
-          categorie: parsed.categorie,
+          arrondissement: parsed.arrondissement || 'Tié-Tié',
+          quartier: parsed.quartier || 'Centre-Ville',
+          adresseExacte: parsed.adresseExacte || `${parsed.arrondissement || 'Tié-Tié'}, Pointe-Noire`,
+          categorie: parsed.categorie || 'Bar Dancing / Cabaret',
           regimeFiscal: 'informel_forfaitaire',
           surfaceM2: 80,
-          montantRedevanceAnnuelle: parsed.montantRedevanceAnnuelle,
-          montantEncaisse: parsed.montantAcompte,
-          soldeRestantDu: parsed.soldeRestantDu,
+          montantRedevanceAnnuelle: parsed.montantRedevanceAnnuelle || 60000,
+          montantEncaisse: parsed.montantAcompte || 0,
+          soldeRestantDu: parsed.soldeRestantDu || 0,
           statut: status,
           latitude: -4.78 + (Math.random() - 0.5) * 0.05,
           longitude: 11.87 + (Math.random() - 0.5) * 0.05,
           niveauDecibelsMoyen: 68,
           limiteurInstalle: status === 'en_regle',
-          dateRecensement: parsed.prochainRdvDate,
+          dateRecensement: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
           recensePar: assignedAgentNom,
           agentAssigneId: assignedAgentId,
           agentAssigneNom: assignedAgentNom,
-          derniereInspectionDate: parsed.prochainRdvDate,
-          prochainRdvDate: parsed.prochainRdvDate,
-          prochainRdvHeure: parsed.prochainRdvHeure,
-          prochainRdvMotif: parsed.prochainRdvMotif,
-          estEteintOuFerme: parsed.estFerme,
+          derniereInspectionDate: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
+          prochainRdvDate: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
+          prochainRdvHeure: parsed.prochainRdvHeure || '10:00',
+          prochainRdvMotif: parsed.prochainRdvMotif || 'Visite de contrôle',
+          estEteintOuFerme: parsed.estFerme || false,
           motifFermeture: parsed.estFerme ? 'Constaté fermé lors de l\'import Google Agenda' : undefined,
-          dateConstatFermeture: parsed.estFerme ? parsed.prochainRdvDate : undefined,
+          dateConstatFermeture: parsed.estFerme ? (parsed.prochainRdvDate || new Date().toISOString().substring(0, 10)) : undefined,
           constateParAgentNom: parsed.estFerme ? assignedAgentNom : undefined,
-        });
+        }, { silent: true });
 
         // Add receipt if acompte was recorded
         if (parsed.montantAcompte > 0) {
           await addReceipt({
-            datePaiement: parsed.prochainRdvDate,
+            datePaiement: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
             etablissementId: newEst.id,
-            etablissementNom: newEst.nomCommercial,
-            promoteurNom: newEst.promoteurNom,
-            arrondissement: newEst.arrondissement,
+            etablissementNom: newEst.nomCommercial || 'Établissement',
+            promoteurNom: newEst.promoteurNom || 'Promoteur',
+            arrondissement: newEst.arrondissement || 'Tié-Tié',
             montantVerse: parsed.montantAcompte,
             resteAPayer: parsed.soldeRestantDu,
             modePaiement: 'especes',
@@ -1282,16 +1307,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Add schedule for field tour
         await addSchedule({
           etablissementId: newEst.id,
-          etablissementNom: newEst.nomCommercial,
-          arrondissement: newEst.arrondissement,
-          brigadeAssignee: `Brigade SAA - ${newEst.arrondissement}`,
-          dateTournee: parsed.prochainRdvDate,
-          heure: parsed.prochainRdvHeure,
+          etablissementNom: newEst.nomCommercial || 'Établissement',
+          arrondissement: newEst.arrondissement || 'Tié-Tié',
+          brigadeAssignee: `Brigade SAA - ${newEst.arrondissement || 'Tié-Tié'}`,
+          dateTournee: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
+          heure: parsed.prochainRdvHeure || '10:00',
           typeMission: 'Recouvrement',
           inspecteurChef: assignedAgentNom,
           agentId: assignedAgentId,
           statut: parsed.estFerme ? 'annule' : 'planifie',
-          notes: parsed.notes,
+          notes: parsed.notes || '',
         });
 
         importedCount++;

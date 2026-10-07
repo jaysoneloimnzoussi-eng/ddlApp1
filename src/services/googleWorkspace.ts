@@ -138,9 +138,9 @@ export function parseCategoryFromText(text: string): any {
  * Parses a Google Calendar event into an Establishment structure
  */
 export function parseGoogleCalendarEvent(event: any): ParsedGoogleCalendarEstablishment {
-  const summary = event.summary || 'Établissement SAA';
-  const description = event.description || '';
-  const location = event.location || '';
+  const summary = (event?.summary || '').toString();
+  const description = (event?.description || '').toString();
+  const location = (event?.location || '').toString();
   const allText = `${summary} ${description} ${location}`;
 
   // Extract Establishment Name
@@ -148,7 +148,7 @@ export function parseGoogleCalendarEvent(event: any): ParsedGoogleCalendarEstabl
     .replace(/^(?:contr[oô]le|recensement|rdv|visite|tourn[ée]e|inspection|acompte|paiement|relance)\s*[:-]?\s*/i, '')
     .trim();
   if (!nomCommercial || nomCommercial.length < 3) {
-    nomCommercial = summary;
+    nomCommercial = summary.trim() || 'Établissement SAA';
   }
 
   // Check if closed
@@ -160,14 +160,14 @@ export function parseGoogleCalendarEvent(event: any): ParsedGoogleCalendarEstabl
 
   // Extract promoter name
   const promMatch = description.match(/(?:promoteur|proprio|propriétaire|gérant|contact)\s*:\s*([^\n,;]+)/i);
-  const promoteurNom = promMatch ? promMatch[1].trim() : 'Promoteur ' + nomCommercial;
+  const promoteurNom = (promMatch && promMatch[1] && promMatch[1].trim()) ? promMatch[1].trim() : 'Promoteur ' + nomCommercial;
 
   // Extract Arrondissement
   const arrondissement = parseArrondissementFromText(allText);
 
   // Extract Quartier
   const quartierMatch = description.match(/quartier\s*:\s*([^\n,;]+)/i) || location.match(/,\s*([^\n,]+)/);
-  const quartier = quartierMatch ? quartierMatch[1].trim() : 'Centre-Ville';
+  const quartier = (quartierMatch && quartierMatch[1] && quartierMatch[1].trim()) ? quartierMatch[1].trim() : 'Centre-Ville';
 
   // Extract fees
   // Look for acompte or montant versé
@@ -330,7 +330,7 @@ export async function createOfficialGoogleDoc(
  * Unfolds continuation lines, parses VEVENT blocks, and transforms them into standard event objects
  */
 export function parseICalendarContent(icsText: string): any[] {
-  if (!icsText || !icsText.trim()) return [];
+  if (!icsText || typeof icsText !== 'string' || !icsText.trim()) return [];
 
   // 1. Unfold lines (RFC 5545: lines starting with space or tab are continuations)
   const unfolded = icsText.replace(/\r\n[ \t]|\r[ \t]|\n[ \t]/g, '');
@@ -341,7 +341,7 @@ export function parseICalendarContent(icsText: string): any[] {
   let currentEvent: Record<string, string> = {};
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = (line || '').trim();
     if (trimmed === 'BEGIN:VEVENT') {
       inEvent = true;
       currentEvent = {};
@@ -413,7 +413,7 @@ export function parseICalendarContent(icsText: string): any[] {
  * "Le Palmier VIP - Tié-Tié, Mbota - Promoteur: M. Jean (06 600 11 22) - Acompte: 50000 FCFA - RDV: 2026-10-15 11:00"
  */
 export function parsePastedTextEvents(rawText: string): any[] {
-  if (!rawText || !rawText.trim()) return [];
+  if (!rawText || typeof rawText !== 'string' || !rawText.trim()) return [];
 
   // Check if it's ICS content
   if (rawText.includes('BEGIN:VCALENDAR') || rawText.includes('BEGIN:VEVENT')) {
@@ -423,12 +423,12 @@ export function parsePastedTextEvents(rawText: string): any[] {
   // Otherwise, split by double newlines or single non-empty lines
   const rawBlocks = rawText
     .split(/\n\s*\n/)
-    .map((b) => b.trim())
+    .map((b) => (b || '').trim())
     .filter(Boolean);
 
   const lines = rawBlocks.length > 1
     ? rawBlocks
-    : rawText.split('\n').map((l) => l.trim()).filter((l) => l.length > 5);
+    : rawText.split('\n').map((l) => (l || '').trim()).filter((l) => l.length > 5);
 
   const results: any[] = [];
 
@@ -452,8 +452,8 @@ export function parsePastedTextEvents(rawText: string): any[] {
     const timeStr = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : '10:00';
 
     // Summary line: first line or before first dash/colon
-    const firstLine = block.split('\n')[0];
-    const summaryCandidate = firstLine.split(/ - | – | \| /)[0].replace(/^[0-9\.\-\*\•\s]+/, '').trim();
+    const firstLine = (block || '').split('\n')[0] || '';
+    const summaryCandidate = (firstLine.split(/ - | – | \| /)[0] || '').replace(/^[0-9\.\-\*\•\s]+/, '').trim();
 
     results.push({
       id: `text-imp-${Date.now()}-${i}`,
