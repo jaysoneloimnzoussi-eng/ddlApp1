@@ -42,6 +42,7 @@ import {
   FileText,
   ClipboardPaste,
   Database,
+  RefreshCw,
 } from 'lucide-react';
 import { InspectionSchedule, Establishment, CashReceipt } from '../../types';
 import {
@@ -59,6 +60,9 @@ export const MobileAgentCalendarModule: React.FC = () => {
     visibleSchedules,
     visibleEstablishments,
     establishments,
+    receipts,
+    schedules,
+    syncAllToFirestore,
     currentAgent,
     currentAgentId,
     setCurrentAgentId,
@@ -1678,14 +1682,24 @@ export const MobileAgentCalendarModule: React.FC = () => {
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto space-y-4 text-xs">
               {/* Statut Firestore */}
-              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-emerald-800 dark:text-emerald-300">
                 <div className="flex items-center gap-2">
                   <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>
-                    <strong>Base Firebase Firestore Connectée :</strong> 34 établissements, 16 tournées et quittances réels déjà enregistrés dans votre base.
+                    <strong>Base Firebase Firestore Connectée :</strong> {establishments.length} établissements, {schedules.length} tournées et {receipts.length} quittances synchronisés en temps réel.
                   </span>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await syncAllToFirestore();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer shrink-0"
+                  title="Pousser immédiatement tous les établissements vers Firebase Firestore"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Synchroniser vers Firestore</span>
+                </button>
               </div>
 
               {/* Onglets de Source d'Importation */}

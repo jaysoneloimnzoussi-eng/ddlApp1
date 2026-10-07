@@ -29,8 +29,9 @@ import {
   logout as firebaseLogout,
   db,
   testFirestoreConnection,
+  cleanForFirestore,
 } from '../services/firebase';
-import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, writeBatch } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
 interface NotificationItem {
@@ -42,6 +43,7 @@ interface NotificationItem {
 interface AppContextType {
   activeModule: string;
   setActiveModule: (mod: string) => void;
+  syncAllToFirestore: () => Promise<void>;
   // Agent Siloing & Identity
   currentUserRole: UserRole;
   setCurrentUserRole: (role: UserRole) => void;
@@ -782,24 +784,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setEstablishments((prev) => [newEst, ...prev]);
 
-    // Push to Firestore
+    // Push to Firestore with clean data
+    const cleanDoc = cleanForFirestore(newEst);
     try {
-      setDoc(doc(db, 'establishments', newEst.id), newEst).catch((err) => {
-        console.warn("Firestore sync fallback to offline store:", err);
-      });
+      await setDoc(doc(db, 'establishments', newEst.id), cleanDoc);
     } catch (e) {
-      console.warn("Firestore write error:", e);
+      console.warn("Firestore write error, queueing offline:", e);
+      if (!isOnline) {
+        setOfflineQueue((prev) => [...prev, { type: 'ESTABLISHMENT_ADD', data: cleanDoc }]);
+      }
     }
 
     if (!options?.silent) {
       if (!isOnline) {
-        setOfflineQueue((prev) => [...prev, { type: 'ESTABLISHMENT_ADD', data: newEst }]);
         showNotification('warning', `Établissement enregistré localement en mode Hors-Ligne (Dossier ${codeDossier}).`);
       } else {
         showNotification('success', `Nouvel établissement recensé et synchronisé Firestore (Attribué à ${newEst.agentAssigneNom}) : ${newEst.nomCommercial}`);
       }
-    } else if (!isOnline) {
-      setOfflineQueue((prev) => [...prev, { type: 'ESTABLISHMENT_ADD', data: newEst }]);
     }
 
     await addAuditLog(
@@ -818,9 +819,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     try {
-      setDoc(doc(db, 'establishments', id), updates, { merge: true }).catch((err) => {
-        console.warn("Firestore update fallback to local store:", err);
-      });
+      const cleanUpdates = cleanForFirestore(updates);
+      await setDoc(doc(db, 'establishments', id), cleanUpdates, { merge: true });
     } catch (e) {
       console.warn("Firestore update error:", e);
     }
@@ -846,11 +846,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setReceipts((prev) => [newReceipt, ...prev]);
 
-    // Push to Firestore
+    // Push to Firestore with clean data
     try {
-      setDoc(doc(db, 'receipts', newReceipt.id), newReceipt).catch((err) => {
-        console.warn("Firestore sync receipt fallback to local store:", err);
-      });
+      const cleanRec = cleanForFirestore(newReceipt);
+      await setDoc(doc(db, 'receipts', newReceipt.id), cleanRec);
     } catch (e) {
       console.warn("Firestore write receipt error:", e);
     }
@@ -1081,14 +1080,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addSchedule = async (schData: Omit<InspectionSchedule, 'id'>): Promise<InspectionSchedule> => {
     const newSch: InspectionSchedule = {
       ...schData,
-      id: 'sch-' + Date.now(),
+      id: 'sch-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
     };
     setSchedules((prev) => [newSch, ...prev]);
 
     try {
-      setDoc(doc(db, 'schedules', newSch.id), newSch).catch((err) => {
-        console.warn("Firestore sync schedule fallback:", err);
-      });
+      const cleanSch = cleanForFirestore(newSch);
+      await setDoc(doc(db, 'schedules', newSch.id), cleanSch);
     } catch (e) {
       console.warn("Firestore schedule error:", e);
     }
@@ -1102,9 +1100,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     try {
-      setDoc(doc(db, 'schedules', id), updates, { merge: true }).catch((err) => {
-        console.warn("Firestore sync update schedule fallback:", err);
-      });
+      const cleanUpdates = cleanForFirestore(updates);
+      await setDoc(doc(db, 'schedules', id), cleanUpdates, { merge: true });
     } catch (e) {
       console.warn("Firestore update schedule error:", e);
     }
@@ -1182,6 +1179,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const assignedAgentId = agent ? agent.id : (currentAgentId !== 'all' ? currentAgentId : 'stf-002');
     const assignedAgentNom = agent ? agent.nomComplet : 'Jacques MATOKO';
 
+    const batchWrites: Array<{ coll: string; id: string; data: any; merge?: boolean }> = [];
+
     for (const rawEvt of rawEvents) {
       const parsed = parseGoogleCalendarEvent(rawEvt);
       const cleanNom = (parsed?.nomCommercial || '').toString().trim().toLowerCase();
@@ -1226,7 +1225,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updates.statut = newSolde === 0 ? 'en_regle' : (existing.statut === 'attestation_provisoire' ? 'attestation_provisoire' : existing.statut || 'mise_en_demeure');
 
           // Add receipt
-          await addReceipt({
+          const rec = await addReceipt({
             datePaiement: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
             etablissementId: existing.id,
             etablissementNom: existing.nomCommercial || parsed.nomCommercial || 'Établissement',
@@ -1239,10 +1238,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             agentId: assignedAgentId,
             natureRecette: 'Forfait Informel SAA',
           });
+          batchWrites.push({ coll: 'receipts', id: rec.id, data: rec });
           acomptesCount++;
         }
 
         await updateEstablishment(existing.id, updates);
+        batchWrites.push({ coll: 'establishments', id: existing.id, data: updates, merge: true });
         updatedCount++;
       } else {
         // Create NEW Establishment -> GROWS THE GENERAL DATABASE!
@@ -1286,9 +1287,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           constateParAgentNom: parsed.estFerme ? assignedAgentNom : undefined,
         }, { silent: true });
 
+        batchWrites.push({ coll: 'establishments', id: newEst.id, data: newEst });
+
         // Add receipt if acompte was recorded
         if (parsed.montantAcompte > 0) {
-          await addReceipt({
+          const rec = await addReceipt({
             datePaiement: parsed.prochainRdvDate || new Date().toISOString().substring(0, 10),
             etablissementId: newEst.id,
             etablissementNom: newEst.nomCommercial || 'Établissement',
@@ -1301,11 +1304,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             agentId: assignedAgentId,
             natureRecette: 'Forfait Informel SAA',
           });
+          batchWrites.push({ coll: 'receipts', id: rec.id, data: rec });
           acomptesCount++;
         }
 
         // Add schedule for field tour
-        await addSchedule({
+        const sch = await addSchedule({
           etablissementId: newEst.id,
           etablissementNom: newEst.nomCommercial || 'Établissement',
           arrondissement: newEst.arrondissement || 'Tié-Tié',
@@ -1318,8 +1322,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           statut: parsed.estFerme ? 'annule' : 'planifie',
           notes: parsed.notes || '',
         });
+        batchWrites.push({ coll: 'schedules', id: sch.id, data: sch });
 
         importedCount++;
+      }
+    }
+
+    // Direct atomic batch commit to Firebase Firestore
+    if (batchWrites.length > 0) {
+      try {
+        const BATCH_SIZE = 350;
+        for (let i = 0; i < batchWrites.length; i += BATCH_SIZE) {
+          const slice = batchWrites.slice(i, i + BATCH_SIZE);
+          const batch = writeBatch(db);
+          for (const item of slice) {
+            const docRef = doc(db, item.coll, item.id);
+            if (item.merge) {
+              batch.set(docRef, cleanForFirestore(item.data), { merge: true });
+            } else {
+              batch.set(docRef, cleanForFirestore(item.data));
+            }
+          }
+          await batch.commit();
+        }
+        console.log(`[Firestore] Succès de la synchronisation par lot : ${batchWrites.length} documents enregistrés dans Firebase.`);
+      } catch (fErr: any) {
+        console.warn("[Firestore] Erreur lors du commit par lot:", fErr);
       }
     }
 
@@ -1327,7 +1355,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     showNotification(
       'success',
-      `Synchronisation Google Calendar réussie : ${importedCount} nouveaux établissements ajoutés, ${updatedCount} actualisés, ${acomptesCount} acomptes enregistrés.`
+      `Synchronisation Google Calendar réussie : ${importedCount} nouveaux établissements ajoutés et envoyés à Firebase Firestore, ${updatedCount} actualisés, ${acomptesCount} acomptes enregistrés.`
     );
 
     await addAuditLog(
@@ -1343,6 +1371,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       acomptesCount,
       totalEstablishmentsAfter: totalAfter,
     };
+  };
+
+  // Synchronise exhaustivement l'intégralité de la base locale vers Firebase Firestore
+  const syncAllToFirestore = async () => {
+    try {
+      showNotification('info', `Synchronisation vers Firebase Firestore de ${establishments.length} établissements...`);
+      const allWrites: Array<{ coll: string; id: string; data: any }> = [];
+
+      for (const est of establishments) {
+        allWrites.push({ coll: 'establishments', id: est.id, data: cleanForFirestore(est) });
+      }
+      for (const rec of receipts) {
+        allWrites.push({ coll: 'receipts', id: rec.id, data: cleanForFirestore(rec) });
+      }
+      for (const sch of schedules) {
+        allWrites.push({ coll: 'schedules', id: sch.id, data: cleanForFirestore(sch) });
+      }
+
+      const BATCH_SIZE = 350;
+      for (let i = 0; i < allWrites.length; i += BATCH_SIZE) {
+        const slice = allWrites.slice(i, i + BATCH_SIZE);
+        const batch = writeBatch(db);
+        for (const w of slice) {
+          batch.set(doc(db, w.coll, w.id), w.data, { merge: true });
+        }
+        await batch.commit();
+      }
+
+      showNotification(
+        'success',
+        `Base générale synchronisée avec succès dans Firebase Firestore (${establishments.length} établissements sauvegardés) !`
+      );
+    } catch (err: any) {
+      console.error('Erreur synchronisation Firestore:', err);
+      showNotification('error', `Erreur de synchronisation Firestore : ${err?.message}`);
+    }
   };
 
   const syncOfflineQueue = () => {
@@ -1369,6 +1433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         activeModule,
         setActiveModule,
+        syncAllToFirestore,
         currentUserRole,
         setCurrentUserRole,
         currentAgentId,

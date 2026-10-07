@@ -36,6 +36,27 @@ const app = !getApps().length ? initializeApp(activeFirebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db: Firestore = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
 
+/**
+ * Strips all undefined fields recursively so Firestore never rejects documents.
+ */
+export function cleanForFirestore<T extends Record<string, any>>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj;
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      cleaned[key] = cleanForFirestore(value);
+    } else if (Array.isArray(value)) {
+      cleaned[key] = value
+        .filter((item) => item !== undefined)
+        .map((item) => (typeof item === 'object' && item !== null ? cleanForFirestore(item) : item));
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned as T;
+}
+
 // Standard Google Provider (Profile & Email - Accessible à tous sans blocage 403)
 export const standardGoogleProvider = new GoogleAuthProvider();
 standardGoogleProvider.addScope('profile');
