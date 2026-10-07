@@ -89,7 +89,7 @@ interface AppContextType {
   soitTransmis: SoitTransmisDgl[];
 
   // Mutators & Business Actions
-  addEstablishment: (est: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'>) => Promise<Establishment>;
+  addEstablishment: (est: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'>, options?: { silent?: boolean }) => Promise<Establishment>;
   updateEstablishment: (id: string, updates: Partial<Establishment>) => Promise<void>;
   addReceipt: (rec: Omit<CashReceipt, 'id' | 'numeroQuittance' | 'quittanceHash'>) => Promise<CashReceipt>;
   issueLegalAct: (act: Omit<LegalAct, 'id' | 'referenceNumero' | 'documentHash'>) => Promise<LegalAct>;
@@ -923,8 +923,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     nextRdvMotif?: string;
     currentScheduleId?: string;
   }): Promise<{ receipt: CashReceipt; nextSchedule?: InspectionSchedule }> => {
-    const est = establishments.find((e) => e.id === establishmentId);
-    if (!est) throw new Error("Établissement non trouvé");
+    let est = establishments.find((e) => e.id === establishmentId);
+    if (!est) {
+      est = visibleEstablishments.find((e) => e.id === establishmentId);
+    }
+    if (!est) {
+      const lower = establishmentId.toLowerCase().trim();
+      est = establishments.find((e) => (e.nomCommercial || '').toLowerCase().trim() === lower) ||
+            visibleEstablishments.find((e) => (e.nomCommercial || '').toLowerCase().trim() === lower);
+    }
+    if (!est) {
+      throw new Error("Établissement non trouvé");
+    }
 
     const activeAgent = currentAgent || staff.find((s) => s.id === est.agentAssigneId) || staff[1];
 
@@ -954,6 +964,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const soldeApresPaiement = Math.max(0, est.soldeRestantDu - montantVerse);
+    const nouveauMontantEncaisse = (est.montantEncaisse || 0) + montantVerse;
+    const nouveauStatut: ComplianceStatus = soldeApresPaiement === 0
+      ? 'en_regle'
+      : (est.statut === 'attestation_provisoire' ? 'attestation_provisoire' : est.statut || 'mise_en_demeure');
+
     let nextSchedule: InspectionSchedule | undefined = undefined;
 
     // 3. CASE A: Partial payment with next agreed appointment date
@@ -978,6 +993,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prochainRdvDate: nextRdvDate,
         prochainRdvHeure: nextRdvHeure,
         prochainRdvMotif: nextRdvMotif,
+        montantEncaisse: nouveauMontantEncaisse,
+        soldeRestantDu: soldeApresPaiement,
+        statut: nouveauStatut,
       });
 
       showNotification(
@@ -1015,6 +1033,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prochainRdvDate: nextYearDate,
         prochainRdvHeure: '10:00',
         prochainRdvMotif: `Reconduction annuelle exercice N+1`,
+        montantEncaisse: nouveauMontantEncaisse,
+        soldeRestantDu: 0,
+        statut: 'en_regle',
       });
 
       showNotification(

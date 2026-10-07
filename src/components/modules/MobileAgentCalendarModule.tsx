@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Calendar,
@@ -79,6 +79,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
     showNotification,
     theme,
     addSchedule,
+    addEstablishment,
     isCalendarFullScreen,
     setIsCalendarFullScreen,
     setActiveModule,
@@ -107,11 +108,26 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
   // Create new appointment modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
-  const [createEstId, setCreateEstId] = useState<string>(visibleEstablishments[0]?.id || '');
+  const [createEstId, setCreateEstId] = useState<string>('');
+  const [isCustomEst, setIsCustomEst] = useState<boolean>(false);
+  const [customEstNom, setCustomEstNom] = useState<string>('');
+  const [createArrondissement, setCreateArrondissement] = useState<string>('Tié-Tié');
   const [createDate, setCreateDate] = useState<string>('2026-10-07');
   const [createHeure, setCreateHeure] = useState<string>('10:00');
   const [createMotif, setCreateMotif] = useState<InspectionSchedule['typeMission']>('Recouvrement');
   const [createNotes, setCreateNotes] = useState<string>('Tournée de recouvrement SAA');
+  const [isCreatingSchedule, setIsCreatingSchedule] = useState<boolean>(false);
+
+  // Auto-sync available establishments for selection
+  const availableEstablishments = useMemo(() => {
+    return visibleEstablishments.length > 0 ? visibleEstablishments : establishments;
+  }, [visibleEstablishments, establishments]);
+
+  useEffect(() => {
+    if (!createEstId && availableEstablishments.length > 0) {
+      setCreateEstId(availableEstablishments[0].id);
+    }
+  }, [availableEstablishments, createEstId]);
 
   // Google Calendar 2026 Import Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -184,16 +200,19 @@ export const MobileAgentCalendarModule: React.FC = () => {
   // Filtered schedules for search query
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return visibleEstablishments.filter(
+    const q = searchQuery.toLowerCase().trim();
+    const source = establishments.length > 0 ? establishments : availableEstablishments;
+    return source.filter(
       (e) =>
-        e.nomCommercial.toLowerCase().includes(q) ||
-        e.promoteurNom.toLowerCase().includes(q) ||
-        e.arrondissement.toLowerCase().includes(q) ||
-        e.quartier.toLowerCase().includes(q) ||
-        e.codeDossier.toLowerCase().includes(q)
+        e && (
+          (e.nomCommercial || '').toLowerCase().includes(q) ||
+          (e.promoteurNom || '').toLowerCase().includes(q) ||
+          (e.arrondissement || '').toLowerCase().includes(q) ||
+          (e.quartier || '').toLowerCase().includes(q) ||
+          (e.codeDossier || '').toLowerCase().includes(q)
+        )
     );
-  }, [searchQuery, visibleEstablishments]);
+  }, [searchQuery, establishments, availableEstablishments]);
 
   // Execute payment & next appointment workflow
   const handleExecutePaymentWorkflow = async (e: React.FormEvent) => {
@@ -418,16 +437,74 @@ export const MobileAgentCalendarModule: React.FC = () => {
     }
   };
 
+  // Open Create Appointment Modal with prefilled parameters
+  const handleOpenCreateModal = (dateStr?: string, hourStr?: string, estId?: string) => {
+    if (estId) {
+      setCreateEstId(estId);
+      setIsCustomEst(false);
+    } else if (!createEstId || !availableEstablishments.some((e) => e.id === createEstId)) {
+      if (availableEstablishments[0]) {
+        setCreateEstId(availableEstablishments[0].id);
+      }
+    }
+    if (dateStr) {
+      setCreateDate(dateStr);
+    }
+    if (hourStr) {
+      setCreateHeure(hourStr);
+    }
+    setIsCreateModalOpen(true);
+  };
+
   // Create new appointment manually
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    const est = visibleEstablishments.find((e) => e.id === createEstId);
-    if (!est) return;
-
-    const activeAgent = currentAgent || staff.find((s) => s.id === est.agentAssigneId) || staff[1];
+    setIsCreatingSchedule(true);
 
     try {
-      const newSch = await addSchedule({
+      let est: Establishment | undefined = undefined;
+
+      if (isCustomEst && customEstNom.trim()) {
+        const activeAgent = currentAgent || staff[1];
+        const newEstData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'> = {
+          nomCommercial: customEstNom.trim(),
+          promoteurNom: `Promoteur ${customEstNom.trim()}`,
+          promoteurTelephone: '+242 06 600 00 00',
+          promoteurEmail: '',
+          arrondissement: (createArrondissement as any) || 'Tié-Tié',
+          quartier: 'Centre-Ville',
+          adresseExacte: `${createArrondissement || 'Tié-Tié'}, Pointe-Noire`,
+          categorie: 'Bar Dancing / Cabaret',
+          regimeFiscal: 'informel_forfaitaire',
+          surfaceM2: 80,
+          montantRedevanceAnnuelle: 60000,
+          montantEncaisse: 0,
+          soldeRestantDu: 60000,
+          statut: 'mise_en_demeure',
+          latitude: -4.78 + (Math.random() - 0.5) * 0.05,
+          longitude: 11.87 + (Math.random() - 0.5) * 0.05,
+          niveauDecibelsMoyen: 68,
+          limiteurInstalle: false,
+          dateRecensement: createDate,
+          recensePar: activeAgent.nomComplet,
+          agentAssigneId: activeAgent.id,
+          agentAssigneNom: activeAgent.nomComplet,
+        };
+        est = await addEstablishment(newEstData);
+      } else {
+        const targetId = createEstId || availableEstablishments[0]?.id;
+        est = availableEstablishments.find((e) => e.id === targetId) ||
+              establishments.find((e) => e.id === targetId);
+      }
+
+      if (!est) {
+        showNotification('warning', 'Veuillez sélectionner un établissement valide ou saisir son nom.');
+        return;
+      }
+
+      const activeAgent = currentAgent || staff.find((s) => s.id === est?.agentAssigneId) || staff[1];
+
+      await addSchedule({
         dateTournee: createDate,
         heure: createHeure,
         etablissementId: est.id,
@@ -442,20 +519,107 @@ export const MobileAgentCalendarModule: React.FC = () => {
         statut: 'planifie',
       });
 
+      if (googleAccessToken) {
+        try {
+          const startIso = `${createDate}T${createHeure}:00`;
+          const endHour = (parseInt(createHeure.split(':')[0], 10) + 1).toString().padStart(2, '0');
+          const endIso = `${createDate}T${endHour}:${createHeure.split(':')[1]}:00`;
+          await createGoogleCalendarEvent(googleAccessToken, {
+            summary: `[DDL-PN] ${createMotif} : ${est.nomCommercial}`,
+            description: `${createNotes}. Agent : ${activeAgent.nomComplet}`,
+            location: `${est.nomCommercial}, ${est.arrondissement}, Pointe-Noire`,
+            startDateTime: startIso,
+            endDateTime: endIso,
+          });
+        } catch (calErr) {
+          console.warn("Sync Google agenda warning:", calErr);
+        }
+      }
+
       showNotification('success', `Rendez-vous planifié au ${createDate} pour ${est.nomCommercial}`);
       setIsCreateModalOpen(false);
+      setCustomEstNom('');
+      setIsCustomEst(false);
     } catch (err: any) {
       showNotification('error', `Erreur de planification: ${err.message}`);
+    } finally {
+      setIsCreatingSchedule(false);
     }
   };
 
-  // Open Payment modal from a schedule
-  const handleOpenPaymentFromSchedule = (sch: InspectionSchedule) => {
-    const est = visibleEstablishments.find((e) => e.id === sch.etablissementId);
+  // Open Payment modal from a schedule (ultra robust with fallbacks and on-the-fly creation)
+  const handleOpenPaymentFromSchedule = async (sch: InspectionSchedule) => {
+    // 1. Try finding in visibleEstablishments by ID
+    let est = visibleEstablishments.find((e) => e && e.id === sch.etablissementId);
+
+    // 2. Try finding in all establishments by ID
+    if (!est) {
+      est = establishments.find((e) => e && e.id === sch.etablissementId);
+    }
+
+    // 3. Try finding by commercial name in visibleEstablishments or establishments
+    if (!est && sch.etablissementNom) {
+      const schNom = sch.etablissementNom.toLowerCase().trim();
+      est = visibleEstablishments.find((e) => e && (e.nomCommercial || '').toLowerCase().trim() === schNom) ||
+            establishments.find((e) => e && (e.nomCommercial || '').toLowerCase().trim() === schNom);
+
+      // 4. Try fuzzy match by name
+      if (!est) {
+        est = establishments.find((e) => {
+          if (!e || !e.nomCommercial) return false;
+          const eNom = e.nomCommercial.toLowerCase().trim();
+          return (schNom.length > 5 && (eNom.includes(schNom) || schNom.includes(eNom)));
+        });
+      }
+    }
+
+    // 5. If STILL not found: create a real establishment on the fly
+    if (!est) {
+      const activeAgent = currentAgent || staff.find((s) => s.id === sch.agentId) || staff[1];
+      const newEstData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'> = {
+        nomCommercial: (sch.etablissementNom || 'Établissement SAA').trim(),
+        promoteurNom: `Promoteur ${(sch.etablissementNom || 'Établissement').trim()}`,
+        promoteurTelephone: '+242 06 600 00 00',
+        promoteurEmail: '',
+        arrondissement: (sch.arrondissement as any) || 'Tié-Tié',
+        quartier: 'Centre-Ville',
+        adresseExacte: `${sch.arrondissement || 'Tié-Tié'}, Pointe-Noire`,
+        categorie: 'Bar Dancing / Cabaret',
+        regimeFiscal: 'informel_forfaitaire',
+        surfaceM2: 80,
+        montantRedevanceAnnuelle: sch.montantAcompteAttendu ? Math.max(sch.montantAcompteAttendu, 60000) : 60000,
+        montantEncaisse: 0,
+        soldeRestantDu: sch.montantAcompteAttendu ? Math.max(sch.montantAcompteAttendu, 60000) : 60000,
+        statut: 'mise_en_demeure',
+        latitude: -4.78 + (Math.random() - 0.5) * 0.05,
+        longitude: 11.87 + (Math.random() - 0.5) * 0.05,
+        niveauDecibelsMoyen: 68,
+        limiteurInstalle: false,
+        dateRecensement: sch.dateTournee || new Date().toISOString().substring(0, 10),
+        recensePar: sch.inspecteurChef || activeAgent.nomComplet,
+        agentAssigneId: sch.agentId || activeAgent.id,
+        agentAssigneNom: sch.inspecteurChef || activeAgent.nomComplet,
+      };
+
+      try {
+        est = await addEstablishment(newEstData, { silent: true });
+        showNotification('info', `Dossier initialisé pour ${est.nomCommercial} afin d'enregistrer l'encaissement.`);
+      } catch (err: any) {
+        showNotification('error', `Erreur lors de la préparation du dossier : ${err.message}`);
+        return;
+      }
+    }
+
     if (est) {
       setSelectedSchedule(sch);
       setTargetEstForPayment(est);
-      setMontantAcompte(est.soldeRestantDu > 0 ? Math.min(25000, est.soldeRestantDu) : 50000);
+      const defaultAcompte = sch.montantAcompteAttendu && sch.montantAcompteAttendu > 0
+        ? sch.montantAcompteAttendu
+        : (est.soldeRestantDu > 0 ? Math.min(25000, est.soldeRestantDu) : 50000);
+      setMontantAcompte(defaultAcompte);
+      setNextRdvDate(sch.dateTournee || new Date().toISOString().substring(0, 10));
+      setNextRdvHeure(sch.heure || '10:00');
+      setNextRdvMotif(`Suite tournée pour ${est.nomCommercial}`);
       setIsPaymentModalOpen(true);
     }
   };
@@ -741,7 +905,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
           <div className="space-y-6">
             {/* Google "+ Créer" Pill Button */}
             <button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => handleOpenCreateModal()}
               className="flex items-center gap-3 px-5 py-3 rounded-full bg-white dark:bg-slate-800 hover:shadow-lg border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-sm shadow-md transition hover:bg-slate-50 cursor-pointer w-full"
             >
               <div className="w-6 h-6 flex items-center justify-center">
@@ -845,12 +1009,15 @@ export const MobileAgentCalendarModule: React.FC = () => {
               </p>
 
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {visibleEstablishments.map((est) => (
+                {(visibleEstablishments.length > 0 ? visibleEstablishments : establishments).slice(0, 30).map((est) => (
                   <div
                     key={est.id}
                     onClick={() => {
                       setTargetEstForPayment(est);
                       setMontantAcompte(est.soldeRestantDu > 0 ? Math.min(25000, est.soldeRestantDu) : 50000);
+                      setNextRdvDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10));
+                      setNextRdvHeure('10:00');
+                      setNextRdvMotif(`Suite tournée pour ${est.nomCommercial}`);
                       setIsPaymentModalOpen(true);
                     }}
                     className={`p-2 rounded-lg border text-xs cursor-pointer transition flex items-center justify-between ${
@@ -1008,9 +1175,15 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         return (
                           <div
                             key={colIdx}
-                            className={`border-r last:border-r-0 p-1 relative min-h-[64px] transition ${
+                            onClick={(e) => {
+                              if (e.target === e.currentTarget) {
+                                handleOpenCreateModal(dateKey, hourStr);
+                              }
+                            }}
+                            className={`border-r last:border-r-0 p-1 relative min-h-[64px] transition cursor-pointer hover:bg-blue-50/40 dark:hover:bg-blue-950/20 ${
                               isLight ? 'border-slate-100' : 'border-slate-800/60'
                             }`}
+                            title="Cliquer pour programmer une descente à cette date et heure"
                           >
                             {/* Red Current Time Line on Today at 10:30 */}
                             {isSimulatedToday && hour === 10 && (
@@ -1024,7 +1197,10 @@ export const MobileAgentCalendarModule: React.FC = () => {
                             {eventsInSlot.map((sch) => (
                               <div
                                 key={sch.id}
-                                onClick={() => setSelectedSchedule(sch)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSchedule(sch);
+                                }}
                                 className={`rounded-lg p-2 text-xs cursor-pointer border transition shadow-sm hover:scale-[1.02] ${getEventBadgeStyle(sch)}`}
                               >
                                 <div className="flex justify-between items-start font-bold">
@@ -1058,9 +1234,18 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
                   Descentes du {currentDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </h3>
-                <span className="text-xs font-mono text-blue-600 font-bold">
-                  {visibleSchedules.filter(s => s.dateTournee === selectedDateKey).length} mission(s)
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-blue-600 font-bold">
+                    {visibleSchedules.filter(s => s.dateTournee === selectedDateKey).length} mission(s)
+                  </span>
+                  <button
+                    onClick={() => handleOpenCreateModal(selectedDateKey)}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Programmer</span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -1069,10 +1254,11 @@ export const MobileAgentCalendarModule: React.FC = () => {
                     <CalendarCheck className="w-12 h-12 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
                     <p className="text-sm font-semibold">Aucune descente programmée à cette date.</p>
                     <button
-                      onClick={() => setIsCreateModalOpen(true)}
-                      className="mt-3 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold"
+                      onClick={() => handleOpenCreateModal(selectedDateKey)}
+                      className="mt-3 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-1.5 mx-auto cursor-pointer"
                     >
-                      + Créer un rendez-vous
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Programmer une descente</span>
                     </button>
                   </div>
                 ) : (
@@ -1182,7 +1368,11 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         {dayEvents.slice(0, 2).map((sch) => (
                           <div
                             key={sch.id}
-                            className={`px-1.5 py-0.5 rounded text-[10px] truncate font-medium ${getEventBadgeStyle(sch)}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSchedule(sch);
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] truncate font-medium hover:opacity-80 transition cursor-pointer ${getEventBadgeStyle(sch)}`}
                           >
                             {sch.heure} {sch.etablissementNom}
                           </div>
@@ -1207,9 +1397,18 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
                   Planning Chronologique des Tournées & Échéances (Vue Agent Exclusif)
                 </h3>
-                <span className="text-xs font-mono text-blue-600 font-bold">
-                  {visibleSchedules.length} missions enregistrées
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-blue-600 font-bold">
+                    {visibleSchedules.length} missions enregistrées
+                  </span>
+                  <button
+                    onClick={() => handleOpenCreateModal()}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Programmer</span>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -1327,7 +1526,9 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
               {/* Complete Payment History */}
               {(() => {
-                const targetEst = visibleEstablishments.find((e) => e.id === selectedSchedule.etablissementId);
+                const targetEst = visibleEstablishments.find((e) => e.id === selectedSchedule.etablissementId) ||
+                                  establishments.find((e) => e.id === selectedSchedule.etablissementId) ||
+                                  establishments.find((e) => (e.nomCommercial || '').toLowerCase().trim() === (selectedSchedule.etablissementNom || '').toLowerCase().trim());
                 if (!targetEst) return null;
 
                 return (
@@ -1371,7 +1572,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
                   <span>Signaler Établissement Fermé / Éteint</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => handleSyncSingleEventToGoogle(selectedSchedule)}
                     className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"
@@ -1380,12 +1581,23 @@ export const MobileAgentCalendarModule: React.FC = () => {
                     <span>Sync Google</span>
                   </button>
 
+                  <button
+                    onClick={() => {
+                      handleOpenCreateModal(selectedSchedule.dateTournee, selectedSchedule.heure, selectedSchedule.etablissementId);
+                      setSelectedSchedule(null);
+                    }}
+                    className="px-3 py-2 rounded-lg border border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Reprogrammer</span>
+                  </button>
+
                   {selectedSchedule.statut !== 'effectue' && (
                     <button
                       onClick={() => {
                         handleOpenPaymentFromSchedule(selectedSchedule);
                       }}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <CreditCard className="w-4 h-4" />
                       <span>Encaisser & Reprogrammer</span>
@@ -1536,9 +1748,19 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  {isProcessing ? 'Enregistrement...' : 'Valider & Imprimer Quittance'}
+                  {isProcessing ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Enregistrement en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      <span>Encaisser et Programmer le RDV</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1566,22 +1788,66 @@ export const MobileAgentCalendarModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateAppointment} className="p-5 space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-bold text-slate-700 dark:text-slate-300">
-                  Sélectionner un établissement de mon portefeuille :
-                </label>
-                <select
-                  value={createEstId}
-                  onChange={(e) => setCreateEstId(e.target.value)}
-                  className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
-                  required
-                >
-                  {visibleEstablishments.map((est) => (
-                    <option key={est.id} value={est.id}>
-                      {est.nomCommercial} ({est.arrondissement}) - Reste: {formatCfa(est.soldeRestantDu)}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">
+                    Établissement concerné :
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomEst(!isCustomEst)}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-500 underline"
+                  >
+                    {isCustomEst ? "Sélectionner dans la liste existante" : "+ Saisir un autre établissement"}
+                  </button>
+                </div>
+
+                {!isCustomEst ? (
+                  <select
+                    value={createEstId}
+                    onChange={(e) => setCreateEstId(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
+                    required={!isCustomEst}
+                  >
+                    {availableEstablishments.length === 0 && (
+                      <option value="">Aucun établissement enregistré</option>
+                    )}
+                    {availableEstablishments.map((est) => (
+                      <option key={est.id} value={est.id}>
+                        {est.nomCommercial} ({est.arrondissement}) - Reste: {formatCfa(est.soldeRestantDu)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="space-y-2 p-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-semibold">Nom commercial de l'établissement :</label>
+                      <input
+                        type="text"
+                        required={isCustomEst}
+                        placeholder="Ex: Bar Chez Maman Pauline"
+                        value={customEstNom}
+                        onChange={(e) => setCustomEstNom(e.target.value)}
+                        className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-semibold">Arrondissement :</label>
+                      <select
+                        value={createArrondissement}
+                        onChange={(e) => setCreateArrondissement(e.target.value)}
+                        className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                      >
+                        <option value="Lumumba">1 - Lumumba</option>
+                        <option value="Mvou-Mvou">2 - Mvou-Mvou</option>
+                        <option value="Tié-Tié">3 - Tié-Tié</option>
+                        <option value="Loandjili">4 - Loandjili</option>
+                        <option value="Mongo-Poukou">5 - Mongo-Poukou</option>
+                        <option value="Ngoyo">6 - Ngoyo</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1642,9 +1908,20 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg transition"
+                  disabled={isCreatingSchedule}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  Enregistrer dans l'Agenda
+                  {isCreatingSchedule ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Programmation en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4" />
+                      <span>Programmer cette descente</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
