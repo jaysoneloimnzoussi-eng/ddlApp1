@@ -146,11 +146,18 @@ export const GoogleWorkspaceGatewayModule: React.FC = () => {
     if (!googleAccessToken) return;
     setIsCreatingDoc(true);
     try {
-      const reportBody = `RÉPUBLIQUE DU CONGO
-Unité - Travail - Progrès
-MINISTÈRE DE LA CULTURE, DES ARTS, DU TOURISME ET DES LOISIRS
+      const reportBody = `MINISTÈRE DE LA CULTURE, DES ARTS,
+DU PATRIMOINE NATIONAL ET DE
+L'INDUSTRIE TOURISTIQUE
+———
 DIRECTION GÉNÉRALE DES LOISIRS
+———
+DÉPARTEMENT DE POINTE-NOIRE
+———
 DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE
+———
+RÉPUBLIQUE DU CONGO
+Unité – Travail – Progrès
 
 ${docTitle.toUpperCase()}
 Date d'édition : ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -167,7 +174,8 @@ II. RECOMMANDATIONS DU COMMANDEMENT TERRITORIAL SAA
 3. Transmission de la prochaine vague de dossiers d'agrément définitif à la Direction Générale à Brazzaville.
 
 Fait à Pointe-Noire,
-Pour le Directeur Départemental des Loisirs.`;
+Le Directeur Départemental des Loisirs
+Jean Richard NTSEKE NGOUAKA`;
 
       const result = await createOfficialGoogleDoc(googleAccessToken, docTitle, reportBody);
       setCreatedDocResult(result);

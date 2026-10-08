@@ -27,6 +27,7 @@ import { DocumentArchivingModule } from './components/modules/DocumentArchivingM
 import { JointInspectionModule } from './components/modules/JointInspectionModule';
 import { PromoterFintechPortalModule } from './components/modules/PromoterFintechPortalModule';
 import { SupabaseDataImportModule } from './components/modules/SupabaseDataImportModule';
+import { AdministrativeDraftingCanvaModule } from './components/modules/AdministrativeDraftingCanvaModule';
 import { AgentLoginConsole } from './components/auth/AgentLoginConsole';
 
 const MainContent: React.FC = () => {
@@ -54,6 +55,7 @@ const MainContent: React.FC = () => {
       {activeModule === 'MOD-16' && <JointInspectionModule />}
       {activeModule === 'MOD-17' && <PromoterFintechPortalModule />}
       {activeModule === 'MOD-18' && <SupabaseDataImportModule />}
+      {activeModule === 'MOD-19' && <AdministrativeDraftingCanvaModule />}
     </main>
   );
 };

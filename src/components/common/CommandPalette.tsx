@@ -35,6 +35,7 @@ import {
   ArrowUpDown,
   Building2,
   CheckCircle2,
+  FileSignature,
 } from 'lucide-react';
 
 interface PaletteItem {
@@ -359,6 +360,21 @@ export const CommandPalette: React.FC = () => {
         showNotification('info', 'Module ouvert : MOD-18 Import Supabase / Données');
       },
       isActive: activeModule === 'MOD-18',
+    },
+    {
+      id: 'mod-19',
+      category: 'modules',
+      code: 'MOD-19',
+      title: 'MOD-19 • Canva Rédaction Admin',
+      subtitle: 'Canva officiel de rédaction rapide : Rapports, Transmissions, TDR, Convocations en Garamond 13pt & Export Word .docx',
+      icon: FileSignature,
+      badge: 'Rédaction Garamond',
+      keywords: ['canva', 'redaction', 'rapport', 'transmission', 'lettre', 'tdr', 'convocation', 'invitation', 'garamond', 'docx', 'word', 'courrier'],
+      action: () => {
+        setActiveModule('MOD-19');
+        showNotification('info', 'Module ouvert : MOD-19 Canva de Rédaction Administrative');
+      },
+      isActive: activeModule === 'MOD-19',
     },
   ], [activeModule, setActiveModule, showNotification]);
 

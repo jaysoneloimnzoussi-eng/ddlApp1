@@ -18,6 +18,16 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+
+  .font-garamond {
+    font-family: 'EB Garamond', Garamond, 'Times New Roman', serif;
+  }
+
+  .doc-courrier-garamond {
+    font-family: 'EB Garamond', Garamond, 'Times New Roman', serif;
+    font-size: 13pt;
+    line-height: 1.45;
+  }
 }
 
 /* Utilities for touch devices & mobile ergonomics */
@@ -35,12 +45,22 @@
 
 /* Custom Print Styles for Official Republic of Congo Administrative Documents & POS 58mm */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 20mm 20mm 20mm 25mm; /* Marges administratives congolaises : G 2.5cm, D 2.0cm, H 2.0cm, B 2.0cm */
+  }
+
+  html, body, #root, #root > div, main, .overflow-y-auto, .overflow-hidden {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    position: static !important;
+    display: block !important;
     background-color: #ffffff !important;
     color: #000000 !important;
   }
 
-  .no-print, nav, aside, header.app-header, button, .sidebar-container {
+  .no-print, nav, aside, header, header.app-header, button, .sidebar-container, .mobile-bottom-nav {
     display: none !important;
   }
 
@@ -49,15 +69,23 @@
   }
 
   .page-a4 {
-    width: 210mm !important;
-    min-height: 297mm !important;
-    padding: 15mm 20mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    padding: 0 !important;
     margin: 0 auto !important;
     background: white !important;
     color: black !important;
     box-shadow: none !important;
     border: none !important;
+    font-family: 'EB Garamond', Garamond, 'Times New Roman', serif !important;
+    font-size: 13pt !important;
+    line-height: 1.45 !important;
     page-break-after: always;
+  }
+
+  .page-a4:last-child {
+    page-break-after: auto;
   }
 
   .receipt-58mm {

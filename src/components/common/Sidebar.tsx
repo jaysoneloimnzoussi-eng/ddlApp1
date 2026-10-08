@@ -25,6 +25,7 @@ import {
   UserCheck,
   Crown,
   X,
+  FileSignature,
 } from 'lucide-react';
 
 interface ModuleItem {
@@ -79,6 +80,13 @@ export const Sidebar: React.FC = () => {
       nomCourt: 'Soit-Transmis DGL',
       nomComplet: 'Liaison Brazzaville Agréments',
       icon: Send,
+      section: 'Pilotage & Stratégie',
+    },
+    {
+      code: 'MOD-19',
+      nomCourt: 'Canva Rédaction Admin',
+      nomComplet: 'Rapports, TDR, Lettres & Garamond',
+      icon: FileSignature,
       section: 'Pilotage & Stratégie',
     },
 

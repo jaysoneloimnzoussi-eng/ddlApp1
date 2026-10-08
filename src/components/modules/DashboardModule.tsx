@@ -35,6 +35,7 @@ import {
   Database,
   UserCheck,
   Crown,
+  FileSignature,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { Arrondissement, ComplianceStatus, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
@@ -250,6 +251,7 @@ export const DashboardModule: React.FC = () => {
     { code: 'MOD-16', title: 'Contrôle Conjoint', count: 'Mixte Inter-services', icon: ShieldAlert, color: 'text-yellow-500' },
     { code: 'MOD-17', title: 'Portail Télépaiement', count: 'MoMo / Airtel', icon: Smartphone, color: 'text-emerald-500' },
     { code: 'MOD-18', title: 'Import Supabase', count: 'Migration Cloud', icon: Database, color: 'text-teal-500' },
+    { code: 'MOD-19', title: 'Canva Rédaction Admin', count: 'Garamond 13 & Docx', icon: FileSignature, color: 'text-amber-500' },
   ];
 
   // STRICT USER CONSTRAINT:

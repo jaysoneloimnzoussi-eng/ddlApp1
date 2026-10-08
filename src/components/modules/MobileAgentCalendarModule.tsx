@@ -87,8 +87,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
   const isLight = theme === 'light';
 
-  // Target date simulation (starts at Oct 6, 2026)
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 9, 6));
+  // Target date simulation (defaults automatically to current day, e.g. Oct 8, 2026)
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [viewMode, setViewMode] = useState<'jour' | 'semaine' | 'mois' | 'planning'>('semaine');
   const [selectedSchedule, setSelectedSchedule] = useState<InspectionSchedule | null>(null);
 
@@ -112,7 +112,13 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [isCustomEst, setIsCustomEst] = useState<boolean>(false);
   const [customEstNom, setCustomEstNom] = useState<string>('');
   const [createArrondissement, setCreateArrondissement] = useState<string>('Tié-Tié');
-  const [createDate, setCreateDate] = useState<string>('2026-10-07');
+  const [createDate, setCreateDate] = useState<string>(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
   const [createHeure, setCreateHeure] = useState<string>('10:00');
   const [createMotif, setCreateMotif] = useState<InspectionSchedule['typeMission']>('Recouvrement');
   const [createNotes, setCreateNotes] = useState<string>('Tournée de recouvrement SAA');
@@ -175,7 +181,17 @@ export const MobileAgentCalendarModule: React.FC = () => {
   };
 
   const selectedDateKey = formatDateKey(currentDate);
-  const simulatedTodayKey = '2026-10-06';
+  const actualToday = useMemo(() => new Date(), []);
+  const todayKey = formatDateKey(actualToday);
+
+  // Schedules and stats for currently selected day (defaults to today)
+  const schedulesForSelectedDate = useMemo(() => {
+    return visibleSchedules.filter((s) => s.dateTournee === selectedDateKey);
+  }, [visibleSchedules, selectedDateKey]);
+
+  const totalAttenduSelectedDate = useMemo(() => {
+    return schedulesForSelectedDate.reduce((sum, s) => sum + (s.montantAcompteAttendu || 0), 0);
+  }, [schedulesForSelectedDate]);
 
   const handlePrev = () => {
     const d = new Date(currentDate);
@@ -194,7 +210,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date(2026, 9, 6)); // Target simulation today
+    setCurrentDate(new Date()); // Jump straight to today
   };
 
   // Filtered schedules for search query
@@ -957,7 +973,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 <span className="text-slate-300 dark:text-slate-700">30</span>
                 {Array.from({ length: 31 }).map((_, i) => {
                   const dayNum = i + 1;
-                  const isSimulatedToday = dayNum === 6;
+                  const isDayToday = dayNum === actualToday.getDate() && currentDate.getMonth() === actualToday.getMonth();
                   const isSelected = currentDate.getDate() === dayNum && currentDate.getMonth() === 9;
                   return (
                     <button
@@ -970,8 +986,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
                       className={`h-7 w-7 rounded-full flex items-center justify-center mx-auto transition cursor-pointer ${
                         isSelected
                           ? 'bg-blue-600 text-white font-bold'
-                          : isSimulatedToday
-                            ? 'bg-blue-100 text-blue-700 font-bold dark:bg-blue-950 dark:text-blue-300'
+                          : isDayToday
+                            ? 'bg-blue-100 text-blue-700 font-bold dark:bg-blue-950 dark:text-blue-300 ring-1 ring-blue-500'
                             : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -1105,6 +1121,135 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
         {/* Central Calendar Screen: Week, Day, Month, or Planning view */}
         <div className="flex-1 flex flex-col overflow-auto min-w-0">
+          {/* APERÇU PROÉMINENT DES RENDEZ-VOUS DU JOUR (Toujours visible et réactif à la date sélectionnée) */}
+          <div className={`p-3 sm:p-4 border-b shrink-0 transition ${
+            isLight
+              ? 'bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-slate-50 border-slate-200'
+              : 'bg-gradient-to-r from-blue-950/50 via-slate-900 to-slate-900 border-slate-800'
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                  selectedDateKey === todayKey
+                    ? 'bg-blue-600 text-white shadow-blue-500/20'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}>
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                      selectedDateKey === todayKey
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-slate-600 dark:text-slate-400'
+                    }`}>
+                      {selectedDateKey === todayKey ? "Aujourd'hui" : "Journée sélectionnée"}
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-500 font-semibold">
+                      ({currentDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })})
+                    </span>
+                    {selectedDateKey !== todayKey && (
+                      <button
+                        onClick={handleToday}
+                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="Revenir à la date d'aujourd'hui"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Aller à Aujourd&apos;hui ({actualToday.getDate()} oct.)</span>
+                      </button>
+                    )}
+                  </div>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+                    <span>Aperçu des Rendez-vous & Descentes du Jour</span>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/20">
+                      {schedulesForSelectedDate.length} mission(s)
+                    </span>
+                    {totalAttenduSelectedDate > 0 && (
+                      <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/20">
+                        Attendu : {formatCfa(totalAttenduSelectedDate)}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-center">
+                <button
+                  onClick={() => handleOpenCreateModal(selectedDateKey)}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Programmer un RDV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Cartes des rendez-vous prévus aujourd'hui */}
+            {schedulesForSelectedDate.length > 0 ? (
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
+                {schedulesForSelectedDate.map((sch) => (
+                  <div
+                    key={sch.id}
+                    className={`p-3 rounded-xl border shadow-sm flex flex-col justify-between gap-2 transition hover:shadow-md ${
+                      isLight
+                        ? 'bg-white border-slate-200 hover:border-blue-300'
+                        : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2 py-0.5 rounded">
+                          {sch.heure}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getEventBadgeStyle(sch)}`}>
+                          {sch.typeMission}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate" title={sch.etablissementNom}>
+                        {sch.etablissementNom}
+                      </h4>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1 truncate">
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span>{sch.arrondissement}</span>
+                        <span>•</span>
+                        <span className="truncate">Agent : {sch.inspecteurChef}</span>
+                      </div>
+                      {sch.montantAcompteAttendu && sch.statut !== 'effectue' && (
+                        <div className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          Acompte attendu : {formatCfa(sch.montantAcompteAttendu)}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      {sch.statut !== 'effectue' && (
+                        <button
+                          onClick={() => handleOpenPaymentFromSchedule(sch)}
+                          className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <CreditCard className="w-3 h-3" />
+                          <span>Encaisser & Reprogrammer</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setSelectedSchedule(sch)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] cursor-pointer"
+                        title="Détails de la mission"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-2.5 p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                <CalendarCheck className="w-4 h-4 text-slate-400" />
+                <span>Aucune descente ni rendez-vous programmé pour cette journée. Cliquez sur &quot;Programmer un RDV&quot; pour en ajouter un.</span>
+              </div>
+            )}
+          </div>
+
           {/* A. SEMAINE (Week View) */}
           {viewMode === 'semaine' && (
             <div className="flex-1 flex flex-col min-w-[700px]">
@@ -1119,7 +1264,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
                 {weekDays.map((d, i) => {
                   const dayNum = d.getDate();
-                  const isSimulatedToday = formatDateKey(d) === simulatedTodayKey;
+                  const isDayToday = formatDateKey(d) === todayKey;
                   const isSelected = formatDateKey(d) === selectedDateKey;
 
                   return (
@@ -1135,8 +1280,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
                       </span>
                       <div className="flex justify-center mt-0.5">
                         <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition ${
-                          isSimulatedToday
-                            ? 'bg-blue-600 text-white shadow-md'
+                          isDayToday
+                            ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400'
                             : isSelected
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
                               : 'text-slate-800 dark:text-slate-200'
@@ -1170,7 +1315,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
                           return schHour === hour;
                         });
 
-                        const isSimulatedToday = dateKey === simulatedTodayKey;
+                        const isDayToday = dateKey === todayKey;
 
                         return (
                           <div
@@ -1185,8 +1330,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
                             }`}
                             title="Cliquer pour programmer une descente à cette date et heure"
                           >
-                            {/* Red Current Time Line on Today at 10:30 */}
-                            {isSimulatedToday && hour === 10 && (
+                            {/* Current Time Line on Today */}
+                            {isDayToday && hour === new Date().getHours() && (
                               <div className="absolute top-[50%] left-0 right-0 z-10 flex items-center pointer-events-none">
                                 <div className="w-2.5 h-2.5 rounded-full bg-red-600 -ml-1.5" />
                                 <div className="flex-1 h-[2px] bg-red-600" />
@@ -1338,7 +1483,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
                   const d = new Date(2026, 9, dayNum);
                   const dateKey = formatDateKey(d);
                   const dayEvents = visibleSchedules.filter((s) => s.dateTournee === dateKey);
-                  const isSimulatedToday = dateKey === simulatedTodayKey;
+                  const isDayToday = dateKey === todayKey;
 
                   return (
                     <div
@@ -1353,7 +1498,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
                     >
                       <div className="flex justify-between items-center mb-1">
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isSimulatedToday ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-slate-300'
+                          isDayToday ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-slate-300'
                         }`}>
                           {dayNum}
                         </span>

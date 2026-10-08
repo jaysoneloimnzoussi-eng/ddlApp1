@@ -2,7 +2,9 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
 import { X, Printer, Download, Shield, FileText, CheckCircle2 } from 'lucide-react';
-import { generateAttestationDocx } from '../../services/docxGenerator';
+import { generateAttestationDocx, generateLegalActDocx } from '../../services/docxGenerator';
+import { printHtmlElement } from '../../services/printService';
+import { OfficialDocumentHeader } from './OfficialDocumentHeader';
 import { formatCfa } from '../../services/crypto';
 
 export const PrintModal: React.FC = () => {
@@ -11,14 +13,24 @@ export const PrintModal: React.FC = () => {
   if (printMode === 'none' || !printData) return null;
 
   const handlePrint = () => {
-    window.print();
+    let docTitle = 'Document_Officiel_DDL_PN';
+    if (printMode === 'a4_attestation') docTitle = `Attestation_${printData.codeDossier || 'DDL_PN'}`;
+    else if (printMode === 'a4_legal_act') docTitle = `Acte_${printData.referenceNumero || 'DDL_PN'}`;
+    else if (printMode === 'pos_receipt') docTitle = `Quittance_${printData.numeroQuittance || 'DDL_PN'}`;
+    else if (printMode === 'staff_badge') docTitle = `Badge_${printData.matricule || 'Agent'}`;
+
+    printHtmlElement('printable-modal-doc', docTitle);
   };
 
   const handleDownloadDocx = async () => {
     if (printMode === 'a4_attestation') {
       await generateAttestationDocx(printData);
+    } else if (printMode === 'a4_legal_act') {
+      await generateLegalActDocx(printData);
     }
   };
+
+  const canDownloadDocx = printMode === 'a4_attestation' || printMode === 'a4_legal_act';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
@@ -36,25 +48,27 @@ export const PrintModal: React.FC = () => {
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            {printMode === 'a4_attestation' && (
+            {canDownloadDocx && (
               <button
                 onClick={handleDownloadDocx}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition cursor-pointer"
+                title="Télécharger le fichier éditable Word .DOCX"
               >
                 <Download className="w-4 h-4" />
-                Télécharger .DOCX (Word)
+                <span>Télécharger .DOCX (Word)</span>
               </button>
             )}
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold shadow-md transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold shadow-md transition cursor-pointer"
+              title="Lancer l'impression vectorielle A4 avec mise en page et marges réglementaires"
             >
               <Printer className="w-4 h-4" />
-              Imprimer Vectoriel
+              <span>Imprimer</span>
             </button>
             <button
               onClick={closePrintModal}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -63,24 +77,30 @@ export const PrintModal: React.FC = () => {
 
         {/* Modal Content Scroll Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center bg-slate-950/60">
+          <div id="printable-modal-doc" className="w-full flex justify-center">
           {/* 1. ATTESTATION DE DÉPÔT A4 OFFICIELLE */}
           {printMode === 'a4_attestation' && (
-            <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-serif leading-relaxed text-sm">
-              {/* Header with 3 columns: Left Ministry, Center Official DDL-PN Logo, Right Republic of Congo */}
+            <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-garamond leading-relaxed text-[13pt]">
+              {/* Header with 2 columns exact official format */}
               <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6 gap-3">
-                <div className="text-left text-xs font-bold text-slate-900 uppercase space-y-0.5 flex-1">
+                <div className="text-left text-[11pt] font-bold text-slate-900 uppercase space-y-0.5 flex-1">
                   <p>Ministère de la Culture, des Arts,</p>
-                  <p>du Tourisme et des Loisirs</p>
-                  <p className="text-[10px] tracking-widest">------------------------</p>
+                  <p>du Patrimoine National et de</p>
+                  <p>l'Industrie Touristique</p>
+                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
                   <p>Direction Générale des Loisirs</p>
-                  <p className="font-cinzel text-slate-950 font-black text-sm">
+                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
+                  <p>Département de Pointe-Noire</p>
+                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
+                  <p className="text-slate-950 font-black">
                     Direction Départementale des Loisirs
                   </p>
-                  <p className="font-cinzel text-slate-950 font-black text-sm">
+                  <p className="text-slate-950 font-black">
                     de Pointe-Noire
                   </p>
-                  <p className="font-mono text-[10px] text-slate-700 italic pt-1">
-                    Service de l'Animation et des Agréments (SAA)
+                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
+                  <p className="font-mono text-[10.5pt] text-slate-700 not-italic pt-0.5">
+                    N° {printData.numeroAttestation || '042'}/MCAPNIT/DGL/DPN/DDL-PN
                   </p>
                 </div>
 
@@ -93,14 +113,14 @@ export const PrintModal: React.FC = () => {
                 </div>
 
                 <div className="text-right text-xs uppercase space-y-0.5 flex-1">
-                  <p className="font-cinzel font-black text-sm text-slate-950">
+                  <p className="font-bold text-sm text-slate-950">
                     RÉPUBLIQUE DU CONGO
                   </p>
-                  <p className="italic font-serif text-[11px] text-slate-700 normal-case">
-                    Unité - Travail - Progrès
+                  <p className="italic font-garamond text-[12pt] text-slate-800 normal-case">
+                    Unité – Travail – Progrès
                   </p>
-                  <p className="text-[10px] tracking-widest text-slate-400">------------------------</p>
-                  <p className="text-[11px] font-medium text-slate-800 pt-2 normal-case">
+                  <p className="text-[10px] tracking-widest text-slate-400">————————</p>
+                  <p className="text-[12pt] font-medium text-slate-800 pt-2 normal-case font-garamond">
                     Pointe-Noire, le{' '}
                     <span className="font-bold underline">
                       {new Date().toLocaleDateString('fr-FR', {
@@ -115,7 +135,7 @@ export const PrintModal: React.FC = () => {
 
               {/* Reference */}
               <div className="mb-6 font-mono text-xs font-bold text-slate-900 bg-slate-100 p-2 border-l-4 border-slate-900">
-                RÉFÉRENCE : N° {printData.numeroAttestation || '042'}/MCAPNIT/DGL/DDL-PNR/SAA/2026
+                RÉFÉRENCE : N° {printData.numeroAttestation || '042'}/MCAPNIT/DGL/DPN/DDL-PN/2026
               </div>
 
               {/* Title */}
@@ -175,17 +195,17 @@ export const PrintModal: React.FC = () => {
 
                 <div className="text-center w-72">
                   <p className="font-bold text-xs uppercase mb-1 text-slate-900">
-                    Pour le Directeur Départemental
+                    Le Directeur Départemental des Loisirs
                   </p>
-                  <p className="text-[11px] italic mb-12">Et par délégation, l'Inspecteur Assermenté</p>
+                  <p className="text-[11px] italic mb-12">de Pointe-Noire</p>
                   <div className="border-t border-slate-800 pt-1 relative">
                     <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-20 h-20 rounded-full border-2 border-dashed border-red-700/60 flex items-center justify-center rotate-12 pointer-events-none opacity-80">
                       <span className="text-[9px] font-bold text-red-700 uppercase tracking-tighter text-center">
                         DDL-PN<br/>SCEAU<br/>OFFICIEL
                       </span>
                     </div>
-                    <p className="font-bold text-xs text-slate-950">Gildas AMBETOS</p>
-                    <p className="text-[10px] text-slate-600">Inspecteur Central des Loisirs</p>
+                    <p className="font-bold text-xs text-slate-950">Jean Richard NTSEKE NGOUAKA</p>
+                    <p className="text-[10px] text-slate-600">Le Directeur Départemental</p>
                   </div>
                 </div>
               </div>
@@ -241,80 +261,78 @@ export const PrintModal: React.FC = () => {
 
           {/* 3. ACTE DE POLICE ADMINISTRATIVE A4 */}
           {printMode === 'a4_legal_act' && (
-            <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-serif leading-relaxed text-sm">
-              <div className="flex justify-between items-start border-b-2 border-red-800 pb-3 mb-6 gap-3">
-                <div className="flex-1">
-                  <p className="font-bold text-xs uppercase">Direction Départementale des Loisirs de Pointe-Noire</p>
-                  <p className="font-mono text-xs text-red-800 font-bold">Police Administrative des Loisirs & Contentieux</p>
-                  <p className="text-[10px] text-slate-600 italic">Brigade de Salubrité Acoustique & Contrôle Réglementaire</p>
-                </div>
-                <div className="flex flex-col items-center justify-center shrink-0">
-                  <DdlLogo size="sm" rounded="lg" bordered={false} className="w-12 h-12 shadow-none ring-1 ring-red-800/40" />
-                </div>
-                <div className="text-right text-xs flex-1">
-                  <p className="font-black text-xs font-cinzel">RÉPUBLIQUE DU CONGO</p>
-                  <p className="italic text-[10px]">Unité - Travail - Progrès</p>
-                </div>
-              </div>
+            <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-garamond leading-relaxed text-[13pt]">
+              <OfficialDocumentHeader
+                numeroActe={`N°${printData.referenceNumero || '035'}/MCAPNIT/DGL/DPN/DDL-PN`}
+                dateLieu={`Pointe-Noire, le ${printData.dateEmission || '08 octobre 2026'}`}
+                destinataireTitre={`Promoteur : ${printData.promoteurNom} (${printData.etablissementNom})`}
+                destinataireVille={printData.arrondissement}
+                emetteurTitre="Le Directeur Départemental des Loisirs de Pointe-Noire"
+                showDestinataire={true}
+                objet={`${printData.type === 'mise_en_demeure' ? 'Mise en demeure sous 72 heures' : printData.type === 'arrete_fermeture' ? 'Arrêté de fermeture administrative' : 'Procès-verbal de contrôle'} — ${printData.etablissementNom}`}
+                reference="Loi N° 21-2019 du 15 novembre 2019 fixant les règles relatives aux loisirs en République du Congo."
+              />
 
-              <div className="bg-red-50 border-l-4 border-red-600 p-3 mb-6">
-                <p className="font-mono text-xs font-bold text-red-950">
-                  RÉF : {printData.referenceNumero}
-                </p>
-                <p className="text-xs text-red-800">
-                  Date d'émission : {printData.dateEmission} | Arrondissement : {printData.arrondissement}
-                </p>
-              </div>
-
-              <div className="text-center my-6">
-                <h2 className="font-cinzel text-lg font-black uppercase text-red-950">
+              <div className="text-center my-6 pt-4 border-t border-slate-300">
+                <h2 className="font-cinzel text-xl font-bold uppercase tracking-wide text-slate-950">
                   {printData.type === 'mise_en_demeure' && "MISE EN DEMEURE SOUS SOIXANTE-DOUZE (72) HEURES"}
                   {printData.type === 'arrete_fermeture' && "ARRÊTÉ DE FERMETURE ADMINISTRATIVE AVEC RÉQUISITION"}
                   {printData.type === 'pv_sonometrie' && "PROCÈS-VERBAL DE CONSTAT SONOMÉTRIQUE CONTRADICTOIRE"}
                   {printData.type === 'ordre_mission' && "ORDRE DE MISSION DE BRIGADE MOBILE DDL-PN"}
                 </h2>
-                <p className="text-xs font-bold uppercase mt-1 text-slate-800">
-                  À l'encontre de : {printData.etablissementNom} (Exploitant : {printData.promoteurNom})
+                <p className="text-[12pt] font-semibold uppercase mt-1 text-slate-800">
+                  Établissement : {printData.etablissementNom} (Arrondissement : {printData.arrondissement})
                 </p>
               </div>
 
-              <div className="my-6 space-y-4 text-justify text-xs leading-6">
+              <div className="my-6 space-y-4 text-justify text-[13pt] leading-relaxed">
+                <p>
+                  <strong>VU</strong> la Constitution de la République du Congo ;
+                </p>
                 <p>
                   <strong>VU</strong> la Loi N° 21-2019 du 15 novembre 2019 fixant les règles relatives aux loisirs en République du Congo ;
                 </p>
                 <p>
-                  <strong>VU</strong> l'Arrêté Préfectoral N° 045/P-PNR/CAB réprimant les nuisances acoustiques et le tapage nocturne ;
+                  <strong>VU</strong> l&apos;Arrêté Préfectoral N° 045/P-PNR/CAB réprimant les pollutions acoustiques et le tapage nocturne dans le Département de Pointe-Noire ;
                 </p>
                 <p>
-                  <strong>CONSIDÉRANT</strong> les constats dressés par les inspecteurs assermentés de la Brigade Mobile SAA :
+                  <strong>CONSIDÉRANT</strong> les constats matériels dressés par les inspecteurs assermentés de la Brigade Mobile SAA de la Direction Départementale des Loisirs :
                 </p>
-                <div className="p-3 bg-slate-100 rounded border border-slate-300 font-sans text-xs">
-                  <p className="font-semibold text-slate-900">Motifs et faits constatés :</p>
+                <div className="p-4 bg-slate-50 rounded border border-slate-300 text-[12pt] leading-normal">
+                  <p className="font-bold text-slate-900">Motifs et infractions constatées :</p>
                   <p className="text-slate-800 mt-1">{printData.motifs}</p>
                   {printData.decibelsMesures && (
                     <p className="mt-2 font-mono font-bold text-red-700">
-                      Niveau sonore mesuré : {printData.decibelsMesures} dB(A) [Seuil maximal autorisé : 65 dB(A)]
+                      Niveau sonore contradictoire mesuré : {printData.decibelsMesures} dB(A) [Seuil maximal autorisé : 65 dB(A)]
                     </p>
                   )}
                 </div>
 
-                {printData.delaiHeures && (
-                  <p className="font-bold text-red-700">
-                    INJONCTION : Il est imparti à l'exploitant un délai strict et impératif de {printData.delaiHeures} heures pour se conformer intégralement. À défaut, la fermeture immédiate de l'établissement sera prononcée avec réquisition de la force publique et pose des scellés départementaux.
+                {printData.delaiHeures ? (
+                  <p className="font-bold text-slate-900 bg-red-50/70 p-3 rounded border border-red-200">
+                    INJONCTION : Il est imparti à l&apos;exploitant un délai strict et impératif de {printData.delaiHeures} heures à compter de la notification du présent acte pour se conformer intégralement. À défaut, la fermeture immédiate de l&apos;établissement sera exécutée avec le concours de la force publique.
+                  </p>
+                ) : (
+                  <p className="font-bold text-slate-900 bg-red-50/70 p-3 rounded border border-red-200">
+                    DÉCISION : L&apos;activité de l&apos;établissement est suspendue sans délai. Les scellés de la Direction Départementale des Loisirs sont apposés jusqu&apos;à parfaite régularisation.
                   </p>
                 )}
               </div>
 
-              <div className="flex justify-between items-end mt-12 pt-6 border-t border-slate-300">
-                <div className="text-xs">
-                  <p className="font-bold">Inspecteurs signataires :</p>
+              <div className="flex justify-between items-end mt-10 pt-6 border-t border-slate-300">
+                <div className="text-[11.5pt] space-y-1">
+                  <p className="font-bold">Les Inspecteurs SAA signataires :</p>
                   {printData.inspecteursAssermentes?.map((insp: string, i: number) => (
                     <p key={i} className="text-slate-700">• {insp}</p>
                   ))}
+                  <p className="italic text-[10pt] text-slate-500 pt-1">Assermentés près le TGI de Pointe-Noire</p>
                 </div>
-                <div className="text-center text-xs">
+                <div className="text-center text-[12pt] space-y-1">
                   <p className="font-bold uppercase">Le Directeur Départemental des Loisirs</p>
-                  <div className="mt-10 font-bold">Commandement Territorial SAA</div>
+                  <div className="h-16 flex items-center justify-center italic text-xs text-slate-400">
+                    [Signature & Sceau Officiel]
+                  </div>
+                  <p className="font-bold text-[13pt]">Jean Richard NTSEKE NGOUAKA</p>
                 </div>
               </div>
             </div>
@@ -356,6 +374,7 @@ export const PrintModal: React.FC = () => {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

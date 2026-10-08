@@ -311,7 +311,7 @@ export const AgentLoginConsole: React.FC = () => {
           isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
         }`}
       >
-        République du Congo • Ministère de l'Économie Forestière, du Tourisme et des Loisirs •
+        République du Congo • MCAPNIT (Ministère de la Culture, des Arts, du Patrimoine National et de l'Industrie Touristique) • DGL •
         Direction Départementale des Loisirs de Pointe-Noire (DDL-PN Sovereign v3.0)
       </footer>
     </div>
