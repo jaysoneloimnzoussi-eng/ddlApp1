@@ -289,7 +289,8 @@ export const SafRegieRecettesModule: React.FC = () => {
 
           {/* Table */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-            <table className="w-full text-xs text-left">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left min-w-[640px]">
               <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
                 <tr>
                   <th className="p-3">N° Quittance</th>
@@ -337,6 +338,7 @@ export const SafRegieRecettesModule: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -359,7 +361,8 @@ export const SafRegieRecettesModule: React.FC = () => {
           </div>
 
           <div className="border border-slate-800 rounded-lg overflow-hidden">
-            <table className="w-full text-xs text-left">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left min-w-[640px]">
               <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
                 <tr>
                   <th className="p-3">Quittance</th>
@@ -407,6 +410,7 @@ export const SafRegieRecettesModule: React.FC = () => {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

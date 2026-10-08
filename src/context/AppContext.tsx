@@ -72,6 +72,11 @@ interface AppContextType {
   setIsCommandPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
   toggleCommandPalette: () => void;
 
+  // Mobile Navigation Drawer
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleMobileMenu: () => void;
+
   googleUser: User | null;
   googleAccessToken: string | null;
   handleGoogleSignIn: () => Promise<void>;
@@ -231,6 +236,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const toggleCommandPalette = () => setIsCommandPaletteOpen((prev) => !prev);
 
+  // Mobile Navigation Drawer State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
+
   // Google Workspace & Auth State
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(null);
@@ -384,7 +393,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const agent = staff.find((s) => s.id === currentAgentId) || authenticatedUser;
     return schedules.filter((s) => {
       if (s.agentId === currentAgentId) return true;
-      if (agent && s.inspecteurChef && s.inspecteurChef.toLowerCase().includes(agent.nomComplet.toLowerCase())) return true;
+      if (agent?.nomComplet && s.inspecteurChef && s.inspecteurChef.toLowerCase().includes(agent.nomComplet.toLowerCase())) return true;
       return false;
     });
   }, [schedules, currentUserRole, currentAgentId, staff, authenticatedUser]);
@@ -563,27 +572,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync to local storage
   useEffect(() => {
-    localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(establishments));
+    try {
+      localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(establishments));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
   }, [establishments]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_receipts_v5', JSON.stringify(receipts));
+    try {
+      localStorage.setItem('ddl_real_receipts_v5', JSON.stringify(receipts));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
   }, [receipts]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_legal_acts_v5', JSON.stringify(legalActs));
+    try {
+      localStorage.setItem('ddl_real_legal_acts_v5', JSON.stringify(legalActs));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
   }, [legalActs]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(schedules));
+    try {
+      localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(schedules));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
   }, [schedules]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_audit_logs_v5', JSON.stringify(auditLogs));
+    try {
+      localStorage.setItem('ddl_real_audit_logs_v5', JSON.stringify(auditLogs));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
   }, [auditLogs]);
 
   useEffect(() => {
-    localStorage.setItem('ddl_real_soit_transmis_v4', JSON.stringify(soitTransmis));
+    try {
+      localStorage.setItem('ddl_real_soit_transmis_v4', JSON.stringify(soitTransmis));
+    } catch (e) {
+      console.warn('Storage save failed:', e);
+    }
   }, [soitTransmis]);
 
   // Firebase Auth listener
@@ -620,7 +653,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               } as Establishment);
             }
           });
-          setEstablishments(list);
+          if (list.length > 0) {
+            setEstablishments(list);
+          }
         },
         (err) => {
           console.warn("Connexion Firestore en cache local:", err);
@@ -634,7 +669,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           snapshot.forEach((d) => {
             list.push(d.data() as CashReceipt);
           });
-          setReceipts(list);
+          if (list.length > 0) {
+            setReceipts(list);
+          }
         },
         (err) => {
           console.warn("Connexion Firestore receipts:", err);
@@ -648,7 +685,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           snapshot.forEach((d) => {
             list.push(d.data() as InspectionSchedule);
           });
-          setSchedules(list);
+          if (list.length > 0) {
+            setSchedules(list);
+          }
         },
         (err) => {
           console.warn("Connexion Firestore schedules:", err);
@@ -662,7 +701,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           snapshot.forEach((d) => {
             list.push(d.data() as LegalAct);
           });
-          setLegalActs(list);
+          if (list.length > 0) {
+            setLegalActs(list);
+          }
         },
         (err) => {
           console.warn("Connexion Firestore legalActs:", err);
@@ -1482,6 +1523,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isCommandPaletteOpen,
         setIsCommandPaletteOpen,
         toggleCommandPalette,
+        isMobileMenuOpen,
+        setIsMobileMenuOpen,
+        toggleMobileMenu,
         googleUser,
         googleAccessToken,
         handleGoogleSignIn,

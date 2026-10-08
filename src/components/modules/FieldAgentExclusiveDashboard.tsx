@@ -69,7 +69,7 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
   // Upcoming RDV count
   const upcomingAgentRdvCount = useMemo(() => {
     return schedules.filter(
-      (s) => s.statut === 'planifie' && (s.agentId === agent?.id || (agent && s.inspecteurChef?.toLowerCase().includes(agent.nomComplet.toLowerCase())))
+      (s) => s.statut === 'planifie' && (s.agentId === agent?.id || (agent?.nomComplet && s.inspecteurChef?.toLowerCase().includes(agent.nomComplet.toLowerCase())))
     ).length;
   }, [schedules, agent]);
 

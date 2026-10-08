@@ -91,7 +91,7 @@ export const DashboardModule: React.FC = () => {
       ? receipts.filter(
           (r) =>
             r.agentId === currentAgentId ||
-            (authenticatedUser && r.inspecteurOuCaissier?.toLowerCase().includes(authenticatedUser.nomComplet.toLowerCase()))
+            (authenticatedUser?.nomComplet && r.inspecteurOuCaissier?.toLowerCase().includes(authenticatedUser.nomComplet.toLowerCase()))
         )
       : receipts;
 

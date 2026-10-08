@@ -647,16 +647,16 @@ export const MobileAgentCalendarModule: React.FC = () => {
     <div className={`flex flex-col h-[calc(100vh-4.5rem)] font-sans select-none transition-colors duration-200 ${
       isLight ? 'bg-white text-slate-800' : 'bg-slate-950 text-slate-100'
     }`}>
-      {/* 1. GOOGLE AGENDA HEADER (Reproduction Pixel-Perfect) */}
-      <div className={`h-16 px-4 flex items-center justify-between border-b shrink-0 ${
+      {/* 1. GOOGLE AGENDA HEADER (Reproduction Pixel-Perfect & Mobile-Responsive) */}
+      <div className={`h-auto min-h-14 py-2 px-2.5 sm:px-4 flex flex-wrap items-center justify-between gap-2 border-b shrink-0 ${
         isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
       }`}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Google Calendar Logo simulation */}
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex flex-col items-center justify-center shadow-md font-sans">
-              <span className="text-[9px] font-bold uppercase tracking-wider">OCT</span>
-              <span className="text-base font-black leading-none font-mono">06</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600 text-white flex flex-col items-center justify-center shadow-md font-sans shrink-0">
+              <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider">OCT</span>
+              <span className="text-sm sm:text-base font-black leading-none font-mono">06</span>
             </div>
             <div className="hidden sm:block">
               <div className="flex items-center gap-1.5">
@@ -674,12 +674,12 @@ export const MobileAgentCalendarModule: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-1" />
+          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block mx-1 shrink-0" />
 
           {/* Navigation Today, Prev, Next */}
           <button
             onClick={handleToday}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold border transition shrink-0 ${
               isLight
                 ? 'border-slate-300 hover:bg-slate-100 text-slate-700'
                 : 'border-slate-700 hover:bg-slate-800 text-slate-200'
@@ -688,24 +688,24 @@ export const MobileAgentCalendarModule: React.FC = () => {
             Aujourd'hui
           </button>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={handlePrev}
-              className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              className="p-1 sm:p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
               title="Précédent"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={handleNext}
-              className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              className="p-1 sm:p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
               title="Suivant"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
-          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 min-w-[150px]">
+          <h2 className="text-xs sm:text-base lg:text-lg font-bold text-slate-900 dark:text-slate-100 min-w-0 truncate">
             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
           </h2>
         </div>
@@ -1104,7 +1104,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
         </aside>
 
         {/* Central Calendar Screen: Week, Day, Month, or Planning view */}
-        <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 flex flex-col overflow-auto min-w-0">
           {/* A. SEMAINE (Week View) */}
           {viewMode === 'semaine' && (
             <div className="flex-1 flex flex-col min-w-[700px]">

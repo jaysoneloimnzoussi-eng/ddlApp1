@@ -24,6 +24,7 @@ import {
   LogOut,
   UserCheck,
   Crown,
+  X,
 } from 'lucide-react';
 
 interface ModuleItem {
@@ -46,6 +47,8 @@ export const Sidebar: React.FC = () => {
     offlineQueueCount,
     isOnline,
     theme,
+    isMobileMenuOpen,
+    setIsMobileMenuOpen,
   } = useApp();
 
   const MODULES: ModuleItem[] = [
@@ -244,11 +247,44 @@ export const Sidebar: React.FC = () => {
   const sections = Array.from(new Set(visibleModules.map((m) => m.section)));
 
   return (
-    <aside className={`w-72 border-r flex flex-col h-[calc(100vh-4.5rem)] shrink-0 select-none overflow-y-auto transition-colors duration-200 ${
-      theme === 'light'
-        ? 'bg-white border-slate-200 text-slate-800'
-        : 'bg-slate-900 border-slate-800 text-slate-100'
-    }`}>
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm md:hidden animate-fade-in"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <aside
+        className={`
+          fixed md:static inset-y-0 left-0 z-50 md:z-auto
+          w-80 md:w-72 max-w-[85vw]
+          transform transition-transform duration-300 ease-in-out md:transform-none
+          ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
+          border-r flex flex-col h-full md:h-[calc(100vh-4.5rem)] shrink-0 select-none overflow-y-auto
+          ${theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'}
+        `}
+      >
+        {/* Mobile Header with Close Button */}
+        <div className="md:hidden flex items-center justify-between p-3.5 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <DdlLogo size="xs" rounded="lg" bordered={true} />
+            <div>
+              <p className="font-cinzel text-xs font-bold">DDL Pointe-Noire</p>
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">18 Modules Métier</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            title="Fermer le menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
       <div className="p-3">
         {/* Institutional Authority Badge */}
         <div className={`p-2.5 mb-3 rounded-xl border flex items-center gap-2.5 transition ${
@@ -296,7 +332,10 @@ export const Sidebar: React.FC = () => {
                   return (
                     <button
                       key={mod.code}
-                      onClick={() => setActiveModule(mod.code)}
+                      onClick={() => {
+                        setActiveModule(mod.code);
+                        setIsMobileMenuOpen(false);
+                      }}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all ${
                         isActive
                           ? theme === 'light'
@@ -368,7 +407,7 @@ export const Sidebar: React.FC = () => {
               {authenticatedUser.photoUrl ? (
                 <img
                   src={authenticatedUser.photoUrl}
-                  alt={authenticatedUser.nomComplet}
+                  alt={authenticatedUser.nomComplet || 'Agent'}
                   className="w-9 h-9 rounded-full object-cover border border-emerald-500 shrink-0"
                 />
               ) : (
@@ -377,12 +416,12 @@ export const Sidebar: React.FC = () => {
                     ? 'bg-amber-600 text-white'
                     : 'bg-emerald-600 text-white'
                 }`}>
-                  {authenticatedUser.nomComplet.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  {(authenticatedUser.nomComplet || 'DDL').split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('') || 'AG'}
                 </div>
               )}
               <div className="min-w-0">
                 <p className="text-xs font-bold truncate">
-                  {authenticatedUser.nomComplet}
+                  {authenticatedUser.nomComplet || 'Agent DDL-PN'}
                 </p>
                 <div className="flex items-center gap-1 text-[10px]">
                   {currentUserRole === 'directeur' || currentUserRole === 'administrateur' ? (
@@ -409,5 +448,6 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
     </aside>
+    </>
   );
 };

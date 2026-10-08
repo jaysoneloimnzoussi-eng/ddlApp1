@@ -128,7 +128,7 @@ export const QuarterlyReportsModule: React.FC = () => {
       </div>
 
       {/* Document A4 Preview in Frame */}
-      <div className="bg-white text-slate-950 p-8 md:p-12 rounded-xl shadow-2xl max-w-4xl mx-auto border border-slate-300 font-serif leading-relaxed text-xs">
+      <div className="bg-white text-slate-950 p-4 sm:p-8 md:p-12 rounded-xl shadow-2xl max-w-4xl mx-auto border border-slate-300 font-serif leading-relaxed text-xs overflow-hidden">
         {/* State Banner */}
         <div className="text-center space-y-1 mb-8">
           <p className="font-bold text-sm uppercase">RÉPUBLIQUE DU CONGO</p>
@@ -185,26 +185,28 @@ export const QuarterlyReportsModule: React.FC = () => {
           <h3 className="font-serif text-sm font-bold border-b border-slate-300 pb-1 text-slate-900">
             II. ÉTAT DES RECOUVREMENTS PAR ARRONDISSEMENT
           </h3>
-          <table className="w-full border-collapse border border-slate-300 text-left text-xs">
-            <thead>
-              <tr className="bg-slate-100">
-                <th className="border border-slate-300 p-2 font-bold">Arrondissement</th>
-                <th className="border border-slate-300 p-2 font-bold text-center">Établissements Recensés</th>
-                <th className="border border-slate-300 p-2 font-bold text-right">Recettes SAF Recouvrées</th>
-              </tr>
-            </thead>
-            <tbody>
-              {repartitionArrondissements.map((arr) => (
-                <tr key={arr.nom} className="hover:bg-slate-50">
-                  <td className="border border-slate-300 p-2 font-semibold">{arr.nom}</td>
-                  <td className="border border-slate-300 p-2 text-center font-mono">{arr.nombre}</td>
-                  <td className="border border-slate-300 p-2 text-right font-mono font-bold">
-                    {formatCfa(arr.montant)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-slate-300 text-left text-xs min-w-[500px]">
+              <thead>
+                <tr className="bg-slate-100">
+                  <th className="border border-slate-300 p-2 font-bold">Arrondissement</th>
+                  <th className="border border-slate-300 p-2 font-bold text-center">Établissements Recensés</th>
+                  <th className="border border-slate-300 p-2 font-bold text-right">Recettes SAF Recouvrées</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {repartitionArrondissements.map((arr) => (
+                  <tr key={arr.nom} className="hover:bg-slate-50">
+                    <td className="border border-slate-300 p-2 font-semibold">{arr.nom}</td>
+                    <td className="border border-slate-300 p-2 text-center font-mono">{arr.nombre}</td>
+                    <td className="border border-slate-300 p-2 text-right font-mono font-bold">
+                      {formatCfa(arr.montant)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Section 3: PTA Actions */}

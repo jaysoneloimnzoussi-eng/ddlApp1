@@ -6,6 +6,7 @@ import { PrintModal } from './components/common/PrintModal';
 import { NotificationToast } from './components/common/NotificationToast';
 import { DomainAuthModal } from './components/common/DomainAuthModal';
 import { CommandPalette } from './components/common/CommandPalette';
+import { MobileBottomNav } from './components/common/MobileBottomNav';
 
 // 17 Module Components
 import { DashboardModule } from './components/modules/DashboardModule';
@@ -32,7 +33,7 @@ const MainContent: React.FC = () => {
   const { activeModule, theme } = useApp();
 
   return (
-    <main className={`flex-1 overflow-y-auto transition-colors duration-200 ${
+    <main className={`flex-1 overflow-y-auto overflow-x-hidden min-w-0 transition-colors duration-200 pb-20 md:pb-0 ${
       theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
     }`}>
       {activeModule === 'MOD-01' && <DashboardModule />}
@@ -78,10 +79,11 @@ const AppContent: React.FC = () => {
       theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
     } selection:bg-emerald-500/30 selection:text-emerald-700`}>
       <Header />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-w-0">
         {!isFullScreenCalendar && <Sidebar />}
         <MainContent />
       </div>
+      {!isFullScreenCalendar && <MobileBottomNav />}
       <PrintModal />
       <DomainAuthModal />
       <CommandPalette />

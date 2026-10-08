@@ -32,9 +32,26 @@ export const activeFirebaseConfig = {
 };
 
 // Initialize Firebase App
-const app = !getApps().length ? initializeApp(activeFirebaseConfig) : getApp();
+let app: any;
+try {
+  app = !getApps().length ? initializeApp(activeFirebaseConfig) : getApp();
+} catch (e) {
+  console.warn('Firebase initializeApp error, fallback to default:', e);
+  app = getApps().length ? getApp() : initializeApp(activeFirebaseConfig);
+}
+
 export const auth = getAuth(app);
-export const db: Firestore = getFirestore(app, activeFirebaseConfig.firestoreDatabaseId);
+
+let dbInstance: Firestore;
+try {
+  dbInstance = activeFirebaseConfig.firestoreDatabaseId && activeFirebaseConfig.firestoreDatabaseId !== '(default)'
+    ? getFirestore(app, activeFirebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
+} catch (e) {
+  console.warn('Fallback getFirestore(app):', e);
+  dbInstance = getFirestore(app);
+}
+export const db: Firestore = dbInstance;
 
 /**
  * Strips all undefined fields recursively so Firestore never rejects documents.

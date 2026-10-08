@@ -263,7 +263,7 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleIssueReceipt} className="space-y-3 text-xs">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-slate-300 font-semibold">Montant à Encaisser (FCFA) *</label>
                       <input
@@ -290,7 +290,7 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-slate-300 font-semibold">Nature de la Recette</label>
                       <select

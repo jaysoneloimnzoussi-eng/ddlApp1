@@ -72,22 +72,23 @@ export const AgentLoginConsole: React.FC = () => {
     >
       {/* Top Sovereign Bar */}
       <header
-        className={`px-4 py-3 border-b flex items-center justify-between ${
+        className={`px-3 sm:px-4 py-2.5 sm:py-3 border-b flex items-center justify-between shrink-0 ${
           isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/90 border-slate-800'
         }`}
       >
-        <div className="flex items-center gap-3">
-          <DdlLogo size="sm" rounded="xl" bordered={true} />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-cinzel text-base font-bold tracking-wider">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <DdlLogo size="xs" rounded="lg" bordered={true} className="sm:hidden shrink-0" />
+          <DdlLogo size="sm" rounded="xl" bordered={true} className="hidden sm:block shrink-0" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-cinzel text-sm sm:text-base font-bold tracking-wider truncate">
                 DDL-PN
               </span>
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
-                Portail Officiel d'Authentification
+              <span className="hidden xs:inline-block text-[9px] sm:text-[10px] uppercase font-mono px-1.5 sm:px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold shrink-0">
+                Portail Officiel
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">
               RÉPUBLIQUE DU CONGO • MCAPNIT • DGL
             </p>
           </div>
@@ -96,7 +97,7 @@ export const AgentLoginConsole: React.FC = () => {
         <button
           onClick={toggleTheme}
           type="button"
-          className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition ${
+          className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
             isLight
               ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300'
@@ -118,21 +119,22 @@ export const AgentLoginConsole: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          {/* Left Column: Official Context */}
+      <main className="flex-1 flex items-center justify-center p-3 sm:p-4 md:p-8">
+        <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
+          {/* Left Column: Official Context (order-2 on mobile so login form is immediately visible) */}
           <div
-            className={`lg:col-span-5 rounded-2xl p-6 md:p-8 border flex flex-col justify-between shadow-xl ${
+            className={`order-2 lg:order-1 lg:col-span-5 rounded-2xl p-4 sm:p-6 md:p-8 border flex flex-col justify-between shadow-xl ${
               isLight
                 ? 'bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-900 text-white border-emerald-800'
                 : 'bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 text-slate-100 border-slate-800'
             }`}
           >
             <div>
-              <div className="flex items-center justify-between mb-5">
-                <DdlLogo size="lg" rounded="2xl" bordered={true} />
+              <div className="flex items-center justify-between mb-4 sm:mb-5">
+                <DdlLogo size="md" rounded="xl" bordered={true} className="sm:hidden" />
+                <DdlLogo size="lg" rounded="2xl" bordered={true} className="hidden sm:block" />
                 <div className="flex flex-col items-end">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold uppercase">
+                  <span className="text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold uppercase">
                     MCAPNIT / DGL
                   </span>
                   <span className="text-[9px] font-mono text-emerald-300/80 mt-1">
@@ -141,17 +143,17 @@ export const AgentLoginConsole: React.FC = () => {
                 </div>
               </div>
 
-              <h1 className="font-cinzel text-xl lg:text-2xl font-bold tracking-wide leading-tight mb-2 text-white">
+              <h1 className="font-cinzel text-lg sm:text-xl lg:text-2xl font-bold tracking-wide leading-tight mb-1.5 sm:mb-2 text-white">
                 Direction Départementale des Loisirs
               </h1>
-              <p className="text-xs text-emerald-300 font-semibold mb-6">
+              <p className="text-xs text-emerald-300 font-semibold mb-4 sm:mb-6">
                 Pointe-Noire • Plateforme Souveraine v3.0
               </p>
 
-              <div className="space-y-3.5">
-                <div className="p-3.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 space-y-1">
+              <div className="space-y-2.5 sm:space-y-3.5">
+                <div className="p-3 sm:p-3.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 space-y-1">
                   <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
-                    <ShieldCheck className="w-4 h-4" />
+                    <ShieldCheck className="w-4 h-4 shrink-0" />
                     <span>Accès Professionnel Sécurisé</span>
                   </div>
                   <p className="text-[11px] text-slate-200/90 leading-relaxed">
@@ -160,9 +162,9 @@ export const AgentLoginConsole: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 space-y-1">
+                <div className="p-3 sm:p-3.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 space-y-1">
                   <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-                    <Lock className="w-4 h-4" />
+                    <Lock className="w-4 h-4 shrink-0" />
                     <span>Gestion Confidentielle des Identifiants</span>
                   </div>
                   <p className="text-[11px] text-slate-200/90 leading-relaxed">
@@ -173,7 +175,7 @@ export const AgentLoginConsole: React.FC = () => {
               </div>
             </div>
 
-            <div className="pt-6 border-t border-white/10 mt-6 flex items-center justify-between text-[11px] text-slate-300/80">
+            <div className="pt-4 sm:pt-6 border-t border-white/10 mt-4 sm:mt-6 flex items-center justify-between text-[11px] text-slate-300/80">
               <span className="flex items-center gap-1 font-mono">
                 <Building2 className="w-3 h-3 text-emerald-400" /> Pointe-Noire (6 Arrondissements)
               </span>
@@ -181,9 +183,9 @@ export const AgentLoginConsole: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Clean Login Form */}
+          {/* Right Column: Clean Login Form (order-1 on mobile for instant access) */}
           <div
-            className={`lg:col-span-7 rounded-2xl p-6 md:p-8 border shadow-xl flex flex-col justify-between ${
+            className={`order-1 lg:order-2 lg:col-span-7 rounded-2xl p-4 sm:p-6 md:p-8 border shadow-xl flex flex-col justify-between ${
               isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
             }`}
           >

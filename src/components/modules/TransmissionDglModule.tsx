@@ -192,30 +192,32 @@ export const TransmissionDglModule: React.FC = () => {
                   Dossiers Inclus dans ce Bordereau ({selectedBordereau.listeEtablissements.length})
                 </h4>
                 <div className="border border-slate-800 rounded-lg overflow-hidden">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
-                      <tr>
-                        <th className="p-2.5">Réf. Dossier</th>
-                        <th className="p-2.5">Établissement</th>
-                        <th className="p-2.5">Promoteur</th>
-                        <th className="p-2.5">Arrondissement</th>
-                        <th className="p-2.5 text-right">Recette Acquittée</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {selectedBordereau.listeEtablissements.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-slate-800/40 text-slate-200">
-                          <td className="p-2.5 font-mono text-[11px] text-slate-400">{item.referenceDossier}</td>
-                          <td className="p-2.5 font-bold">{item.etablissementNom}</td>
-                          <td className="p-2.5">{item.promoteurNom}</td>
-                          <td className="p-2.5">{item.arrondissement}</td>
-                          <td className="p-2.5 text-right font-mono text-emerald-400 font-semibold">
-                            {formatCfa(item.montantRegieAcquitte)}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left min-w-[550px]">
+                      <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800">
+                        <tr>
+                          <th className="p-2.5">Réf. Dossier</th>
+                          <th className="p-2.5">Établissement</th>
+                          <th className="p-2.5">Promoteur</th>
+                          <th className="p-2.5">Arrondissement</th>
+                          <th className="p-2.5 text-right">Recette Acquittée</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {selectedBordereau.listeEtablissements.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-800/40 text-slate-200">
+                            <td className="p-2.5 font-mono text-[11px] text-slate-400">{item.referenceDossier}</td>
+                            <td className="p-2.5 font-bold">{item.etablissementNom}</td>
+                            <td className="p-2.5">{item.promoteurNom}</td>
+                            <td className="p-2.5">{item.arrondissement}</td>
+                            <td className="p-2.5 text-right font-mono text-emerald-400 font-semibold">
+                              {formatCfa(item.montantRegieAcquitte)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 

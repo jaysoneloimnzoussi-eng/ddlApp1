@@ -72,6 +72,16 @@ export const SigMapModule: React.FC = () => {
       circlesLayerRef.current = L.layerGroup().addTo(map);
 
       mapInstanceRef.current = map;
+
+      const handleResize = () => {
+        map.invalidateSize();
+      };
+      window.addEventListener('resize', handleResize);
+      setTimeout(handleResize, 350);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+      };
     }
   }, []);
 
@@ -227,7 +237,7 @@ export const SigMapModule: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-7xl mx-auto flex flex-col h-[calc(100vh-5rem)]">
+    <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 max-w-7xl mx-auto flex flex-col min-h-[calc(100vh-5rem)] md:h-[calc(100vh-5rem)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800 shrink-0">
         <div>
@@ -379,7 +389,7 @@ export const SigMapModule: React.FC = () => {
       )}
 
       {/* Map Container */}
-      <div className="flex-1 rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[450px]">
+      <div className="flex-1 rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative min-h-[350px] sm:min-h-[450px]">
         <div ref={mapContainerRef} className="w-full h-full" />
       </div>
     </div>
