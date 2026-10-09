@@ -68,6 +68,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
     setCurrentAgentId,
     currentUserRole,
     staff,
+    authenticatedUser,
     recordPaymentAndScheduleNext,
     reportEstablishmentClosed,
     importFromGoogleCalendar,
@@ -170,7 +171,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
     return d;
   });
 
-  const hoursGutter = Array.from({ length: 14 }).map((_, i) => i + 7); // 07:00 to 20:00
+  const hoursGutter = Array.from({ length: 17 }).map((_, i) => i + 6); // 06:00 to 22:00
 
   // Format date string YYYY-MM-DD
   const formatDateKey = (d: Date) => {
@@ -479,9 +480,13 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
     try {
       let est: Establishment | undefined = undefined;
+      const defaultSAA = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
+      const activeAgent = (currentAgentId !== 'all' ? staff.find((s) => s.id === currentAgentId) : null) ||
+                          currentAgent ||
+                          authenticatedUser ||
+                          defaultSAA;
 
       if (isCustomEst && customEstNom.trim()) {
-        const activeAgent = currentAgent || staff[1];
         const newEstData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'> = {
           nomCommercial: customEstNom.trim(),
           promoteurNom: `Promoteur ${customEstNom.trim()}`,
@@ -502,9 +507,9 @@ export const MobileAgentCalendarModule: React.FC = () => {
           niveauDecibelsMoyen: 68,
           limiteurInstalle: false,
           dateRecensement: createDate,
-          recensePar: activeAgent.nomComplet,
-          agentAssigneId: activeAgent.id,
-          agentAssigneNom: activeAgent.nomComplet,
+          recensePar: activeAgent?.nomComplet || 'Jacques MATOKO',
+          agentAssigneId: activeAgent?.id || '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc',
+          agentAssigneNom: activeAgent?.nomComplet || 'Jacques MATOKO',
         };
         est = await addEstablishment(newEstData);
       } else {
@@ -518,9 +523,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
         return;
       }
 
-      const activeAgent = currentAgent || staff.find((s) => s.id === est?.agentAssigneId) || staff[1];
-
-      await addSchedule({
+      const newSchedule = await addSchedule({
         dateTournee: createDate,
         heure: createHeure,
         etablissementId: est.id,
@@ -534,6 +537,14 @@ export const MobileAgentCalendarModule: React.FC = () => {
         notes: createNotes,
         statut: 'planifie',
       });
+
+      // Synchronize immediately calendar view to display the new intervention on that day
+      const dateParts = createDate.split('-').map(Number);
+      if (dateParts.length === 3 && !isNaN(dateParts[0]) && !isNaN(dateParts[1]) && !isNaN(dateParts[2])) {
+        const targetDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], 12, 0, 0);
+        setCurrentDate(targetDate);
+      }
+      setSelectedSchedule(newSchedule);
 
       if (googleAccessToken) {
         try {
@@ -552,7 +563,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
         }
       }
 
-      showNotification('success', `Rendez-vous planifié au ${createDate} pour ${est.nomCommercial}`);
+      showNotification('success', `Rendez-vous planifié au ${createDate} (${createHeure}) pour ${est.nomCommercial} et affiché dans l'agenda.`);
       setIsCreateModalOpen(false);
       setCustomEstNom('');
       setIsCustomEst(false);
@@ -965,16 +976,25 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 ))}
               </div>
 
-              {/* Days grid for October 2026 (Starts on Thursday Oct 1) */}
+              {/* Dynamic Days grid for currently selected month */}
               <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium">
-                {/* 3 leading empty spaces for Thu start */}
-                <span className="text-slate-300 dark:text-slate-700">28</span>
-                <span className="text-slate-300 dark:text-slate-700">29</span>
-                <span className="text-slate-300 dark:text-slate-700">30</span>
-                {Array.from({ length: 31 }).map((_, i) => {
+                {/* Leading offset days from previous month */}
+                {Array.from({ length: (new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay() + 6) % 7 }).map((_, idx, arr) => {
+                  const prevMonthLast = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+                  const dNum = prevMonthLast - arr.length + 1 + idx;
+                  return (
+                    <span key={`prev-${idx}`} className="text-slate-300 dark:text-slate-700 py-1">
+                      {dNum}
+                    </span>
+                  );
+                })}
+                {Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
                   const dayNum = i + 1;
-                  const isDayToday = dayNum === actualToday.getDate() && currentDate.getMonth() === actualToday.getMonth();
-                  const isSelected = currentDate.getDate() === dayNum && currentDate.getMonth() === 9;
+                  const isDayToday =
+                    dayNum === actualToday.getDate() &&
+                    currentDate.getMonth() === actualToday.getMonth() &&
+                    currentDate.getFullYear() === actualToday.getFullYear();
+                  const isSelected = currentDate.getDate() === dayNum;
                   return (
                     <button
                       key={dayNum}
@@ -1243,9 +1263,39 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="mt-2.5 p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                <CalendarCheck className="w-4 h-4 text-slate-400" />
-                <span>Aucune descente ni rendez-vous programmé pour cette journée. Cliquez sur &quot;Programmer un RDV&quot; pour en ajouter un.</span>
+              <div className="mt-2.5 p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-800 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                  <span>Aucune descente ni rendez-vous programmé pour le {selectedDateKey}.</span>
+                </div>
+                {visibleSchedules.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] text-slate-400">Accès rapide :</span>
+                    {Array.from(new Set(visibleSchedules.map((s) => s.dateTournee))).slice(0, 3).map((dStr) => {
+                      const countOnDate = visibleSchedules.filter((s) => s.dateTournee === dStr).length;
+                      return (
+                        <button
+                          key={dStr}
+                          onClick={() => {
+                            const p = dStr.split('-').map(Number);
+                            if (p.length === 3 && !isNaN(p[0]) && !isNaN(p[1]) && !isNaN(p[2])) {
+                              setCurrentDate(new Date(p[0], p[1] - 1, p[2], 12, 0, 0));
+                            }
+                          }}
+                          className="px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-mono text-[11px] font-bold border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition cursor-pointer"
+                        >
+                          {dStr} ({countOnDate})
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setViewMode('planning')}
+                      className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold hover:bg-slate-200 transition cursor-pointer"
+                    >
+                      Voir Planning complet ({visibleSchedules.length})
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1294,6 +1344,38 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 })}
               </div>
 
+              {/* Day Missions Summary Row */}
+              <div className={`grid grid-cols-8 border-b shrink-0 ${
+                isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+              }`}>
+                <div className="p-1.5 text-[10px] font-bold text-slate-400 text-center border-r border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                  Missions
+                </div>
+                {weekDays.map((d, colIdx) => {
+                  const dateKey = formatDateKey(d);
+                  const daySchedules = visibleSchedules.filter((s) => s.dateTournee === dateKey);
+                  return (
+                    <div
+                      key={colIdx}
+                      onClick={() => {
+                        setCurrentDate(d);
+                        setViewMode('jour');
+                      }}
+                      className="p-1 border-r last:border-r-0 min-h-[30px] flex items-center justify-center cursor-pointer hover:bg-blue-100/40 dark:hover:bg-blue-900/30 transition"
+                      title="Cliquer pour afficher la vue jour de cette date"
+                    >
+                      {daySchedules.length > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-600 text-white shadow-xs">
+                          {daySchedules.length} RDV
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 dark:text-slate-700 font-mono">-</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
               {/* Hourly Grid with Time Gutter & Event Chips */}
               <div className="flex-1 overflow-y-auto relative">
                 {hoursGutter.map((hour) => {
@@ -1311,7 +1393,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         // Find events scheduled on this day during this hour
                         const eventsInSlot = visibleSchedules.filter((sch) => {
                           if (sch.dateTournee !== dateKey) return false;
-                          const schHour = parseInt(sch.heure.split(':')[0], 10);
+                          const rawHeure = (sch.heure || '10:00').toString().replace('h', ':');
+                          const schHour = parseInt(rawHeure.split(':')[0], 10);
                           return schHour === hour;
                         });
 
@@ -1473,17 +1556,24 @@ export const MobileAgentCalendarModule: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-7 flex-1 border-b border-slate-200 dark:border-slate-800">
-                {/* 3 leading offset cells */}
-                <div className="p-1 border-r border-b border-slate-100 dark:border-slate-800/40 text-slate-300">28</div>
-                <div className="p-1 border-r border-b border-slate-100 dark:border-slate-800/40 text-slate-300">29</div>
-                <div className="p-1 border-r border-b border-slate-100 dark:border-slate-800/40 text-slate-300">30</div>
+                {/* Dynamic leading offset cells */}
+                {Array.from({ length: ((new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay() + 6) % 7) }).map((_, idx, arr) => {
+                  const prevMonthLastDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+                  const dayNum = prevMonthLastDay - arr.length + 1 + idx;
+                  return (
+                    <div key={`lead-${idx}`} className="p-1.5 border-r border-b border-slate-100 dark:border-slate-800/40 text-slate-300 dark:text-slate-700 text-xs font-mono select-none">
+                      {dayNum}
+                    </div>
+                  );
+                })}
 
-                {Array.from({ length: 31 }).map((_, i) => {
+                {Array.from({ length: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
                   const dayNum = i + 1;
-                  const d = new Date(2026, 9, dayNum);
+                  const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), dayNum, 12, 0, 0);
                   const dateKey = formatDateKey(d);
                   const dayEvents = visibleSchedules.filter((s) => s.dateTournee === dateKey);
                   const isDayToday = dateKey === todayKey;
+                  const isSelected = dateKey === selectedDateKey;
 
                   return (
                     <div
@@ -1493,17 +1583,23 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         setViewMode('jour');
                       }}
                       className={`p-1.5 border-r border-b min-h-[90px] cursor-pointer transition ${
-                        isLight ? 'border-slate-100 hover:bg-blue-50/50' : 'border-slate-800/60 hover:bg-slate-800/40'
+                        isSelected
+                          ? isLight ? 'bg-blue-50/70 border-blue-200 ring-1 ring-blue-400' : 'bg-blue-950/40 border-blue-800 ring-1 ring-blue-500'
+                          : isLight ? 'border-slate-100 hover:bg-blue-50/50' : 'border-slate-800/60 hover:bg-slate-800/40'
                       }`}
                     >
                       <div className="flex justify-between items-center mb-1">
                         <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isDayToday ? 'bg-blue-600 text-white' : 'text-slate-700 dark:text-slate-300'
+                          isDayToday
+                            ? 'bg-blue-600 text-white'
+                            : isSelected
+                              ? 'bg-blue-200 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
+                              : 'text-slate-700 dark:text-slate-300'
                         }`}>
                           {dayNum}
                         </span>
                         {dayEvents.length > 0 && (
-                          <span className="text-[9px] font-mono text-blue-600 font-bold">
+                          <span className="text-[9px] font-mono text-blue-600 dark:text-blue-400 font-bold">
                             {dayEvents.length} RDV
                           </span>
                         )}

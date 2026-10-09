@@ -405,54 +405,66 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Authenticated User Session Card in Sidebar Footer */}
-      {authenticatedUser && (
+      {/* Offline Status & User Session Card in Sidebar Footer */}
+      {(authenticatedUser || !isOnline) && (
         <div className={`p-3 mt-auto border-t shrink-0 ${
           theme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/80 border-slate-800'
         }`}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              {authenticatedUser.photoUrl ? (
-                <img
-                  src={authenticatedUser.photoUrl}
-                  alt={authenticatedUser.nomComplet || 'Agent'}
-                  className="w-9 h-9 rounded-full object-cover border border-emerald-500 shrink-0"
-                />
-              ) : (
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                  currentUserRole === 'directeur' || currentUserRole === 'administrateur'
-                    ? 'bg-amber-600 text-white'
-                    : 'bg-emerald-600 text-white'
-                }`}>
-                  {(authenticatedUser.nomComplet || 'DDL').split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('') || 'AG'}
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="text-xs font-bold truncate">
-                  {authenticatedUser.nomComplet || 'Agent DDL-PN'}
-                </p>
-                <div className="flex items-center gap-1 text-[10px]">
-                  {currentUserRole === 'directeur' || currentUserRole === 'administrateur' ? (
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5">
-                      <Crown className="w-2.5 h-2.5" /> Super-Admin
-                    </span>
-                  ) : (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
-                      <UserCheck className="w-2.5 h-2.5" /> Agent ({visibleEstablishments.length})
-                    </span>
-                  )}
+          {!isOnline && (
+            <div className="mb-2 px-2 py-1 rounded text-[11px] font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                Mode Hors-Ligne Actif
+              </span>
+              <span className="text-[10px] font-mono font-bold">100% Autonome</span>
+            </div>
+          )}
+
+          {authenticatedUser && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {authenticatedUser.photoUrl ? (
+                  <img
+                    src={authenticatedUser.photoUrl}
+                    alt={authenticatedUser.nomComplet || 'Agent'}
+                    className="w-9 h-9 rounded-full object-cover border border-emerald-500 shrink-0"
+                  />
+                ) : (
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    currentUserRole === 'directeur' || currentUserRole === 'administrateur'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-emerald-600 text-white'
+                  }`}>
+                    {(authenticatedUser.nomComplet || 'DDL').split(' ').map((n) => n[0]).filter(Boolean).slice(0, 2).join('') || 'AG'}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-bold truncate">
+                    {authenticatedUser.nomComplet || 'Agent DDL-PN'}
+                  </p>
+                  <div className="flex items-center gap-1 text-[10px]">
+                    {currentUserRole === 'directeur' || currentUserRole === 'administrateur' ? (
+                      <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-0.5">
+                        <Crown className="w-2.5 h-2.5" /> Super-Admin
+                      </span>
+                    ) : (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                        <UserCheck className="w-2.5 h-2.5" /> Agent ({visibleEstablishments.length})
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <button
-              onClick={logoutAgentSession}
-              title="Se déconnecter"
-              className="p-1.5 rounded-lg hover:bg-rose-500/10 hover:text-rose-600 text-slate-400 transition"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+              <button
+                onClick={logoutAgentSession}
+                title="Se déconnecter"
+                className="p-1.5 rounded-lg hover:bg-rose-500/10 hover:text-rose-600 text-slate-400 transition"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </aside>

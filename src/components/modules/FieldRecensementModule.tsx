@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   MapPinPlus,
@@ -40,6 +40,7 @@ export const FieldRecensementModule: React.FC = () => {
     currentUserRole,
     staff,
     addEstablishment,
+    addSchedule,
     updateEstablishment,
     showNotification,
     isOnline,
@@ -71,10 +72,35 @@ export const FieldRecensementModule: React.FC = () => {
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [niveauDecibels, setNiveauDecibels] = useState<number>(75);
   const [limiteurInstalle, setLimiteurInstalle] = useState<boolean>(false);
-  const [selectedAssignedAgentId, setSelectedAssignedAgentId] = useState<string>(
-    currentAgentId !== 'all' ? currentAgentId : 'stf-002'
-  );
+  const [selectedAssignedAgentId, setSelectedAssignedAgentId] = useState<string>(() => {
+    if (currentAgentId !== 'all') return currentAgentId;
+    const defaultAgent = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
+    return defaultAgent ? defaultAgent.id : '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc';
+  });
   const [showSonometer, setShowSonometer] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Sync selected agent if currentAgentId changes
+  useEffect(() => {
+    if (currentAgentId !== 'all') {
+      setSelectedAssignedAgentId(currentAgentId);
+    } else if (!staff.some((s) => s.id === selectedAssignedAgentId)) {
+      const defaultAgent = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
+      if (defaultAgent) setSelectedAssignedAgentId(defaultAgent.id);
+    }
+  }, [currentAgentId, staff, selectedAssignedAgentId]);
+
+  // Optional first intervention scheduling on the spot
+  const [planifierIntervention, setPlanifierIntervention] = useState<boolean>(false);
+  const [dateIntervention, setDateIntervention] = useState<string>(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [heureIntervention, setHeureIntervention] = useState<string>('10:00');
+  const [motifIntervention, setMotifIntervention] = useState<'Recouvrement' | 'Contrôle Décibels' | 'Signification Mise en Demeure'>('Recouvrement');
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -121,52 +147,93 @@ export const FieldRecensementModule: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nomCommercial || !promoteurNom) return;
+    if (!nomCommercial.trim() || !promoteurNom.trim()) {
+      showNotification('warning', 'Veuillez renseigner le nom de l\'établissement et le nom du promoteur.');
+      return;
+    }
 
-    const assignedAgentId = currentAgentId !== 'all' ? currentAgentId : selectedAssignedAgentId;
-    const assignedAgent = staff.find((s) => s.id === assignedAgentId);
-    const fullQuartier = repereLocal.trim() ? `${quartier} (${repereLocal.trim()})` : quartier;
+    setIsSubmitting(true);
+    // Anti-bloquage: garantit que le bouton ne mouline jamais en continu même en cas d'interruption réseau
+    const safetyTimeout = setTimeout(() => {
+      setIsSubmitting(false);
+    }, 4000);
 
-    await addEstablishment({
-      nomCommercial,
-      promoteurNom,
-      promoteurTelephone: promoteurTelephone || '+242 06 000 00 00',
-      promoteurEmail,
-      arrondissement,
-      quartier: fullQuartier,
-      adresseExacte: adresseExacte || `${fullQuartier}, ${arrondissement}`,
-      categorie,
-      regimeFiscal,
-      surfaceM2: Number(surfaceM2),
-      montantRedevanceAnnuelle: redevanceCalculee,
-      montantEncaisse: statutInitial === 'en_regle' ? redevanceCalculee : 0,
-      soldeRestantDu: statutInitial === 'en_regle' ? 0 : redevanceCalculee,
-      statut: statutInitial,
-      latitude,
-      longitude,
-      niveauDecibelsMoyen: Number(niveauDecibels),
-      limiteurInstalle,
-      dateRecensement: new Date().toISOString().substring(0, 10),
-      recensePar: assignedAgent ? assignedAgent.nomComplet : 'Brigade SAA',
-      agentAssigneId: assignedAgentId,
-      agentAssigneNom: assignedAgent ? assignedAgent.nomComplet : 'Inspecteur SAA',
-    });
+    try {
+      const defaultAgent = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
+      const assignedAgentId = (currentAgentId !== 'all' && currentAgentId !== 'stf-002')
+        ? currentAgentId
+        : (selectedAssignedAgentId !== 'stf-002' ? selectedAssignedAgentId : (defaultAgent?.id || '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc'));
+      const assignedAgent = staff.find((s) => s.id === assignedAgentId) || defaultAgent;
+      const fullQuartier = repereLocal.trim() ? `${quartier} (${repereLocal.trim()})` : quartier;
 
-    showNotification(
-      'success',
-      `Établissement « ${nomCommercial} » recensé (${arrondissement} - ${quartier}). Statut : ${
-        statutInitial === 'attestation_provisoire' ? 'Attestation de Dépôt accordée' : 'En instance de régularisation'
-      }`
-    );
+      const createdEst = await addEstablishment({
+        nomCommercial: nomCommercial.trim(),
+        promoteurNom: promoteurNom.trim(),
+        promoteurTelephone: promoteurTelephone.trim() || '+242 06 000 00 00',
+        promoteurEmail: promoteurEmail.trim(),
+        arrondissement,
+        quartier: fullQuartier,
+        adresseExacte: adresseExacte.trim() || `${fullQuartier}, ${arrondissement}`,
+        categorie,
+        regimeFiscal,
+        surfaceM2: Number(surfaceM2),
+        montantRedevanceAnnuelle: redevanceCalculee,
+        montantEncaisse: statutInitial === 'en_regle' ? redevanceCalculee : 0,
+        soldeRestantDu: statutInitial === 'en_regle' ? 0 : redevanceCalculee,
+        statut: statutInitial,
+        latitude,
+        longitude,
+        niveauDecibelsMoyen: Number(niveauDecibels),
+        limiteurInstalle,
+        dateRecensement: new Date().toISOString().substring(0, 10),
+        recensePar: assignedAgent ? assignedAgent.nomComplet : 'Jacques MATOKO',
+        agentAssigneId: assignedAgent ? assignedAgent.id : assignedAgentId,
+        agentAssigneNom: assignedAgent ? assignedAgent.nomComplet : 'Jacques MATOKO',
+      });
 
-    // Reset Form
-    setNomCommercial('');
-    setPromoteurNom('');
-    setPromoteurTelephone('');
-    setPromoteurEmail('');
-    setRepereLocal('');
-    setAdresseExacte('');
-    setStatutInitial('mise_en_demeure');
+      // Optional First Intervention / Tournée
+      if (planifierIntervention && createdEst) {
+        await addSchedule({
+          dateTournee: dateIntervention,
+          heure: heureIntervention,
+          etablissementId: createdEst.id,
+          etablissementNom: createdEst.nomCommercial,
+          arrondissement: createdEst.arrondissement,
+          brigadeAssignee: assignedAgent?.brigadeAffectee || 'Brigade SAA',
+          inspecteurChef: assignedAgent?.nomComplet || 'Jacques MATOKO',
+          agentId: assignedAgent ? assignedAgent.id : assignedAgentId,
+          typeMission: motifIntervention,
+          montantAcompteAttendu: createdEst.soldeRestantDu > 0 ? createdEst.soldeRestantDu : undefined,
+          notes: `Première visite suite au recensement sur le terrain.`,
+          statut: 'planifie',
+        });
+        showNotification(
+          'success',
+          `Établissement « ${createdEst.nomCommercial} » enregistré et intervention planifiée au ${dateIntervention} (${heureIntervention}) dans l'Agenda !`
+        );
+      } else {
+        showNotification(
+          'success',
+          `Établissement « ${nomCommercial} » recensé avec succès (${arrondissement} - ${quartier}).`
+        );
+      }
+
+      // Reset Form
+      setNomCommercial('');
+      setPromoteurNom('');
+      setPromoteurTelephone('');
+      setPromoteurEmail('');
+      setRepereLocal('');
+      setAdresseExacte('');
+      setStatutInitial('mise_en_demeure');
+      setPlanifierIntervention(false);
+    } catch (err: any) {
+      console.error("Erreur enregistrement recensement:", err);
+      showNotification('error', `Erreur lors de l'enregistrement : ${err?.message || 'Erreur inconnue'}`);
+    } finally {
+      clearTimeout(safetyTimeout);
+      setIsSubmitting(false);
+    }
   };
 
   // List filtered by search, arrondissement & quartier
@@ -640,12 +707,82 @@ export const FieldRecensementModule: React.FC = () => {
               </div>
             </div>
 
+            {/* Option Planification Intervention Immédiate */}
+            <div className={`p-3 rounded-xl border space-y-2.5 ${
+              isLight ? 'bg-blue-50/60 border-blue-200' : 'bg-blue-950/30 border-blue-900/60'
+            }`}>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="planifierInterventionCheck"
+                  checked={planifierIntervention}
+                  onChange={(e) => setPlanifierIntervention(e.target.checked)}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <label htmlFor="planifierInterventionCheck" className="font-bold text-xs text-blue-700 dark:text-blue-300 cursor-pointer flex items-center gap-1.5">
+                  <CalendarCheck className="w-3.5 h-3.5" />
+                  <span>Programmer immédiatement une 1ère intervention / visite</span>
+                </label>
+              </div>
+
+              {planifierIntervention && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+                  <div>
+                    <label className="text-slate-600 dark:text-slate-400 font-semibold block mb-0.5">Date :</label>
+                    <input
+                      type="date"
+                      value={dateIntervention}
+                      onChange={(e) => setDateIntervention(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-xs"
+                      required={planifierIntervention}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-600 dark:text-slate-400 font-semibold block mb-0.5">Heure :</label>
+                    <input
+                      type="time"
+                      value={heureIntervention}
+                      onChange={(e) => setHeureIntervention(e.target.value)}
+                      className="w-full px-2 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-xs"
+                      required={planifierIntervention}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-600 dark:text-slate-400 font-semibold block mb-0.5">Motif :</label>
+                    <select
+                      value={motifIntervention}
+                      onChange={(e) => setMotifIntervention(e.target.value as any)}
+                      className="w-full px-2 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-xs font-semibold"
+                    >
+                      <option value="Recouvrement">Recouvrement Acompte</option>
+                      <option value="Contrôle Décibels">Contrôle Décibels</option>
+                      <option value="Signification Mise en Demeure">Mise en Demeure</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
-              className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className={`w-full py-2.5 rounded-lg font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 cursor-pointer ${
+                isSubmitting
+                  ? 'bg-slate-400 text-white cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+              }`}
             >
-              <Save className="w-4 h-4" />
-              <span>Valider & Enregistrer Fiche Terrain</span>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Enregistrement en cours...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Valider & Enregistrer Fiche Terrain {planifierIntervention ? '& RDV' : ''}</span>
+                </>
+              )}
             </button>
           </form>
         </div>
