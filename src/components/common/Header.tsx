@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   Shield,
   Wifi,
@@ -148,11 +149,36 @@ export const Header: React.FC = () => {
           </div>
         )}
 
+        {/* Network & Offline Status Badge */}
+        <div
+          className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+            isOnline
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+              : 'bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400'
+          }`}
+          title={isOnline ? 'Connecté au réseau' : 'Mode Hors-Ligne Souverain : données persistées localement'}
+        >
+          {isOnline ? (
+            <>
+              <Wifi className="w-3.5 h-3.5 text-emerald-500" />
+              <span>En ligne</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+              <span>Hors-ligne (Autonome)</span>
+            </>
+          )}
+        </div>
+
+        {/* In-app PWA install button */}
+        <PWAInstallButton variant="header" />
+
         {/* Offline Queue Badge */}
         {offlineQueueCount > 0 && isOnline && (
           <button
             onClick={syncOfflineQueue}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow transition"
+            className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow transition cursor-pointer"
           >
             <RefreshCw className="w-3 h-3 animate-spin" />
             Sync ({offlineQueueCount})

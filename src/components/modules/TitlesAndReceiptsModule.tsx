@@ -30,7 +30,9 @@ export const TitlesAndReceiptsModule: React.FC = () => {
   const isLight = theme === 'light';
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedEst, setSelectedEst] = useState<Establishment>(establishments[0] || null);
+  const [selectedEst, setSelectedEst] = useState<Establishment | null>(() => {
+    return establishments && establishments.length > 0 ? establishments[0] : null;
+  });
 
   // Formulaire d'encaissement rapide
   const [montantVerse, setMontantVerse] = useState<number>(50000);
@@ -39,18 +41,32 @@ export const TitlesAndReceiptsModule: React.FC = () => {
   const [natureRecette, setNatureRecette] = useState<CashReceipt['natureRecette']>('Forfait Informel SAA');
   const [isCashingIn, setIsCashingIn] = useState(false);
 
+  // Auto-select first establishment if none is selected
+  React.useEffect(() => {
+    if (!selectedEst && establishments && establishments.length > 0) {
+      setSelectedEst(establishments[0]);
+      setMontantVerse((establishments[0].soldeRestantDu || 0) > 0 ? establishments[0].soldeRestantDu : 50000);
+    }
+  }, [establishments, selectedEst]);
+
   // Filter establishments
-  const filteredEstablishments = establishments.filter((est) => {
+  const filteredEstablishments = (establishments || []).filter((est) => {
+    if (!est) return false;
+    const nom = (est.nomCommercial || '').toLowerCase();
+    const promoteur = (est.promoteurNom || '').toLowerCase();
+    const dossier = (est.codeDossier || '').toLowerCase();
+    const search = (searchTerm || '').toLowerCase();
     return (
-      est.nomCommercial.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      est.promoteurNom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      est.codeDossier.toLowerCase().includes(searchTerm.toLowerCase())
+      !search ||
+      nom.includes(search) ||
+      promoteur.includes(search) ||
+      dossier.includes(search)
     );
   });
 
   const handleSelectEst = (est: Establishment) => {
     setSelectedEst(est);
-    setMontantVerse(est.soldeRestantDu > 0 ? est.soldeRestantDu : 50000);
+    setMontantVerse((est.soldeRestantDu || 0) > 0 ? est.soldeRestantDu : 50000);
   };
 
   // Quick issuance of Quittance
@@ -60,14 +76,16 @@ export const TitlesAndReceiptsModule: React.FC = () => {
 
     setIsCashingIn(true);
     try {
-      const reste = Math.max(0, selectedEst.soldeRestantDu - montantVerse);
+      const solde = selectedEst.soldeRestantDu || 0;
+      const verse = Number(montantVerse) || 0;
+      const reste = Math.max(0, solde - verse);
       const newRec = await addReceipt({
         datePaiement: new Date().toISOString().replace('T', ' ').substring(0, 16),
         etablissementId: selectedEst.id,
-        etablissementNom: selectedEst.nomCommercial,
-        promoteurNom: selectedEst.promoteurNom,
-        arrondissement: selectedEst.arrondissement,
-        montantVerse: Number(montantVerse),
+        etablissementNom: selectedEst.nomCommercial || 'Établissement SAA',
+        promoteurNom: selectedEst.promoteurNom || 'Promoteur N/A',
+        arrondissement: selectedEst.arrondissement || 'Lumumba',
+        montantVerse: verse,
         resteAPayer: reste,
         modePaiement,
         referenceTransaction: referenceTransaction || `GUICHET-${Date.now().toString().slice(-4)}`,
@@ -78,7 +96,7 @@ export const TitlesAndReceiptsModule: React.FC = () => {
 
       // Update attestation number if first time
       if (!selectedEst.numeroAttestation) {
-        const attNum = `${selectedEst.id.slice(-3)}/2026`;
+        const attNum = `${(selectedEst.id || 'EST').slice(-3)}/2026`;
         await updateEstablishment(selectedEst.id, {
           numeroAttestation: attNum,
           dateDelivranceAttestation: new Date().toISOString().substring(0, 10),
@@ -96,9 +114,10 @@ export const TitlesAndReceiptsModule: React.FC = () => {
 
   // Download DOCX
   const handleDownloadDocx = async (est: Establishment) => {
+    if (!est) return;
     try {
       await generateAttestationDocx(est);
-      showNotification('success', `Attestation de dépôt pour ${est.nomCommercial} téléchargée en format Word (.docx) !`);
+      showNotification('success', `Attestation de dépôt pour ${est.nomCommercial || 'l\'établissement'} téléchargée en format Word (.docx) !`);
     } catch (err: any) {
       showNotification('error', `Erreur de génération DOCX : ${err.message}`);
     }
@@ -164,7 +183,7 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                 >
                   <div className="flex justify-between items-start">
                     <span className="font-bold text-xs truncate max-w-[200px] text-slate-900 dark:text-slate-100">
-                      {est.nomCommercial}
+                      {est.nomCommercial || 'Établissement SAA'}
                     </span>
                     <span
                       className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-mono font-bold ${
@@ -175,15 +194,15 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                           : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
                       }`}
                     >
-                      {est.statut.replace('_', ' ')}
+                      {(est.statut || 'en_regle').replace('_', ' ')}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500">
-                    {est.promoteurNom} • {est.arrondissement}
+                    {est.promoteurNom || 'Promoteur N/A'} • {est.arrondissement || 'Lumumba'}
                   </p>
                   <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-800/60">
-                    <span>Encaissé: {formatCfa(est.montantEncaisse)}</span>
-                    <span className="text-amber-400 font-bold">Solde: {formatCfa(est.soldeRestantDu)}</span>
+                    <span>Encaissé: {formatCfa(est.montantEncaisse || 0)}</span>
+                    <span className="text-amber-400 font-bold">Solde: {formatCfa(est.soldeRestantDu || 0)}</span>
                   </div>
                 </button>
               );
@@ -196,29 +215,31 @@ export const TitlesAndReceiptsModule: React.FC = () => {
           {selectedEst ? (
             <>
               {/* Carte Établissement Sélectionné & Actions Titres */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div className={`border rounded-xl p-5 shadow-xl space-y-4 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
                   <div>
-                    <span className="font-mono text-[10px] font-bold text-emerald-400">
-                      DOSSIER N° {selectedEst.codeDossier}
+                    <span className="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                      DOSSIER N° {selectedEst.codeDossier || 'DDL-PN-2026'}
                     </span>
-                    <h2 className="text-lg font-bold text-slate-100">{selectedEst.nomCommercial}</h2>
-                    <p className="text-xs text-slate-400">
-                      Promoteur: <span className="text-slate-200 font-semibold">{selectedEst.promoteurNom}</span> ({selectedEst.promoteurTelephone})
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">{selectedEst.nomCommercial || 'Établissement SAA'}</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Promoteur: <span className="text-slate-800 dark:text-slate-200 font-semibold">{selectedEst.promoteurNom || 'N/A'}</span> ({selectedEst.promoteurTelephone || 'N/A'})
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleDownloadDocx(selectedEst)}
-                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       Télécharger Word (.docx)
                     </button>
                     <button
                       onClick={() => openPrintModal('a4_attestation', selectedEst)}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold shadow transition flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5" />
                       Attestation A4
@@ -226,38 +247,42 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                <div className={`grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs p-3 rounded-lg border ${
+                  isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                }`}>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Arrondissement:</span>
-                    <span className="font-bold text-slate-200">{selectedEst.arrondissement}</span>
+                    <span className="font-bold text-slate-900 dark:text-slate-200">{selectedEst.arrondissement || 'Lumumba'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Catégorie:</span>
-                    <span className="font-semibold text-slate-200 truncate block">{selectedEst.categorie}</span>
+                    <span className="font-semibold text-slate-900 dark:text-slate-200 truncate block">{selectedEst.categorie || 'Loisirs'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Redevance Annuelle:</span>
-                    <span className="font-mono font-bold text-emerald-400">
-                      {formatCfa(selectedEst.montantRedevanceAnnuelle)}
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                      {formatCfa(selectedEst.montantRedevanceAnnuelle || 0)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">Solde Restant Dû:</span>
-                    <span className="font-mono font-bold text-amber-400">
-                      {formatCfa(selectedEst.soldeRestantDu)}
+                    <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                      {formatCfa(selectedEst.soldeRestantDu || 0)}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Formulaire d'Encaissement Express au Guichet */}
-              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                    <Receipt className="w-4 h-4 text-emerald-400" />
+              <div className={`border rounded-xl p-5 shadow-xl space-y-4 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+              }`}>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <span>Émission Immédiate de Quittance (Feuille A4 ou Reçu POS 58mm)</span>
                   </h3>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-300">
                     Caisse SAF
                   </span>
                 </div>
@@ -265,21 +290,25 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                 <form onSubmit={handleIssueReceipt} className="space-y-3 text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">Montant à Encaisser (FCFA) *</label>
+                      <label className="text-slate-700 dark:text-slate-300 font-semibold">Montant à Encaisser (FCFA) *</label>
                       <input
                         type="number"
                         required
                         value={montantVerse}
                         onChange={(e) => setMontantVerse(Number(e.target.value))}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-mono text-base font-bold text-emerald-400"
+                        className={`w-full px-3 py-2 rounded-lg border font-mono text-base font-bold text-emerald-600 dark:text-emerald-400 ${
+                          isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950 border-slate-700'
+                        }`}
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">Mode de Règlement *</label>
+                      <label className="text-slate-700 dark:text-slate-300 font-semibold">Mode de Règlement *</label>
                       <select
                         value={modePaiement}
                         onChange={(e) => setModePaiement(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100"
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                        }`}
                       >
                         <option value="especes">Espèces (Caisse)</option>
                         <option value="momo_mtn">MTN Mobile Money</option>
@@ -292,11 +321,13 @@ export const TitlesAndReceiptsModule: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">Nature de la Recette</label>
+                      <label className="text-slate-700 dark:text-slate-300 font-semibold">Nature de la Recette</label>
                       <select
                         value={natureRecette}
                         onChange={(e) => setNatureRecette(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100"
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                        }`}
                       >
                         <option value="Forfait Informel SAA">Forfait Informel SAA (50 000 FCFA)</option>
                         <option value="Redevance Proportionnelle">Redevance Proportionnelle (Surface)</option>
@@ -305,13 +336,15 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-slate-300 font-semibold">Référence / Numéro Reçu</label>
+                      <label className="text-slate-700 dark:text-slate-300 font-semibold">Référence / Numéro Reçu</label>
                       <input
                         type="text"
                         value={referenceTransaction}
                         onChange={(e) => setReferenceTransaction(e.target.value)}
                         placeholder="Ex: ESP-0482 ou MoMo ID"
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100"
+                        className={`w-full px-3 py-2 rounded-lg border ${
+                          isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                        }`}
                       />
                     </div>
                   </div>
@@ -319,7 +352,7 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isCashingIn}
-                    className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 mt-2"
+                    className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center justify-center gap-2 mt-2 cursor-pointer"
                   >
                     <Receipt className="w-4 h-4" />
                     <span>{isCashingIn ? 'Encaissement...' : 'Valider l\'Encaissement & Générer la Quittance POS 58mm'}</span>
@@ -328,7 +361,9 @@ export const TitlesAndReceiptsModule: React.FC = () => {
               </div>
             </>
           ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center text-slate-400 text-xs">
+            <div className={`border rounded-xl p-12 text-center text-xs ${
+              isLight ? 'bg-white border-slate-200 text-slate-500' : 'bg-slate-900 border-slate-800 text-slate-400'
+            }`}>
               Sélectionnez un établissement pour délivrer l'attestation ou encaisser des droits.
             </div>
           )}

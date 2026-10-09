@@ -10,9 +10,10 @@ export async function computeSha256(text: string): Promise<string> {
   return hashHex;
 }
 
-export function formatCfa(amount: number): string {
+export function formatCfa(amount?: number | null): string {
+  const safeAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
   return new Intl.NumberFormat('fr-CG', {
     style: 'decimal',
     maximumFractionDigits: 0,
-  }).format(amount) + ' FCFA';
+  }).format(safeAmount) + ' FCFA';
 }

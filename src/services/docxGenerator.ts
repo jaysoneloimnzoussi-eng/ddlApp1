@@ -218,7 +218,7 @@ export async function generateAttestationDocx(etablissement: Establishment): Pro
                 size: 22,
               }),
               new TextRun({
-                text: etablissement.nomCommercial.toUpperCase(),
+                text: (etablissement.nomCommercial || 'ÉTABLISSEMENT SAA').toUpperCase(),
                 bold: true,
                 size: 22,
               }),
@@ -227,16 +227,16 @@ export async function generateAttestationDocx(etablissement: Establishment): Pro
                 size: 22,
               }),
               new TextRun({
-                text: etablissement.promoteurNom,
+                text: etablissement.promoteurNom || 'Promoteur non renseigné',
                 bold: true,
                 size: 22,
               }),
               new TextRun({
-                text: `, relevant de la catégorie « ${etablissement.categorie} », sis à Pointe-Noire, Arrondissement `,
+                text: `, relevant de la catégorie « ${etablissement.categorie || 'Établissement de loisirs'} », sis à Pointe-Noire, Arrondissement `,
                 size: 22,
               }),
               new TextRun({
-                text: `${etablissement.arrondissement} (Quartier ${etablissement.quartier}, Adresse : ${etablissement.adresseExacte})`,
+                text: `${etablissement.arrondissement || 'Lumumba'} (Quartier ${etablissement.quartier || 'Centre'}, Adresse : ${etablissement.adresseExacte || 'Pointe-Noire'})`,
                 bold: true,
                 size: 22,
               }),

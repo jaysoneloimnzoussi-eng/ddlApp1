@@ -7,6 +7,7 @@ import { NotificationToast } from './components/common/NotificationToast';
 import { DomainAuthModal } from './components/common/DomainAuthModal';
 import { CommandPalette } from './components/common/CommandPalette';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
+import { OfflineIndicator } from './components/common/OfflineIndicator';
 
 // 17 Module Components
 import { DashboardModule } from './components/modules/DashboardModule';
@@ -29,6 +30,7 @@ import { PromoterFintechPortalModule } from './components/modules/PromoterFintec
 import { SupabaseDataImportModule } from './components/modules/SupabaseDataImportModule';
 import { AdministrativeDraftingCanvaModule } from './components/modules/AdministrativeDraftingCanvaModule';
 import { AgentLoginConsole } from './components/auth/AgentLoginConsole';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainContent: React.FC = () => {
   const { activeModule, theme } = useApp();
@@ -37,25 +39,27 @@ const MainContent: React.FC = () => {
     <main className={`flex-1 overflow-y-auto overflow-x-hidden min-w-0 transition-colors duration-200 pb-20 md:pb-0 ${
       theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
     }`}>
-      {activeModule === 'MOD-01' && <DashboardModule />}
-      {activeModule === 'MOD-02' && <FieldRecensementModule />}
-      {activeModule === 'MOD-03' && <MobileAgentCalendarModule />}
-      {activeModule === 'MOD-04' && <GoogleWorkspaceGatewayModule />}
-      {activeModule === 'MOD-05' && <LegalActsGeneratorModule />}
-      {activeModule === 'MOD-06' && <QuarterlyReportsModule />}
-      {activeModule === 'MOD-07' && <SigMapModule />}
-      {activeModule === 'MOD-08' && <SpaPromotionModule />}
-      {activeModule === 'MOD-09' && <TransmissionDglModule />}
-      {activeModule === 'MOD-10' && <SafRegieRecettesModule />}
-      {activeModule === 'MOD-11' && <TitlesAndReceiptsModule />}
-      {activeModule === 'MOD-12' && <LegalTextsAndSimulatorModule />}
-      {activeModule === 'MOD-13' && <PtaTrackerModule />}
-      {activeModule === 'MOD-14' && <AdminPersonnelModule />}
-      {activeModule === 'MOD-15' && <DocumentArchivingModule />}
-      {activeModule === 'MOD-16' && <JointInspectionModule />}
-      {activeModule === 'MOD-17' && <PromoterFintechPortalModule />}
-      {activeModule === 'MOD-18' && <SupabaseDataImportModule />}
-      {activeModule === 'MOD-19' && <AdministrativeDraftingCanvaModule />}
+      <ErrorBoundary key={activeModule}>
+        {activeModule === 'MOD-01' && <DashboardModule />}
+        {activeModule === 'MOD-02' && <FieldRecensementModule />}
+        {activeModule === 'MOD-03' && <MobileAgentCalendarModule />}
+        {activeModule === 'MOD-04' && <GoogleWorkspaceGatewayModule />}
+        {activeModule === 'MOD-05' && <LegalActsGeneratorModule />}
+        {activeModule === 'MOD-06' && <QuarterlyReportsModule />}
+        {activeModule === 'MOD-07' && <SigMapModule />}
+        {activeModule === 'MOD-08' && <SpaPromotionModule />}
+        {activeModule === 'MOD-09' && <TransmissionDglModule />}
+        {activeModule === 'MOD-10' && <SafRegieRecettesModule />}
+        {activeModule === 'MOD-11' && <TitlesAndReceiptsModule />}
+        {activeModule === 'MOD-12' && <LegalTextsAndSimulatorModule />}
+        {activeModule === 'MOD-13' && <PtaTrackerModule />}
+        {activeModule === 'MOD-14' && <AdminPersonnelModule />}
+        {activeModule === 'MOD-15' && <DocumentArchivingModule />}
+        {activeModule === 'MOD-16' && <JointInspectionModule />}
+        {activeModule === 'MOD-17' && <PromoterFintechPortalModule />}
+        {activeModule === 'MOD-18' && <SupabaseDataImportModule />}
+        {activeModule === 'MOD-19' && <AdministrativeDraftingCanvaModule />}
+      </ErrorBoundary>
     </main>
   );
 };
@@ -69,6 +73,7 @@ const AppContent: React.FC = () => {
         theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
       }`}>
         <AgentLoginConsole />
+        <OfflineIndicator />
         <NotificationToast />
       </div>
     );
@@ -89,6 +94,7 @@ const AppContent: React.FC = () => {
       <PrintModal />
       <DomainAuthModal />
       <CommandPalette />
+      <OfflineIndicator />
       <NotificationToast />
     </div>
   );

@@ -36,15 +36,13 @@ export const SigMapModule: React.FC = () => {
 
   // Itinerary calculation state
   const [isItineraryMode, setIsItineraryMode] = useState<boolean>(false);
-  const [selectedWaypoints, setSelectedWaypoints] = useState<string[]>([
-    scopedEstablishments[0]?.id || '',
-    scopedEstablishments[1]?.id || '',
-    scopedEstablishments[2]?.id || '',
-  ]);
+  const [selectedWaypoints, setSelectedWaypoints] = useState<string[]>(() => {
+    return (scopedEstablishments || []).slice(0, 3).map((e) => e?.id).filter(Boolean);
+  });
   const [itineraryStats, setItineraryStats] = useState<{ distanceKm: number; etaMinutes: number } | null>(null);
 
   // Status colors
-  const statusColors: Record<ComplianceStatus, string> = {
+  const statusColors: Record<string, string> = {
     en_regle: '#10b981',              // Vert
     attestation_provisoire: '#3b82f6',// Bleu
     mise_en_demeure: '#f59e0b',       // Orange
@@ -55,7 +53,20 @@ export const SigMapModule: React.FC = () => {
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    if (!mapInstanceRef.current) {
+    if (mapInstanceRef.current) {
+      try {
+        mapInstanceRef.current.remove();
+      } catch (e) {
+        console.warn('Error removing old map:', e);
+      }
+      mapInstanceRef.current = null;
+    }
+
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
+
+    try {
       // Center of Pointe-Noire (Grand Marché / Lumumba)
       const map = L.map(mapContainerRef.current, {
         center: [-4.795, 11.854],
@@ -74,14 +85,30 @@ export const SigMapModule: React.FC = () => {
       mapInstanceRef.current = map;
 
       const handleResize = () => {
-        map.invalidateSize();
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
       };
       window.addEventListener('resize', handleResize);
-      setTimeout(handleResize, 350);
+      const timer = setTimeout(handleResize, 350);
 
       return () => {
         window.removeEventListener('resize', handleResize);
+        clearTimeout(timer);
+        if (mapInstanceRef.current) {
+          try {
+            mapInstanceRef.current.remove();
+          } catch (e) {
+            console.warn('Error removing map on unmount:', e);
+          }
+          mapInstanceRef.current = null;
+        }
+        markersLayerRef.current = null;
+        circlesLayerRef.current = null;
+        routeLayerRef.current = null;
       };
+    } catch (err) {
+      console.warn('Leaflet initialization error:', err);
     }
   }, []);
 
@@ -92,25 +119,36 @@ export const SigMapModule: React.FC = () => {
     markersLayerRef.current.clearLayers();
     circlesLayerRef.current.clearLayers();
     if (routeLayerRef.current) {
-      mapInstanceRef.current.removeLayer(routeLayerRef.current);
+      try {
+        mapInstanceRef.current.removeLayer(routeLayerRef.current);
+      } catch (e) {
+        console.warn('Error removing route layer:', e);
+      }
       routeLayerRef.current = null;
     }
 
-    const filtered = scopedEstablishments.filter((est) => {
+    const filtered = (scopedEstablishments || []).filter((est) => {
+      if (!est) return false;
       const matchStatus = selectedStatus === 'all' || est.statut === selectedStatus;
       const matchArr = selectedArr === 'all' || est.arrondissement === selectedArr;
+      const quartierStr = (est.quartier || '').toLowerCase();
       const matchQuartier =
         selectedQuartier === 'all' ||
-        (est.quartier && est.quartier.toLowerCase().includes(selectedQuartier.toLowerCase()));
+        quartierStr.includes((selectedQuartier || '').toLowerCase());
       return matchStatus && matchArr && matchQuartier;
     });
 
     filtered.forEach((est) => {
-      const color = statusColors[est.statut] || '#94a3b8';
+      if (!est) return;
+      const lat = Number(est.latitude);
+      const lng = Number(est.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      const color = statusColors[est.statut || ''] || '#94a3b8';
 
       // 1. Acoustic Heatmap circle
       if (showAcousticHeatmap) {
-        const dB = est.niveauDecibelsMoyen || 60;
+        const dB = Number(est.niveauDecibelsMoyen) || 60;
         let circleColor = '#10b981';
         let circleRadius = 150;
         let fillOpacity = 0.2;
@@ -129,7 +167,7 @@ export const SigMapModule: React.FC = () => {
           fillOpacity = 0.25;
         }
 
-        const circle = L.circle([est.latitude, est.longitude], {
+        const circle = L.circle([lat, lng], {
           color: circleColor,
           fillColor: circleColor,
           fillOpacity: fillOpacity,
@@ -138,7 +176,7 @@ export const SigMapModule: React.FC = () => {
         });
 
         circle.bindTooltip(
-          `<strong>${est.nomCommercial}</strong><br/>Zone sonore: ${dB} dB(A)`,
+          `<strong>${est.nomCommercial || 'Établissement'}</strong><br/>Zone sonore: ${dB} dB(A)`,
           { sticky: true }
         );
         circlesLayerRef.current?.addLayer(circle);
@@ -166,30 +204,31 @@ export const SigMapModule: React.FC = () => {
             font-weight: bold;
             font-size: 11px;
           ">
-            ${isInItinerary ? `#${waypointIndex + 1}` : est.niveauDecibelsMoyen > 80 ? '🔊' : '★'}
+            ${isInItinerary ? `#${waypointIndex + 1}` : (est.niveauDecibelsMoyen || 0) > 80 ? '🔊' : '★'}
           </div>
         `,
         iconSize: [28, 28],
         iconAnchor: [14, 14],
       });
 
-      const marker = L.marker([est.latitude, est.longitude], { icon: customIcon });
+      const marker = L.marker([lat, lng], { icon: customIcon });
 
       // Popup Content
+      const statutStr = (est.statut || 'en_regle').replace('_', ' ');
       const popupHtml = `
         <div style="font-family: sans-serif; font-size: 12px; min-width: 220px; color: #0f172a;">
-          <h4 style="margin: 0 0 4px 0; font-weight: bold; font-size: 13px; color: #047857;">${est.nomCommercial}</h4>
+          <h4 style="margin: 0 0 4px 0; font-weight: bold; font-size: 13px; color: #047857;">${est.nomCommercial || 'Établissement'}</h4>
           <p style="margin: 0 0 4px 0; font-size: 11px; color: #475569;">
-            ${est.arrondissement} • ${est.quartier}
+            ${est.arrondissement || 'Lumumba'} • ${est.quartier || 'Centre'}
           </p>
           <div style="margin: 6px 0; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px;">
-            <strong>Promoteur :</strong> ${est.promoteurNom}<br/>
-            <strong>Tél :</strong> ${est.promoteurTelephone}<br/>
-            <strong>Décibels :</strong> <span style="font-weight:bold; color: ${est.niveauDecibelsMoyen > 80 ? '#dc2626' : '#047857'};">${est.niveauDecibelsMoyen} dB(A)</span><br/>
+            <strong>Promoteur :</strong> ${est.promoteurNom || 'N/A'}<br/>
+            <strong>Tél :</strong> ${est.promoteurTelephone || 'N/A'}<br/>
+            <strong>Décibels :</strong> <span style="font-weight:bold; color: ${(est.niveauDecibelsMoyen || 0) > 80 ? '#dc2626' : '#047857'};">${est.niveauDecibelsMoyen || 60} dB(A)</span><br/>
             <strong>Limiteur :</strong> ${est.limiteurInstalle ? 'Homologué Présent' : 'Non détecté'}<br/>
-            <strong>Statut :</strong> <span style="font-weight:bold; text-transform:uppercase;">${est.statut.replace('_', ' ')}</span>
+            <strong>Statut :</strong> <span style="font-weight:bold; text-transform:uppercase;">${statutStr}</span>
           </div>
-          <div style="font-size: 10px; color: #64748b; font-family: monospace;">Réf: ${est.codeDossier}</div>
+          <div style="font-size: 10px; color: #64748b; font-family: monospace;">Réf: ${est.codeDossier || 'DDL-PN-2026'}</div>
         </div>
       `;
 
@@ -198,11 +237,17 @@ export const SigMapModule: React.FC = () => {
     });
 
     // 3. Draw Itinerary Route if active
-    if (isItineraryMode && selectedWaypoints.length >= 2) {
+    if (isItineraryMode && selectedWaypoints.length >= 2 && mapInstanceRef.current) {
       const points: [number, number][] = [];
       selectedWaypoints.forEach((id) => {
-        const item = scopedEstablishments.find((e) => e.id === id);
-        if (item) points.push([item.latitude, item.longitude]);
+        const item = (scopedEstablishments || []).find((e) => e && e.id === id);
+        if (item) {
+          const pLat = Number(item.latitude);
+          const pLng = Number(item.longitude);
+          if (Number.isFinite(pLat) && Number.isFinite(pLng)) {
+            points.push([pLat, pLng]);
+          }
+        }
       });
 
       if (points.length >= 2) {
@@ -224,11 +269,13 @@ export const SigMapModule: React.FC = () => {
         const distKm = Number(totalDist.toFixed(1));
         const eta = Math.round(distKm * 4 + points.length * 20); // 4 min/km + 20 min inspection per point
         setItineraryStats({ distanceKm: distKm, etaMinutes: eta });
+      } else {
+        setItineraryStats(null);
       }
     } else {
       setItineraryStats(null);
     }
-  }, [scopedEstablishments, selectedStatus, selectedArr, showAcousticHeatmap, isItineraryMode, selectedWaypoints]);
+  }, [scopedEstablishments, selectedStatus, selectedArr, selectedQuartier, showAcousticHeatmap, isItineraryMode, selectedWaypoints]);
 
   const handleToggleWaypoint = (id: string) => {
     setSelectedWaypoints((prev) =>

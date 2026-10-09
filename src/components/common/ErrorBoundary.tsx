@@ -51,15 +51,15 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
-          <div className="max-w-xl w-full bg-slate-900 border border-rose-500/30 rounded-2xl p-6 md:p-8 shadow-2xl">
+        <div className="w-full min-h-[450px] flex items-center justify-center p-4 md:p-8">
+          <div className="max-w-xl w-full bg-slate-900 border border-rose-500/30 rounded-2xl p-6 md:p-8 shadow-2xl text-slate-100">
             <div className="flex items-center gap-3 text-rose-400 mb-4">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-rose-500" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-100">
-                  Une erreur inattendue est survenue
+                  Une anomalie est survenue dans ce module
                 </h2>
                 <p className="text-xs text-rose-400 font-mono">
                   DDL-PN Sovereign Recovery Console
@@ -68,7 +68,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              L'application a intercepté une anomalie d'exécution. Vous pouvez recharger l'interface ou réinitialiser le cache local corrompu pour restaurer l'état normal.
+              Le module a intercepté une interruption d'affichage. Vous pouvez réinitialiser le composant ou recharger les données pour poursuivre normalement.
             </p>
 
             {this.state.error && (
@@ -79,11 +79,19 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={this.handleReload}
+                onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Recharger la page</span>
+                <span>Réessayer ce module</span>
+              </button>
+
+              <button
+                onClick={this.handleReload}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Recharger l'application</span>
               </button>
 
               <button
@@ -91,7 +99,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 font-semibold text-xs transition cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Purger le cache local & Réparer</span>
+                <span>Purger le cache</span>
               </button>
             </div>
           </div>

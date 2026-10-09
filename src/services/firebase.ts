@@ -9,6 +9,9 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc,
   getDocFromServer,
   collection,
@@ -42,14 +45,33 @@ try {
 
 export const auth = getAuth(app);
 
+// Initialize Firestore with IndexedDB Offline Persistence for Sovereign offline mode
 let dbInstance: Firestore;
 try {
-  dbInstance = activeFirebaseConfig.firestoreDatabaseId && activeFirebaseConfig.firestoreDatabaseId !== '(default)'
-    ? getFirestore(app, activeFirebaseConfig.firestoreDatabaseId)
-    : getFirestore(app);
+  const targetDbId =
+    activeFirebaseConfig.firestoreDatabaseId && activeFirebaseConfig.firestoreDatabaseId !== '(default)'
+      ? activeFirebaseConfig.firestoreDatabaseId
+      : undefined;
+
+  dbInstance = initializeFirestore(
+    app,
+    {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    },
+    targetDbId
+  );
 } catch (e) {
-  console.warn('Fallback getFirestore(app):', e);
-  dbInstance = getFirestore(app);
+  // If already initialized (e.g. HMR or existing instance), fallback to getFirestore
+  try {
+    dbInstance =
+      activeFirebaseConfig.firestoreDatabaseId && activeFirebaseConfig.firestoreDatabaseId !== '(default)'
+        ? getFirestore(app, activeFirebaseConfig.firestoreDatabaseId)
+        : getFirestore(app);
+  } catch (err2) {
+    dbInstance = getFirestore(app);
+  }
 }
 export const db: Firestore = dbInstance;
 
@@ -137,13 +159,24 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 export const testFirestoreConnection = async (): Promise<boolean> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    console.log("Client en mode hors-ligne : données locales et session souveraine actives.");
+    return true;
+  }
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    // Timeout of 1800ms to avoid blocking on flaky or offline networks
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('client_offline_timeout')), 1800)
+    );
+    await Promise.race([
+      getDocFromServer(doc(db, 'test', 'connection')),
+      timeoutPromise,
+    ]);
     console.log("Connecté à Firestore avec succès !");
     return true;
   } catch (error: any) {
-    if (error?.message?.includes('the client is offline')) {
-      console.warn("Client Firestore en mode hors-ligne.");
+    if (error?.message?.includes('the client is offline') || error?.message?.includes('client_offline_timeout') || error?.code === 'unavailable') {
+      console.warn("Client Firestore en mode hors-ligne (cache local IndexedDB actif).");
     } else {
       console.log("Test de connexion Firestore effectué.");
     }
