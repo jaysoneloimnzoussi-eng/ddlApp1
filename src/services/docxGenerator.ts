@@ -837,22 +837,31 @@ export interface UniversalAdministrativeDocxData {
   signataireTitre?: string;
   piecesJointes?: string;
   ampliations?: string[];
+  margeGaucheCm?: number;
+  margeDroiteCm?: number;
+  margeHautCm?: number;
+  margeBasCm?: number;
 }
 
 /**
  * Universal DOCX generator for the Administrative Drafting Canva (TDR, Convocations, Rapports, etc.)
  */
 export async function generateUniversalAdministrativeDocx(data: UniversalAdministrativeDocxData): Promise<void> {
+  const topDxa = Math.round((data.margeHautCm ?? 2.0) * 567);
+  const bottomDxa = Math.round((data.margeBasCm ?? 2.0) * 567);
+  const leftDxa = Math.round((data.margeGaucheCm ?? 2.5) * 567);
+  const rightDxa = Math.round((data.margeDroiteCm ?? 2.0) * 567);
+
   const doc = new Document({
     sections: [
       {
         properties: {
           page: {
             margin: {
-              top: 1134,
-              bottom: 1134,
-              left: 1417,
-              right: 1134,
+              top: topDxa,
+              bottom: bottomDxa,
+              left: leftDxa,
+              right: rightDxa,
             },
           },
         },

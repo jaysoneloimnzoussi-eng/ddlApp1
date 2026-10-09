@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
 import { X, Printer, Download, Shield, FileText, CheckCircle2 } from 'lucide-react';
-import { generateAttestationDocx, generateLegalActDocx } from '../../services/docxGenerator';
+import { generateAttestationDocx, generateLegalActDocx, generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
 import { printHtmlElement } from '../../services/printService';
 import { OfficialDocumentHeader } from './OfficialDocumentHeader';
 import { formatCfa } from '../../services/crypto';
@@ -18,6 +18,7 @@ export const PrintModal: React.FC = () => {
     else if (printMode === 'a4_legal_act') docTitle = `Acte_${printData.referenceNumero || 'DDL_PN'}`;
     else if (printMode === 'pos_receipt') docTitle = `Quittance_${printData.numeroQuittance || 'DDL_PN'}`;
     else if (printMode === 'staff_badge') docTitle = `Badge_${printData.matricule || 'Agent'}`;
+    else if (printMode === 'spa_diploma') docTitle = `Diplome_${printData.nomCommercial || 'DDL_PN'}`;
 
     printHtmlElement('printable-modal-doc', docTitle);
   };
@@ -27,10 +28,30 @@ export const PrintModal: React.FC = () => {
       await generateAttestationDocx(printData);
     } else if (printMode === 'a4_legal_act') {
       await generateLegalActDocx(printData);
+    } else if (printMode === 'spa_diploma') {
+      await generateUniversalAdministrativeDocx({
+        titreActe: "DIPLÔME D'HONNEUR DU CIVISME ACOUSTIQUE",
+        numeroActe: `DIP-2026-${printData.codeDossier || 'DDL'}`,
+        dateLieu: 'Pointe-Noire, le 08 octobre 2026',
+        destinataireTitre: `Décerné à l'établissement : ${printData.nomCommercial}`,
+        destinataireVille: printData.arrondissement || 'Pointe-Noire',
+        sections: [
+          {
+            titre: 'DISTINCTION OFFICIELLE DDL-PN',
+            contenu: `En reconnaissance de son civisme exemplaire, de sa conformité acoustique stricte à la Loi N° 21-2019 (< 65 dB(A)) et de sa contribution active à la tranquillité publique et à la salubrité environnementale du Département de Pointe-Noire.`,
+          },
+        ],
+        signataireNom: 'Jean Richard NTSEKE NGOUAKA',
+        signataireTitre: 'Le Directeur Départemental des Loisirs',
+        margeGaucheCm: 2.5,
+        margeDroiteCm: 2.0,
+        margeHautCm: 2.0,
+        margeBasCm: 2.0,
+      });
     }
   };
 
-  const canDownloadDocx = printMode === 'a4_attestation' || printMode === 'a4_legal_act';
+  const canDownloadDocx = printMode === 'a4_attestation' || printMode === 'a4_legal_act' || printMode === 'spa_diploma';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">

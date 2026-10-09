@@ -10,9 +10,12 @@ import {
   Flame,
   CheckCircle2,
   AlertTriangle,
+  Download,
 } from 'lucide-react';
 import { JointInspectionReport } from '../../types';
 import { computeSha256 } from '../../services/crypto';
+import { printHtmlElement } from '../../services/printService';
+import { generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
 
 export const JointInspectionModule: React.FC = () => {
   const { establishments, showNotification } = useApp();
@@ -114,6 +117,7 @@ export const JointInspectionModule: React.FC = () => {
         {reports.map((r) => (
           <div
             key={r.id}
+            id={`pv-card-${r.id}`}
             className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-4 shadow-lg"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
@@ -134,11 +138,53 @@ export const JointInspectionModule: React.FC = () => {
                   {r.decisionCommission}
                 </span>
                 <button
-                  onClick={() => window.print()}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  title="Imprimer PV Conjoint"
+                  onClick={async () => {
+                    try {
+                      await generateUniversalAdministrativeDocx({
+                        titreActe: "PROCÈS-VERBAL DE CONTRÔLE CONJOINT",
+                        numeroActe: r.referenceNumero,
+                        dateLieu: `Pointe-Noire, le ${r.dateControle}`,
+                        destinataireTitre: `Établissement contrôlé : ${r.etablissementNom}`,
+                        destinataireVille: r.arrondissement,
+                        emetteurTitre: "Commission Mixte Départementale de Contrôle",
+                        objet: `Rapport de constatations contradictoires - Décision : ${r.decisionCommission}`,
+                        sections: [
+                          {
+                            titre: "I. CONSTATATIONS ACOUSTIQUES (SAA)",
+                            contenu: `Niveau de pression acoustique mesuré : ${r.conformiteAcoustique.decibels} dB(A). Observations : ${r.conformiteAcoustique.observations}. Statut : ${r.conformiteAcoustique.conforme ? 'Conforme (< 65 dB(A))' : 'Non conforme (émergence excessive)'}.`,
+                          },
+                          {
+                            titre: "II. SÉCURITÉ INCENDIE ET SALUBRITÉ (SAPEURS-POMPIERS & MAIRIE)",
+                            contenu: `Extincteurs : ${r.securiteIncendie.extincteursPresents ? 'Vérifiés conformes' : 'Absents ou périmés'}. Issues de secours : ${r.securiteIncendie.issueSecoursDegagee ? 'Dégagées' : 'Obstruées'}. Hygiène et salubrité générale : ${r.conformiteHygiene.conforme ? 'Conforme' : 'Non conforme'}.`,
+                          },
+                          {
+                            titre: "III. SITUATION ADMINISTRATIVE ET DÉCISION DE LA COMMISSION",
+                            contenu: `Licence d'exploitation de débits de boissons : ${r.licenceBoissons.conforme ? `Conforme (N° ${r.licenceBoissons.numeroLicence})` : 'En cours de régularisation'}. DÉCISION FINALE DE LA COMMISSION MIXTE : ${r.decisionCommission.toUpperCase()}.`,
+                          },
+                        ],
+                        signataireNom: "Jean Richard NTSEKE NGOUAKA",
+                        signataireTitre: "Le Directeur Départemental des Loisirs",
+                        margeGaucheCm: 2.5,
+                        margeDroiteCm: 2.0,
+                        margeHautCm: 2.0,
+                        margeBasCm: 2.0,
+                      });
+                      showNotification('success', `PV ${r.referenceNumero} exporté en Word (.docx) avec succès !`);
+                    } catch (e: any) {
+                      showNotification('error', `Erreur export Word : ${e.message}`);
+                    }
+                  }}
+                  className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white cursor-pointer transition shadow"
+                  title="Télécharger le PV en Word (.docx)"
                 >
-                  <Printer className="w-4 h-4 text-emerald-400" />
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => printHtmlElement(`pv-card-${r.id}`, `PV_Conjoint_${r.referenceNumero}`)}
+                  className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold cursor-pointer transition shadow"
+                  title="Imprimer le PV Conjoint"
+                >
+                  <Printer className="w-4 h-4" />
                 </button>
               </div>
             </div>

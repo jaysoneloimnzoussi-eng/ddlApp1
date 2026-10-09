@@ -43,14 +43,94 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Screen style: Dedicated print layer is completely hidden on screens */
+@media screen {
+  #ddl-dedicated-print-layer {
+    display: none !important;
+  }
+}
+
 /* Custom Print Styles for Official Republic of Congo Administrative Documents & POS 58mm */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 20mm 20mm 20mm 25mm; /* Marges administratives congolaises : G 2.5cm, D 2.0cm, H 2.0cm, B 2.0cm */
+    /* Marges officielles administratives congolaises : Haut 20mm, Bas 20mm, Droite 20mm, Gauche 25mm (reliure et enregistrement) */
+    margin: 20mm 20mm 20mm 25mm;
   }
 
-  html, body, #root, #root > div, main, .overflow-y-auto, .overflow-hidden {
+  /* When isolated print mode is triggered, hide all regular UI completely */
+  body.ddl-printing-active > #root,
+  body.ddl-printing-active > *:not(#ddl-dedicated-print-layer) {
+    display: none !important;
+  }
+
+  body.ddl-printing-active {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: 'EB Garamond', Garamond, 'Times New Roman', serif !important;
+  }
+
+  #ddl-dedicated-print-layer {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  #ddl-dedicated-print-layer * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #ddl-dedicated-print-layer .page-a4 {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'EB Garamond', Garamond, 'Times New Roman', serif !important;
+    font-size: 13pt !important;
+    line-height: 1.45 !important;
+    page-break-after: always;
+  }
+
+  #ddl-dedicated-print-layer .page-a4:last-child {
+    page-break-after: auto;
+  }
+
+  #ddl-dedicated-print-layer .no-print,
+  #ddl-dedicated-print-layer button,
+  .no-print,
+  nav,
+  aside,
+  header,
+  header.app-header,
+  button,
+  .sidebar-container,
+  .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  /* General fallback if printing outside ddl-printing-active */
+  body:not(.ddl-printing-active) {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  body:not(.ddl-printing-active) html, 
+  body:not(.ddl-printing-active) #root, 
+  body:not(.ddl-printing-active) #root > div, 
+  body:not(.ddl-printing-active) main {
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
@@ -58,10 +138,6 @@
     display: block !important;
     background-color: #ffffff !important;
     color: #000000 !important;
-  }
-
-  .no-print, nav, aside, header, header.app-header, button, .sidebar-container, .mobile-bottom-nav {
-    display: none !important;
   }
 
   .print-only {

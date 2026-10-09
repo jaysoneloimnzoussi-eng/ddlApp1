@@ -16,6 +16,7 @@ import {
   Building,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
+import { printHtmlElement } from '../../services/printService';
 import { CashReceipt } from '../../types';
 
 export const SafRegieRecettesModule: React.FC = () => {
@@ -155,8 +156,9 @@ export const SafRegieRecettesModule: React.FC = () => {
             <span>{isClotureDone ? 'Caisse Clôturée' : 'Clôturer la Caisse'}</span>
           </button>
           <button
-            onClick={() => window.print()}
-            className="px-3.5 py-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition flex items-center gap-1.5"
+            onClick={() => printHtmlElement('saf-recettes-content', 'Journal_Caisse_SAF_Recettes_DDL_PN')}
+            className="px-3.5 py-1.5 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Imprimer l'état des recettes et le journal de caisse"
           >
             <Printer className="w-3.5 h-3.5 text-emerald-600" />
             <span>Imprimer</span>
@@ -164,6 +166,7 @@ export const SafRegieRecettesModule: React.FC = () => {
         </div>
       </div>
 
+      <div id="saf-recettes-content" className="space-y-6">
       {/* KPI Cards: Répartition des flux de paiement */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className={`p-3 rounded-xl border space-y-1 ${
@@ -483,6 +486,7 @@ export const SafRegieRecettesModule: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

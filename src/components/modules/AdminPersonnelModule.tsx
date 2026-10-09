@@ -40,6 +40,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import { StaffPersonnel, UserRole } from '../../types';
+import { printHtmlElement } from '../../services/printService';
 
 export const AdminPersonnelModule: React.FC = () => {
   const {
@@ -1113,7 +1114,10 @@ Vos Accès Confidentiels à la Plateforme Souveraine (Loi N° 21-2019) :
             </div>
 
             {/* Fiche Format Document Officiel */}
-            <div className="p-5 rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-800 space-y-4 text-xs font-sans">
+            <div
+              id="printable-slip-agent"
+              className="p-5 rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-800 space-y-4 text-xs font-sans"
+            >
               <div className="text-center pb-3 border-b border-slate-200 dark:border-slate-800 space-y-0.5">
                 <p className="font-bold text-[11px] uppercase tracking-wider text-slate-900 dark:text-slate-100">
                   RÉPUBLIQUE DU CONGO • MCAPNIT • DGL
@@ -1176,7 +1180,7 @@ Vos Accès Confidentiels à la Plateforme Souveraine (Loi N° 21-2019) :
 
               <button
                 onClick={() => {
-                  window.print();
+                  printHtmlElement('printable-slip-agent', `Fiche_Remise_${slipAgent?.matricule || 'Agent'}`);
                 }}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md"
               >

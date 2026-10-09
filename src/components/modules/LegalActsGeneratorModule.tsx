@@ -14,10 +14,12 @@ import {
   Radio,
   Building,
   CheckCircle2,
+  Download,
 } from 'lucide-react';
 import { LegalAct, Arrondissement } from '../../types';
 import { CountdownTimer72h } from '../common/CountdownTimer72h';
 import { SonometerTool } from '../common/SonometerTool';
+import { generateLegalActDocx } from '../../services/docxGenerator';
 
 export const LegalActsGeneratorModule: React.FC = () => {
   const {
@@ -212,13 +214,31 @@ export const LegalActsGeneratorModule: React.FC = () => {
                   </button>
                 )}
 
-                <button
-                  onClick={() => openPrintModal('a4_legal_act', act)}
-                  className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 transition ml-auto"
-                >
-                  <Printer className="w-3 h-3 text-emerald-400" />
-                  Imprimer Acte A4
-                </button>
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await generateLegalActDocx(act);
+                        showNotification('success', `Acte ${act.referenceNumero} exporté en Word (.docx) avec succès !`);
+                      } catch (e: any) {
+                        showNotification('error', `Erreur export Word : ${e.message}`);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-1 transition cursor-pointer shadow"
+                    title="Télécharger l'acte au format Microsoft Word .docx"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Word (.docx)</span>
+                  </button>
+                  <button
+                    onClick={() => openPrintModal('a4_legal_act', act)}
+                    className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold flex items-center gap-1 transition cursor-pointer shadow"
+                    title="Imprimer l'acte A4"
+                  >
+                    <Printer className="w-3 h-3" />
+                    <span>Imprimer A4</span>
+                  </button>
+                </div>
               </div>
             </div>
           );
