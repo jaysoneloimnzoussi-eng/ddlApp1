@@ -30,6 +30,9 @@ import {
 } from '../../types';
 import { formatCfa } from '../../services/crypto';
 import { SonometerTool } from '../common/SonometerTool';
+import { PhotoCapture } from '../common/PhotoCapture';
+import { SignaturePad } from '../common/SignaturePad';
+import { openWhatsAppReminder } from '../../services/whatsappService';
 
 export const FieldRecensementModule: React.FC = () => {
   const {
@@ -79,6 +82,9 @@ export const FieldRecensementModule: React.FC = () => {
   });
   const [showSonometer, setShowSonometer] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [photoUrl, setPhotoUrl] = useState<string>('');
+  const [signatureUrl, setSignatureUrl] = useState<string>('');
+  const [showSignaturePad, setShowSignaturePad] = useState<boolean>(false);
 
   // Sync selected agent if currentAgentId changes
   useEffect(() => {
@@ -189,6 +195,8 @@ export const FieldRecensementModule: React.FC = () => {
         recensePar: assignedAgent ? assignedAgent.nomComplet : 'Jacques MATOKO',
         agentAssigneId: assignedAgent ? assignedAgent.id : assignedAgentId,
         agentAssigneNom: assignedAgent ? assignedAgent.nomComplet : 'Jacques MATOKO',
+        photoUrl: photoUrl || undefined,
+        signatureUrl: signatureUrl || undefined,
       });
 
       // Optional First Intervention / Tournée
@@ -227,6 +235,9 @@ export const FieldRecensementModule: React.FC = () => {
       setAdresseExacte('');
       setStatutInitial('mise_en_demeure');
       setPlanifierIntervention(false);
+      setPhotoUrl('');
+      setSignatureUrl('');
+      setShowSignaturePad(false);
     } catch (err: any) {
       console.error("Erreur enregistrement recensement:", err);
       showNotification('error', `Erreur lors de l'enregistrement : ${err?.message || 'Erreur inconnue'}`);
@@ -474,6 +485,71 @@ export const FieldRecensementModule: React.FC = () => {
                     : 'bg-slate-950 border-slate-700 text-slate-100 focus:border-emerald-500'
                 }`}
               />
+            </div>
+
+            {/* Photo de l'établissement */}
+            <div className={`p-3 rounded-xl border space-y-2 ${
+              isLight ? 'bg-sky-50/60 border-sky-200' : 'bg-sky-950/20 border-sky-800/40'
+            }`}>
+              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                📸 Photo de l'Établissement (Optionnel)
+              </span>
+              <PhotoCapture
+                currentPhoto={photoUrl}
+                onPhotoCaptured={(data) => setPhotoUrl(data)}
+                onPhotoRemoved={() => setPhotoUrl('')}
+                label="Prendre une photo de l'établissement"
+              />
+            </div>
+
+            {/* Signature numérique du promoteur */}
+            <div className={`p-3 rounded-xl border space-y-2 ${
+              isLight ? 'bg-violet-50/60 border-violet-200' : 'bg-violet-950/20 border-violet-800/40'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  ✍️ Signature Numérique du Promoteur (Optionnel)
+                </span>
+                {signatureUrl ? (
+                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
+                    ✓ Signature capturée
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowSignaturePad((v) => !v)}
+                    className="text-[10px] px-2 py-0.5 rounded bg-violet-600 hover:bg-violet-500 text-white font-semibold transition"
+                  >
+                    {showSignaturePad ? 'Masquer' : 'Ouvrir le Pad'}
+                  </button>
+                )}
+              </div>
+              {showSignaturePad && !signatureUrl && (
+                <SignaturePad
+                  onSave={(dataUrl) => {
+                    setSignatureUrl(dataUrl);
+                    setShowSignaturePad(false);
+                  }}
+                  onCancel={() => setShowSignaturePad(false)}
+                />
+              )}
+              {signatureUrl && (
+                <div className="flex items-center gap-2">
+                  <img
+                    src={signatureUrl}
+                    alt="Signature"
+                    className="h-12 border rounded bg-white dark:bg-slate-900 object-contain"
+                    style={{ maxWidth: 180 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setSignatureUrl(''); setShowSignaturePad(true); }}
+                    className="text-[10px] px-2 py-0.5 rounded bg-red-600 hover:bg-red-500 text-white font-semibold transition"
+                  >
+                    Refaire
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Statut Administratif & Dépôt du Dossier (Non Automatique) */}
@@ -959,7 +1035,25 @@ export const FieldRecensementModule: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex justify-end items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/60">
+                    <div className="flex justify-end items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/60 flex-wrap">
+                      {/* Rappel WhatsApp */}
+                      {est.promoteurTelephone && (
+                        <button
+                          type="button"
+                          onClick={() => openWhatsAppReminder({
+                            phone: est.promoteurTelephone,
+                            etablissementNom: est.nomCommercial,
+                            promoteurNom: est.promoteurNom,
+                            montantDu: est.soldeRestantDu,
+                            rdvDate: est.prochainRdvDate,
+                          })}
+                          className="px-2.5 py-1 rounded bg-green-50 hover:bg-green-100 text-green-700 dark:bg-green-950 dark:hover:bg-green-900 dark:text-green-300 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                          title="Envoyer un rappel WhatsApp au promoteur"
+                        >
+                          <span className="text-[12px]">💬</span>
+                          WhatsApp
+                        </button>
+                      )}
                       <button
                         onClick={() => setActiveModule('MOD-01')}
                         className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"

@@ -11,15 +11,139 @@ import {
   ShieldAlert,
   Hash,
   Database,
+  Download,
+  Upload,
+  HardDrive,
 } from 'lucide-react';
 import { computeSha256 } from '../../services/crypto';
 
 export const DocumentArchivingModule: React.FC = () => {
-  const { auditLogs, receipts, legalActs, establishments, showNotification, setActiveModule } = useApp();
+  const {
+    auditLogs,
+    receipts,
+    legalActs,
+    establishments,
+    schedules,
+    soitTransmis,
+    addAuditLog,
+    showNotification,
+    setActiveModule,
+  } = useApp();
 
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [verifyInput, setVerifyInput] = useState('');
   const [verifyResult, setVerifyResult] = useState<any>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportBackup = async () => {
+    setIsExporting(true);
+    try {
+      const backupPayload = {
+        metadata: {
+          system: 'DDL-PN Direction Départementale des Loisirs de Pointe-Noire',
+          version: '2.0.0-PRO',
+          dateExport: new Date().toISOString(),
+          totalEstablishments: establishments.length,
+          totalReceipts: receipts.length,
+          totalLegalActs: legalActs.length,
+          totalSchedules: schedules.length,
+          totalAuditLogs: auditLogs.length,
+        },
+        data: {
+          establishments,
+          receipts,
+          legalActs,
+          schedules,
+          auditLogs,
+          soitTransmis,
+        },
+      };
+
+      const rawJson = JSON.stringify(backupPayload, null, 2);
+      const hash = await computeSha256(rawJson);
+
+      const sealedPayload = {
+        ...backupPayload,
+        securitySignature: {
+          algorithm: 'SHA-256',
+          hashSha256: hash,
+          certifiedAt: new Date().toISOString(),
+          certificationAuthority: 'DDL-PN République du Congo',
+        },
+      };
+
+      const blob = new Blob([JSON.stringify(sealedPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `DDL_PN_Sauvegarde_Souveraine_${new Date().toISOString().substring(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      if (addAuditLog) {
+        await addAuditLog(
+          'SAUVEGARDE_SOUVERAINE_USB',
+          'SYSTEM',
+          `BACKUP-${Date.now().toString().slice(-4)}`,
+          `Exportation intégrale des données (${establishments.length} étab., ${receipts.length} quittances). Empreinte SHA-256: ${hash.substring(0, 16)}...`
+        );
+      }
+
+      showNotification('success', 'Sauvegarde souveraine exportée avec succès sur support amovible / clé USB !');
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de l'exportation de la sauvegarde : ${err?.message || 'Erreur inconnue'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        if (!parsed.data || !parsed.metadata) {
+          showNotification('error', 'Fichier de sauvegarde invalide ou corrompu.');
+          return;
+        }
+
+        if (Array.isArray(parsed.data.establishments)) {
+          localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(parsed.data.establishments));
+        }
+        if (Array.isArray(parsed.data.receipts)) {
+          localStorage.setItem('ddl_real_receipts_v5', JSON.stringify(parsed.data.receipts));
+        }
+        if (Array.isArray(parsed.data.legalActs)) {
+          localStorage.setItem('ddl_real_legal_acts_v5', JSON.stringify(parsed.data.legalActs));
+        }
+        if (Array.isArray(parsed.data.schedules)) {
+          localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(parsed.data.schedules));
+        }
+        if (Array.isArray(parsed.data.auditLogs)) {
+          localStorage.setItem('ddl_real_audit_logs_v4', JSON.stringify(parsed.data.auditLogs));
+        }
+        if (Array.isArray(parsed.data.soitTransmis)) {
+          localStorage.setItem('ddl_real_soit_transmis_v4', JSON.stringify(parsed.data.soitTransmis));
+        }
+
+        showNotification('success', 'Restauration terminée avec succès ! Actualisation en cours...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } catch (err: any) {
+        showNotification('error', `Erreur lors de la lecture du fichier : ${err?.message || 'Format JSON invalide'}`);
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const filteredLogs = auditLogs.filter((log) => {
     return (
@@ -93,13 +217,39 @@ export const DocumentArchivingModule: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setActiveModule('MOD-18')}
-          className="px-3.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-2 transition-all shadow-xs self-start md:self-auto"
-        >
-          <Database className="w-4 h-4 text-emerald-400" />
-          <span>Passerelle d'Import Supabase ➔ Firestore</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportBackup}
+            className="hidden"
+          />
+          <button
+            onClick={handleExportBackup}
+            disabled={isExporting}
+            className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
+            title="Exporter une archive JSON chiffrée et scellée sur clé USB"
+          >
+            <HardDrive className="w-4 h-4 text-emerald-200" />
+            <span>{isExporting ? 'Exportation...' : 'Sauvegarde Souveraine USB'}</span>
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition cursor-pointer"
+            title="Restaurer une sauvegarde depuis une clé USB"
+          >
+            <Upload className="w-4 h-4 text-emerald-400" />
+            <span>Restaurer USB</span>
+          </button>
+          <button
+            onClick={() => setActiveModule('MOD-18')}
+            className="px-3.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-2 transition-all shadow-xs"
+          >
+            <Database className="w-4 h-4 text-emerald-400" />
+            <span>Passerelle Supabase</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

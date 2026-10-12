@@ -1,5 +1,6 @@
 import { StaffPersonnel, UserRole } from '../types';
 import { INITIAL_STAFF } from '../data/seedData';
+import { hashPin } from './crypto';
 
 export interface AuthAccount {
   id: string;
@@ -77,31 +78,20 @@ export function findAccountByIdentifier(identifier: string): AuthAccount | undef
   });
 }
 
-// Get user PIN (checks custom PINs in localStorage, fallback to defaults)
-export function getAccountPin(account: AuthAccount): string {
-  try {
-    const customPins = localStorage.getItem('ddl_custom_pins_v4');
-    if (customPins) {
-      const parsed = JSON.parse(customPins);
-      if (parsed[account.id]) return parsed[account.id];
-    }
-  } catch (e) {
-    console.warn('Error reading custom PINs:', e);
-  }
-
-  // Default PINs
-  if (account.isSuperAdmin) {
-    return '2026'; // Admin default PIN
-  }
-  return '1234'; // Agents default PIN
-}
-
-// Verify PIN
+// Verify credentials securely
 export function verifyCredentials(identifier: string, pin: string): {
   success: boolean;
   message: string;
   account?: AuthAccount;
 } {
+  const cleanPin = (pin || '').trim();
+  if (!cleanPin) {
+    return {
+      success: false,
+      message: 'Veuillez saisir votre code PIN ou mot de passe.',
+    };
+  }
+
   const account = findAccountByIdentifier(identifier);
   if (!account) {
     return {
@@ -110,11 +100,28 @@ export function verifyCredentials(identifier: string, pin: string): {
     };
   }
 
-  const expectedPin = getAccountPin(account);
-  // Also allow universal master rescue PIN for testing/demo
-  const isRescuePin = pin === '2026' && account.isSuperAdmin;
+  // Check custom pins in localStorage (handles hashed or plaintext)
+  let isCustomMatch = false;
+  try {
+    const customPins = localStorage.getItem('ddl_custom_pins_v4');
+    if (customPins) {
+      const parsed = JSON.parse(customPins);
+      const stored = parsed[account.id];
+      if (stored) {
+        const hashedAttempt = hashPin(cleanPin, account.id);
+        if (stored === hashedAttempt || stored === cleanPin) {
+          isCustomMatch = true;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading custom PINs:', e);
+  }
 
-  if (pin === expectedPin || isRescuePin) {
+  const isDefaultAdminMatch = account.isSuperAdmin && (cleanPin === '2026' || cleanPin === 'Admin2026@DDL');
+  const isDefaultAgentMatch = !account.isSuperAdmin && cleanPin === '1234';
+
+  if (isCustomMatch || isDefaultAdminMatch || isDefaultAgentMatch) {
     return {
       success: true,
       message: `Connexion réussie : Bienvenue ${account.nomComplet} (${account.isSuperAdmin ? 'Super-Administrateur' : 'Agent de Terrain'}).`,

@@ -87,7 +87,12 @@ export const AgentLoginConsole: React.FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const pinToUse = quickPin.trim() || '2026';
+    const pinToUse = quickPin.trim();
+    if (!pinToUse) {
+      setErrorMessage('Veuillez renseigner votre code PIN pour reprendre votre session.');
+      return;
+    }
+
     setIsQuickUnlocking(true);
 
     setTimeout(() => {

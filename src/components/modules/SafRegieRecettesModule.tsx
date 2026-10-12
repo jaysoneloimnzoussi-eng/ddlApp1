@@ -14,13 +14,15 @@ import {
   CheckSquare,
   FileSpreadsheet,
   Building,
+  MessageSquare,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { printHtmlElement } from '../../services/printService';
+import { openWhatsAppReceipt } from '../../services/whatsappService';
 import { CashReceipt } from '../../types';
 
 export const SafRegieRecettesModule: React.FC = () => {
-  const { receipts, openPrintModal, showNotification, theme } = useApp();
+  const { receipts, establishments, openPrintModal, showNotification, theme } = useApp();
   const isLight = theme === 'light';
 
   const [activeTab, setActiveTab] = useState<'journal' | 'rapprochement' | 'cloture'>('journal');
@@ -329,13 +331,40 @@ export const SafRegieRecettesModule: React.FC = () => {
                       {formatCfa(rec.montantVerse)}
                     </td>
                     <td className="p-3 text-center">
-                      <button
-                        onClick={() => openPrintModal('pos_receipt', rec)}
-                        className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400"
-                        title="Imprimer Reçu POS 58mm"
-                      >
-                        <Receipt className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => openPrintModal('pos_receipt', rec)}
+                          className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 cursor-pointer"
+                          title="Imprimer Reçu POS 58mm"
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const est = establishments.find((e) => e.id === rec.etablissementId);
+                            const phone = est?.promoteurTelephone || '';
+                            if (!phone) {
+                              showNotification('warning', 'Numéro de téléphone du promoteur non renseigné.');
+                              return;
+                            }
+                            openWhatsAppReceipt({
+                              phone,
+                              etablissementNom: rec.etablissementNom,
+                              promoteurNom: rec.promoteurNom,
+                              numeroQuittance: rec.numeroQuittance,
+                              montantVerse: rec.montantVerse,
+                              resteAPayer: rec.resteAPayer,
+                              datePaiement: rec.datePaiement,
+                              modePaiement: rec.modePaiement,
+                              referenceTransaction: rec.referenceTransaction,
+                            });
+                          }}
+                          className="p-1.5 rounded bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-800/60 text-emerald-300 cursor-pointer"
+                          title="Envoyer la quittance par WhatsApp"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -123,12 +123,29 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve('.'),
+      },
+    },
+    build: {
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('docx')) return 'vendor-docx';
+              if (id.includes('leaflet')) return 'vendor-leaflet';
+              if (id.includes('d3')) return 'vendor-d3';
+              if (id.includes('firebase')) return 'vendor-firebase';
+              if (id.includes('lucide-react')) return 'vendor-icons';
+              if (id.includes('react') || id.includes('react-dom')) return 'vendor-react';
+            }
+          },
+        },
       },
     },
     server: {
       host: '0.0.0.0',
-      port: 3000,
+      port: 5173,
       allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.

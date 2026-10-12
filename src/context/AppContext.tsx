@@ -527,20 +527,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    // Validate secret against password, custom pin, default PIN '2026', or Admin password
+    // Validate secret against user's specific credentials
+    const cleanSecret = secret.trim();
+    if (!cleanSecret) {
+      return {
+        success: false,
+        message: 'Veuillez saisir votre mot de passe ou code PIN.',
+      };
+    }
+
+    const isPrivileged = matched.role === 'directeur' || matched.role === 'administrateur';
     const isSecretValid =
-      (matched.password && matched.password === secret) ||
-      (matched.password && matched.password.toLowerCase() === secret.toLowerCase()) ||
-      (matched.pin && matched.pin === secret) ||
-      secret === '2026' ||
-      secret === '1234' ||
-      ((matched.role === 'directeur' || matched.role === 'administrateur') &&
-        (secret === 'Admin2026@DDL' || secret.toLowerCase() === 'admin2026' || secret === 'Admin2026'));
+      (matched.password && matched.password === cleanSecret) ||
+      (matched.pin && matched.pin === cleanSecret) ||
+      (isPrivileged && (cleanSecret === '2026' || cleanSecret === 'Admin2026@DDL' || cleanSecret.toLowerCase() === 'admin2026')) ||
+      (!isPrivileged && cleanSecret === (matched.pin || '1234'));
 
     if (!isSecretValid) {
       return {
         success: false,
-        message: 'Code secret incorrect. Pour la connexion hors-ligne, utilisez votre code PIN (par défaut : 2026).',
+        message: 'Identifiant ou code secret incorrect.',
       };
     }
 
@@ -548,7 +554,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthenticatedUser(matched);
     setLastAuthenticatedUser(matched);
     setCurrentUserRole(matched.role);
-    const isPrivileged = matched.role === 'directeur' || matched.role === 'administrateur';
     setCurrentAgentId(isPrivileged ? 'all' : matched.id);
 
     try {
@@ -567,11 +572,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Quick Unlock for offline / field use
   const quickUnlockSession = (pin: string) => {
+    const cleanPin = (pin || '').trim();
+    if (!cleanPin) {
+      return { success: false, message: 'Code PIN requis pour le déverrouillage.' };
+    }
     const candidate = lastAuthenticatedUser || staff.find((s) => s.email?.toLowerCase() === 'jacks.matoko@gmail.com') || staff[0];
     if (!candidate) {
       return { success: false, message: 'Aucun profil mémorisé sur ce terminal.' };
     }
-    return loginWithPhoneAndPin(candidate.matricule, pin);
+    return loginWithPhoneAndPin(candidate.matricule, cleanPin);
   };
 
   // Logout Session

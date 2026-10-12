@@ -170,6 +170,10 @@ export interface Establishment {
   motifFermeture?: string;
   constateParAgentNom?: string;
   observationsFermeture?: string;
+
+  // Preuve visuelle & Signature in situ
+  photoUrl?: string;
+  signatureUrl?: string;
 }
 
 export interface CashReceipt {
@@ -189,6 +193,7 @@ export interface CashReceipt {
   brigadeCode?: string;
   natureRecette: 'Forfait Informel SAA' | 'Redevance Proportionnelle' | 'Pénalité de retard' | 'Taxe d\'agrément provisoire';
   quittanceHash?: string;
+  signatureUrl?: string;
 }
 
 export interface LegalAct {

@@ -11,6 +11,7 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [showManualGuide, setShowManualGuide] = useState(false);
 
   // If already running as an installed standalone PWA, hide the button
   if (isInstalled) {
@@ -110,8 +111,6 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
       </>
     );
   }
-
-  const [showManualGuide, setShowManualGuide] = useState(false);
 
   // Fallback if beforeinstallprompt not fired yet: show manual helper modal
   return (

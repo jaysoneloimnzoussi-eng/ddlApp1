@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   LayoutDashboard,
@@ -6,6 +6,9 @@ import {
   CalendarCheck,
   Map,
   Menu,
+  Coins,
+  FileCheck2,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -17,49 +20,134 @@ export const MobileBottomNav: React.FC = () => {
     theme,
     offlineQueueCount,
     isOnline,
+    currentUserRole,
   } = useApp();
 
   const isLight = theme === 'light';
 
-  const navItems = [
-    {
-      id: 'MOD-01',
-      label: 'Cockpit',
-      icon: LayoutDashboard,
-      action: () => setActiveModule('MOD-01'),
-      isActive: activeModule === 'MOD-01' && !isMobileMenuOpen,
-    },
-    {
-      id: 'MOD-02',
-      label: 'Terrain',
-      icon: MapPinPlus,
-      badge: !isOnline || offlineQueueCount > 0 ? `${offlineQueueCount}` : undefined,
-      action: () => setActiveModule('MOD-02'),
-      isActive: activeModule === 'MOD-02' && !isMobileMenuOpen,
-    },
-    {
-      id: 'MOD-03',
-      label: 'Agenda',
-      icon: CalendarCheck,
-      action: () => setActiveModule('MOD-03'),
-      isActive: activeModule === 'MOD-03' && !isMobileMenuOpen,
-    },
-    {
-      id: 'MOD-07',
-      label: 'SIG & Sono',
-      icon: Map,
-      action: () => setActiveModule('MOD-07'),
-      isActive: activeModule === 'MOD-07' && !isMobileMenuOpen,
-    },
-    {
-      id: 'MENU',
-      label: 'Modules',
-      icon: Menu,
-      badge: '18',
-      action: () => toggleMobileMenu(),
-      isActive: isMobileMenuOpen,
-    },
-  ];
+  const navItems = useMemo(() => {
+    if (currentUserRole === 'caissier_saf') {
+      return [
+        {
+          id: 'MOD-10',
+          label: 'Régie SAF',
+          icon: Coins,
+          action: () => setActiveModule('MOD-10'),
+          isActive: activeModule === 'MOD-10' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MOD-11',
+          label: 'Quittances',
+          icon: FileCheck2,
+          action: () => setActiveModule('MOD-11'),
+          isActive: activeModule === 'MOD-11' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MOD-02',
+          label: 'Dossiers',
+          icon: MapPinPlus,
+          action: () => setActiveModule('MOD-02'),
+          isActive: activeModule === 'MOD-02' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MOD-01',
+          label: 'Cockpit',
+          icon: LayoutDashboard,
+          action: () => setActiveModule('MOD-01'),
+          isActive: activeModule === 'MOD-01' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MENU',
+          label: 'Menu',
+          icon: Menu,
+          action: () => toggleMobileMenu(),
+          isActive: isMobileMenuOpen,
+        },
+      ];
+    }
+
+    if (currentUserRole !== 'directeur' && currentUserRole !== 'administrateur') {
+      // Agent SAA de terrain
+      return [
+        {
+          id: 'MOD-02',
+          label: 'Terrain',
+          icon: MapPinPlus,
+          badge: !isOnline || offlineQueueCount > 0 ? `${offlineQueueCount}` : undefined,
+          action: () => setActiveModule('MOD-02'),
+          isActive: activeModule === 'MOD-02' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MOD-03',
+          label: 'Agenda',
+          icon: CalendarCheck,
+          action: () => setActiveModule('MOD-03'),
+          isActive: activeModule === 'MOD-03' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MOD-07',
+          label: 'SIG/Sono',
+          icon: Map,
+          action: () => setActiveModule('MOD-07'),
+          isActive: activeModule === 'MOD-07' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MOD-11',
+          label: 'Reçus POS',
+          icon: FileCheck2,
+          action: () => setActiveModule('MOD-11'),
+          isActive: activeModule === 'MOD-11' && !isMobileMenuOpen,
+        },
+        {
+          id: 'MENU',
+          label: 'Modules',
+          icon: Menu,
+          action: () => toggleMobileMenu(),
+          isActive: isMobileMenuOpen,
+        },
+      ];
+    }
+
+    // Direction & Administrateur
+    return [
+      {
+        id: 'MOD-01',
+        label: 'Cockpit',
+        icon: LayoutDashboard,
+        action: () => setActiveModule('MOD-01'),
+        isActive: activeModule === 'MOD-01' && !isMobileMenuOpen,
+      },
+      {
+        id: 'MOD-02',
+        label: 'Terrain',
+        icon: MapPinPlus,
+        badge: !isOnline || offlineQueueCount > 0 ? `${offlineQueueCount}` : undefined,
+        action: () => setActiveModule('MOD-02'),
+        isActive: activeModule === 'MOD-02' && !isMobileMenuOpen,
+      },
+      {
+        id: 'MOD-03',
+        label: 'Agenda',
+        icon: CalendarCheck,
+        action: () => setActiveModule('MOD-03'),
+        isActive: activeModule === 'MOD-03' && !isMobileMenuOpen,
+      },
+      {
+        id: 'MOD-06',
+        label: 'Bilans DGL',
+        icon: FileSpreadsheet,
+        action: () => setActiveModule('MOD-06'),
+        isActive: activeModule === 'MOD-06' && !isMobileMenuOpen,
+      },
+      {
+        id: 'MENU',
+        label: 'Modules',
+        icon: Menu,
+        action: () => toggleMobileMenu(),
+        isActive: isMobileMenuOpen,
+      },
+    ];
+  }, [currentUserRole, activeModule, isMobileMenuOpen, isOnline, offlineQueueCount, setActiveModule, toggleMobileMenu]);
 
   return (
     <nav

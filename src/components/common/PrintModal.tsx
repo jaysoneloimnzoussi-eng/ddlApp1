@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
 import { X, Printer, Download, Shield, FileText, CheckCircle2 } from 'lucide-react';
@@ -6,9 +6,45 @@ import { generateAttestationDocx, generateLegalActDocx, generateUniversalAdminis
 import { printHtmlElement } from '../../services/printService';
 import { OfficialDocumentHeader } from './OfficialDocumentHeader';
 import { formatCfa } from '../../services/crypto';
+import { generateReceiptQrCode, generateLegalActQrCode } from '../../services/qrService';
 
 export const PrintModal: React.FC = () => {
   const { printMode, printData, closePrintModal } = useApp();
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!printData) return;
+
+    const loadQr = async () => {
+      try {
+        let url = '';
+        if (printMode === 'pos_receipt') {
+          url = await generateReceiptQrCode(printData);
+        } else if (printMode === 'a4_attestation') {
+          url = await generateLegalActQrCode(
+            printData.codeDossier || 'DDL-2026',
+            printData.nomCommercial || '',
+            printData.quittanceHash || printData.codeDossier || ''
+          );
+        } else if (printMode === 'a4_legal_act') {
+          url = await generateLegalActQrCode(
+            printData.referenceNumero || 'ACTE-2026',
+            printData.etablissementNom || '',
+            printData.documentHash || ''
+          );
+        }
+        if (isMounted) setQrCodeUrl(url);
+      } catch (err) {
+        console.warn('QR Code load error:', err);
+      }
+    };
+
+    loadQr();
+    return () => {
+      isMounted = false;
+    };
+  }, [printMode, printData]);
 
   if (printMode === 'none' || !printData) return null;
 
@@ -195,19 +231,40 @@ export const PrintModal: React.FC = () => {
                 <strong>quatre-vingt-dix (90) jours renouvelable</strong> à compter de sa signature, et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.
               </p>
 
-              {/* Security watermark and Hash */}
-              <div className="p-2 bg-slate-50 border border-slate-300 rounded font-mono text-[9px] text-slate-600 flex justify-between items-center mb-10">
-                <span>Code Sécurisé : {printData.codeDossier}</span>
-                <span>Statut : {printData.statut?.toUpperCase()}</span>
-                <span>Contrôle QR : ACTIF</span>
+              {/* Security watermark, QR Code and Hash */}
+              <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-[9px] text-slate-600 flex justify-between items-center mb-8">
+                <div className="space-y-0.5">
+                  <p><strong className="text-slate-800">Code Sécurisé :</strong> {printData.codeDossier}</p>
+                  <p><strong className="text-slate-800">Statut Républicain :</strong> {printData.statut?.toUpperCase()}</p>
+                  <p><strong className="text-slate-800">Scellement Numérique :</strong> Conforme Loi 21-2019</p>
+                </div>
+                {qrCodeUrl && (
+                  <div className="flex flex-col items-center">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Sceau Officiel"
+                      className="w-18 h-18 object-contain p-1 border border-slate-300 rounded-lg bg-white shadow-xs"
+                    />
+                    <span className="text-[7px] text-slate-500 mt-0.5 font-sans">Contrôle QR Officiel</span>
+                  </div>
+                )}
               </div>
 
               {/* Signatures */}
               <div className="flex justify-between items-end pt-4 mt-6">
                 <div className="text-center w-60">
-                  <p className="font-bold text-xs uppercase mb-14 text-slate-900">
+                  <p className="font-bold text-xs uppercase mb-4 text-slate-900">
                     Le Chef de Service SAA
                   </p>
+                  {printData.signatureUrl ? (
+                    <img
+                      src={printData.signatureUrl}
+                      alt="Signature Émargement"
+                      className="h-12 mx-auto object-contain mb-1"
+                    />
+                  ) : (
+                    <div className="h-10" />
+                  )}
                   <div className="border-t border-slate-800 pt-1">
                     <p className="font-bold text-xs">Inspecteur Principal SAA</p>
                     <p className="text-[10px] text-slate-600">Brigade Assermentée</p>
@@ -271,10 +328,32 @@ export const PrintModal: React.FC = () => {
               <div className="border-t border-dashed border-slate-800 pt-2 my-2 text-center text-[8px] space-y-1">
                 <p>Agent : {printData.inspecteurOuCaissier}</p>
                 <p className="font-mono truncate text-[7px]">Hash: {printData.quittanceHash?.substring(0, 24)}...</p>
-                <div className="my-2 py-1 bg-slate-100 border border-slate-400 font-mono text-[8px] tracking-widest font-bold">
-                  ||| | |||| | ||| || |||
-                </div>
-                <p className="font-bold">CONSERVEZ CETTE QUITTANCE</p>
+
+                {qrCodeUrl && (
+                  <div className="my-2 flex flex-col items-center">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code Contrôle DDL-PN"
+                      className="w-24 h-24 object-contain p-1 border border-slate-300 rounded bg-white shadow-xs"
+                    />
+                    <span className="text-[7px] text-slate-500 font-mono mt-0.5">
+                      Scannez pour certifier l&apos;authenticité
+                    </span>
+                  </div>
+                )}
+
+                {printData.signatureUrl && (
+                  <div className="my-1.5 p-1 bg-slate-50 border border-slate-200 rounded">
+                    <p className="text-[7px] font-bold text-slate-600 mb-0.5">Émargement Déclarant :</p>
+                    <img
+                      src={printData.signatureUrl}
+                      alt="Signature Déclarant"
+                      className="h-9 mx-auto object-contain"
+                    />
+                  </div>
+                )}
+
+                <p className="font-bold mt-1">CONSERVEZ CETTE QUITTANCE</p>
                 <p>À présenter à toute réquisition des Brigades SAA</p>
               </div>
             </div>
