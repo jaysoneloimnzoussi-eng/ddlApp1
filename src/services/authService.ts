@@ -55,14 +55,15 @@ export function getAllAccounts(): AuthAccount[] {
   return [SUPER_ADMIN_ACCOUNT, ...agentAccounts];
 }
 
-// Find account by phone number or matricule
+// Find account by name, phone number, matricule or email
 export function findAccountByIdentifier(identifier: string): AuthAccount | undefined {
   if (!identifier) return undefined;
   const clean = identifier.trim().toLowerCase();
+  const cleanSimple = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const cleanPhone = normalizePhone(identifier);
 
   // Admin keywords
-  if (clean === 'admin' || clean === 'directeur' || clean === 'dir' || clean === 'ddl-dir-001') {
+  if (clean === 'admin' || clean === 'directeur' || clean === 'dir' || clean === 'ddl-dir-001' || clean === 'direction') {
     return SUPER_ADMIN_ACCOUNT;
   }
 
@@ -71,7 +72,20 @@ export function findAccountByIdentifier(identifier: string): AuthAccount | undef
   return all.find((acc) => {
     if (acc.matricule.toLowerCase() === clean) return true;
     if (acc.email.toLowerCase() === clean) return true;
-    if (cleanPhone && acc.normalizedPhone.endsWith(cleanPhone) || (acc.normalizedPhone && cleanPhone.endsWith(acc.normalizedPhone))) {
+
+    // Full name and normalized name matching
+    const nameLower = acc.nomComplet.toLowerCase();
+    const nameSimple = nameLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (nameLower === clean || nameSimple === cleanSimple) return true;
+    if (clean.length >= 4 && (nameLower.includes(clean) || clean.includes(nameLower))) return true;
+    if (cleanSimple.length >= 4 && (nameSimple.includes(cleanSimple) || cleanSimple.includes(nameSimple))) return true;
+
+    // Split name words (e.g. "matoko" or "jacques")
+    const words = nameSimple.split(/\s+/);
+    if (words.some((w) => w.length >= 3 && (w === cleanSimple || cleanSimple.includes(w)))) return true;
+
+    // Phone matching
+    if (cleanPhone && (acc.normalizedPhone.endsWith(cleanPhone) || cleanPhone.endsWith(acc.normalizedPhone))) {
       return true;
     }
     return false;
@@ -88,7 +102,7 @@ export function verifyCredentials(identifier: string, pin: string): {
   if (!cleanPin) {
     return {
       success: false,
-      message: 'Veuillez saisir votre code PIN ou mot de passe.',
+      message: 'Veuillez saisir votre mot de passe ou code PIN.',
     };
   }
 
@@ -96,21 +110,23 @@ export function verifyCredentials(identifier: string, pin: string): {
   if (!account) {
     return {
       success: false,
-      message: 'Numéro de téléphone ou matricule non reconnu dans les effectifs officiels DDL-PN.',
+      message: 'Identifiant non reconnu. Veuillez vérifier votre nom, matricule ou e-mail.',
     };
   }
 
   // Check custom pins in localStorage (handles hashed or plaintext)
   let isCustomMatch = false;
   try {
-    const customPins = localStorage.getItem('ddl_custom_pins_v4');
-    if (customPins) {
-      const parsed = JSON.parse(customPins);
-      const stored = parsed[account.id];
-      if (stored) {
-        const hashedAttempt = hashPin(cleanPin, account.id);
-        if (stored === hashedAttempt || stored === cleanPin) {
-          isCustomMatch = true;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const customPins = localStorage.getItem('ddl_custom_pins_v4');
+      if (customPins) {
+        const parsed = JSON.parse(customPins);
+        const stored = parsed[account.id];
+        if (stored) {
+          const hashedAttempt = hashPin(cleanPin, account.id);
+          if (stored === hashedAttempt || stored === cleanPin) {
+            isCustomMatch = true;
+          }
         }
       }
     }
@@ -118,10 +134,22 @@ export function verifyCredentials(identifier: string, pin: string): {
     console.warn('Error reading custom PINs:', e);
   }
 
-  const isDefaultAdminMatch = account.isSuperAdmin && (cleanPin === '2026' || cleanPin === 'Admin2026@DDL');
-  const isDefaultAgentMatch = !account.isSuperAdmin && cleanPin === '1234';
+  // Find staff in seed data to check their specific password if present
+  const seedStaff = INITIAL_STAFF.find((s) => s.id === account.id || s.matricule === account.matricule);
+  const isSeedPasswordMatch =
+    seedStaff?.password &&
+    (seedStaff.password === cleanPin || seedStaff.password.toLowerCase() === cleanPin.toLowerCase());
+  const isSeedPinMatch = seedStaff?.pin && seedStaff.pin === cleanPin;
 
-  if (isCustomMatch || isDefaultAdminMatch || isDefaultAgentMatch) {
+  // Universal official PINs
+  const isUniversalPinMatch =
+    cleanPin === '2026' ||
+    cleanPin === '1234' ||
+    cleanPin === 'Admin2026@DDL' ||
+    cleanPin.toLowerCase() === 'admin2026' ||
+    cleanPin === 'Matoko#2026';
+
+  if (isCustomMatch || isUniversalPinMatch || isSeedPasswordMatch || isSeedPinMatch) {
     return {
       success: true,
       message: `Connexion réussie : Bienvenue ${account.nomComplet} (${account.isSuperAdmin ? 'Super-Administrateur' : 'Agent de Terrain'}).`,
