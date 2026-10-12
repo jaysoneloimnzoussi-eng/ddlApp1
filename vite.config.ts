@@ -23,12 +23,14 @@ export default defineConfig(() => {
           id: '/',
           name: 'DDL-PN Sovereign Enterprise v3.0',
           short_name: 'DDL-PN',
+          lang: 'fr',
+          dir: 'ltr',
           description:
             'Direction Départementale des Loisirs de Pointe-Noire (MCAPNIT / DGL) - Système Souverain de Gestion Territoriale, Recensement Mobile, Régie Financière, Police Administrative et Cartographie SIG.',
           theme_color: '#059669',
           background_color: '#020617',
           display: 'standalone',
-          orientation: 'portrait-primary',
+          orientation: 'any',
           start_url: '/',
           scope: '/',
           icons: [
@@ -49,6 +51,29 @@ export default defineConfig(() => {
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
+            },
+          ],
+          shortcuts: [
+            {
+              name: 'Recensement Terrain',
+              short_name: 'Terrain',
+              description: 'Accéder directement aux fiches d\'enquêtes terrain',
+              url: '/?module=MOD-02',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Agenda & Descentes',
+              short_name: 'Agenda',
+              description: 'Programmation et suivi des descentes inspecteurs',
+              url: '/?module=MOD-03',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Régie SAF & Caisses',
+              short_name: 'Régie SAF',
+              description: 'Encaissements, quittances et recouvrements',
+              url: '/?module=MOD-10',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
             },
           ],
         },
@@ -145,13 +170,17 @@ export default defineConfig(() => {
     },
     server: {
       host: '0.0.0.0',
-      port: 5173,
+      port: 3000,
       allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: 3000,
     },
   };
 });

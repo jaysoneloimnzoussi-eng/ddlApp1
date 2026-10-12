@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   LayoutDashboard,
   MapPinPlus,
@@ -27,6 +28,7 @@ import {
   X,
   FileSignature,
 } from 'lucide-react';
+import { FirebaseStatusModal } from './FirebaseStatusModal';
 
 interface ModuleItem {
   code: string;
@@ -51,6 +53,8 @@ export const Sidebar: React.FC = () => {
     isMobileMenuOpen,
     setIsMobileMenuOpen,
   } = useApp();
+
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = React.useState(false);
 
   const MODULES: ModuleItem[] = [
     // 1. Pilotage & Stratégie
@@ -420,6 +424,28 @@ export const Sidebar: React.FC = () => {
             </div>
           )}
 
+          {/* Bouton Diagnostic Firebase */}
+          <button
+            onClick={() => setIsFirebaseModalOpen(true)}
+            type="button"
+            className="w-full mb-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold flex items-center justify-between transition cursor-pointer bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+            title="Consulter l'état et faire un ping de la base de données Firebase"
+          >
+            <span className="flex items-center gap-1.5 truncate">
+              <Database className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span className="truncate">Base Firebase Cloud</span>
+            </span>
+            <span className="flex items-center gap-1 shrink-0 text-[10px] font-mono font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-700 dark:text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Active
+            </span>
+          </button>
+
+          {/* Bouton d'installation PC & Android */}
+          <div className="mb-2.5">
+            <PWAInstallButton variant="sidebar" />
+          </div>
+
           {authenticatedUser && (
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -468,6 +494,10 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
     </aside>
+    <FirebaseStatusModal
+      isOpen={isFirebaseModalOpen}
+      onClose={() => setIsFirebaseModalOpen(false)}
+    />
     </>
   );
 };

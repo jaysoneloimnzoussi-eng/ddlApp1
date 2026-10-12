@@ -21,12 +21,15 @@ import {
   Shield,
   CalendarCheck,
   Building,
+  Edit3,
+  X,
 } from 'lucide-react';
 import {
   Arrondissement,
   EstablishmentCategory,
   ComplianceStatus,
   QUARTIERS_PAR_ARRONDISSEMENT,
+  Establishment,
 } from '../../types';
 import { formatCfa } from '../../services/crypto';
 import { SonometerTool } from '../common/SonometerTool';
@@ -52,6 +55,8 @@ export const FieldRecensementModule: React.FC = () => {
     openPrintModal,
     setActiveModule,
     theme,
+    selectedEstablishmentForRecensement,
+    setSelectedEstablishmentForRecensement,
   } = useApp();
 
   const isLight = theme === 'light';
@@ -118,6 +123,84 @@ export const FieldRecensementModule: React.FC = () => {
     regimeFiscal === 'informel_forfaitaire'
       ? forfaitStandard
       : Math.max(150000, surfaceM2 * 1200);
+
+  // Modal Édition / Complément de fiche d'un établissement
+  const [editingEst, setEditingEst] = useState<Establishment | null>(null);
+  const [editNomCommercial, setEditNomCommercial] = useState('');
+  const [editPromoteurNom, setEditPromoteurNom] = useState('');
+  const [editPromoteurTel, setEditPromoteurTel] = useState('');
+  const [editPromoteurEmail, setEditPromoteurEmail] = useState('');
+  const [editArrondissement, setEditArrondissement] = useState<Arrondissement>('Lumumba');
+  const [editQuartier, setEditQuartier] = useState<string>('');
+  const [editAdresseExacte, setEditAdresseExacte] = useState('');
+  const [editCategorie, setEditCategorie] = useState<EstablishmentCategory>('Bar Dancing / Cabaret');
+  const [editRedevance, setEditRedevance] = useState<number>(60000);
+  const [editSoldeRestant, setEditSoldeRestant] = useState<number>(60000);
+  const [editStatut, setEditStatut] = useState<ComplianceStatus>('mise_en_demeure');
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+
+  const openEditEstablishment = (est: Establishment) => {
+    setEditingEst(est);
+    setEditNomCommercial(est.nomCommercial);
+    setEditPromoteurNom(est.promoteurNom || '');
+    setEditPromoteurTel(est.promoteurTelephone || '');
+    setEditPromoteurEmail(est.promoteurEmail || '');
+    const arr = (est.arrondissement as Arrondissement) || 'Lumumba';
+    setEditArrondissement(arr);
+    setEditQuartier(est.quartier || (QUARTIERS_PAR_ARRONDISSEMENT[arr] ? QUARTIERS_PAR_ARRONDISSEMENT[arr][0] : 'Centre-Ville'));
+    setEditAdresseExacte(est.adresseExacte || '');
+    setEditCategorie(est.categorie || 'Bar Dancing / Cabaret');
+    setEditRedevance(est.montantRedevanceAnnuelle || 60000);
+    setEditSoldeRestant(est.soldeRestantDu ?? (est.montantRedevanceAnnuelle || 60000));
+    setEditStatut(est.statut || 'mise_en_demeure');
+  };
+
+  const handleEditArrondissementChange = (newArr: Arrondissement) => {
+    setEditArrondissement(newArr);
+    const quartiers = QUARTIERS_PAR_ARRONDISSEMENT[newArr] || [];
+    if (quartiers.length > 0) {
+      setEditQuartier(quartiers[0]);
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEst) return;
+    setIsUpdating(true);
+    try {
+      await updateEstablishment(editingEst.id, {
+        nomCommercial: editNomCommercial.trim(),
+        promoteurNom: editPromoteurNom.trim(),
+        promoteurTelephone: editPromoteurTel.trim(),
+        promoteurEmail: editPromoteurEmail.trim(),
+        arrondissement: editArrondissement,
+        quartier: editQuartier.trim(),
+        adresseExacte: editAdresseExacte.trim(),
+        categorie: editCategorie,
+        montantRedevanceAnnuelle: Number(editRedevance) || 0,
+        soldeRestantDu: Number(editSoldeRestant) || 0,
+        statut: editStatut,
+      });
+      showNotification('success', `Fiche de « ${editNomCommercial} » mise à jour avec succès dans la base.`);
+      setEditingEst(null);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de la mise à jour: ${err.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Traite la navigation directe depuis l'agenda des descentes
+  useEffect(() => {
+    if (selectedEstablishmentForRecensement) {
+      const target = establishments.find((e) => e.id === selectedEstablishmentForRecensement);
+      if (target) {
+        setSearchTerm(target.codeDossier || target.nomCommercial);
+        openEditEstablishment(target);
+      }
+      setSelectedEstablishmentForRecensement(null);
+    }
+  }, [selectedEstablishmentForRecensement, establishments, setSelectedEstablishmentForRecensement]);
 
   // 1-Click GPS Capture
   const handleCaptureGPS = () => {
@@ -1054,6 +1137,17 @@ export const FieldRecensementModule: React.FC = () => {
                           WhatsApp
                         </button>
                       )}
+                      {/* Bouton Éditer Fiche */}
+                      <button
+                        type="button"
+                        onClick={() => openEditEstablishment(est)}
+                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                        title="Modifier ou compléter les informations de cet établissement"
+                      >
+                        <Edit3 className="w-3 h-3 text-slate-600 dark:text-slate-400" />
+                        <span>Éditer Fiche</span>
+                      </button>
+
                       <button
                         onClick={() => setActiveModule('MOD-01')}
                         className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
@@ -1098,6 +1192,201 @@ export const FieldRecensementModule: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* MODAL ÉDITION / COMPLÉMENT DE FICHE ÉTABLISSEMENT */}
+      {editingEst && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+            isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            <div className="bg-indigo-600 p-4 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <Edit3 className="w-4 h-4" />
+                  <span>Compléter / Modifier la Fiche Établissement</span>
+                </h3>
+                <p className="text-xs text-indigo-100 font-mono">
+                  {editingEst.codeDossier || 'Dossier DDL-PN'} • {editingEst.nomCommercial}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingEst(null)}
+                className="p-1 rounded-full hover:bg-indigo-700 text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300">Nom commercial :</label>
+                <input
+                  type="text"
+                  required
+                  value={editNomCommercial}
+                  onChange={(e) => setEditNomCommercial(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Arrondissement :</label>
+                  <select
+                    value={editArrondissement}
+                    onChange={(e) => handleEditArrondissementChange(e.target.value as Arrondissement)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                  >
+                    <option value="Lumumba">1 - Lumumba</option>
+                    <option value="Mvou-Mvou">2 - Mvou-Mvou</option>
+                    <option value="Tié-Tié">3 - Tié-Tié</option>
+                    <option value="Loandjili">4 - Loandjili</option>
+                    <option value="Mongo-Mpoukou">5 - Mongo-Mpoukou</option>
+                    <option value="Ngoyo">6 - Ngoyo</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Quartier :</label>
+                  <select
+                    value={editQuartier}
+                    onChange={(e) => setEditQuartier(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                  >
+                    {(QUARTIERS_PAR_ARRONDISSEMENT[editArrondissement] || []).map((q) => (
+                      <option key={q} value={q}>
+                        {q}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300">Repère local / Adresse exacte :</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Face marché central, avenue de la Paix"
+                  value={editAdresseExacte}
+                  onChange={(e) => setEditAdresseExacte(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Promoteur / Gérant :</label>
+                  <input
+                    type="text"
+                    required
+                    value={editPromoteurNom}
+                    onChange={(e) => setEditPromoteurNom(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Téléphone (WhatsApp) :</label>
+                  <input
+                    type="text"
+                    placeholder="+242 06 000 00 00"
+                    value={editPromoteurTel}
+                    onChange={(e) => setEditPromoteurTel(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Catégorie :</label>
+                  <select
+                    value={editCategorie}
+                    onChange={(e) => setEditCategorie(e.target.value as EstablishmentCategory)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                  >
+                    <option value="Bar Dancing / Cabaret">Bar Dancing / Cabaret</option>
+                    <option value="Discothèque / Night-club">Discothèque / Night-club</option>
+                    <option value="Lounge Bar & Terrasse">Lounge Bar & Terrasse</option>
+                    <option value="Snack-Bar Sonorisé">Snack-Bar Sonorisé</option>
+                    <option value="Espace Récréatif & Salle Polyvalente">Espace Récréatif</option>
+                    <option value="Complexe de Loisirs & Piscine">Complexe de Loisirs</option>
+                    <option value="Autre établissement de loisirs">Autre établissement</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Statut de conformité :</label>
+                  <select
+                    value={editStatut}
+                    onChange={(e) => setEditStatut(e.target.value as ComplianceStatus)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 font-semibold"
+                  >
+                    <option value="mise_en_demeure">Mise en Demeure (Orange)</option>
+                    <option value="attestation_provisoire">Attestation Provisoire (Bleu)</option>
+                    <option value="en_regle">En Règle / Agrément Définitif (Vert)</option>
+                    <option value="ferme_contentieux">Fermeture / Contentieux (Rouge)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Redevance Annuelle (FCFA) :</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={5000}
+                    value={editRedevance}
+                    onChange={(e) => setEditRedevance(Number(e.target.value))}
+                    className="w-full text-xs font-mono font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-emerald-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Solde Restant Dû (FCFA) :</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={5000}
+                    value={editSoldeRestant}
+                    onChange={(e) => setEditSoldeRestant(Number(e.target.value))}
+                    className="w-full text-xs font-mono font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-blue-600"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingEst(null)}
+                  className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isUpdating ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Enregistrement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Enregistrer les modifications</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -29,9 +29,9 @@ const ROUNDED_MAP = {
   full: 'rounded-full',
 };
 
-// Primary logo asset path (Vite public & src asset fallbacks)
-const LOGO_SRC = '/logo-ddl-pn.jpg';
-const BACKUP_SRC = '/src/assets/images/logo_officiel_ddl_pn_1791274431440.jpg';
+// Primary official logo asset path (Vector SVG matching LOGO-OFFICIEL)
+const LOGO_SRC = '/logo-ddl-pn.svg';
+const BACKUP_SRC = '/logo-ddl-pn.jpg';
 
 export const DdlLogo: React.FC<DdlLogoProps> = ({
   size = 'md',

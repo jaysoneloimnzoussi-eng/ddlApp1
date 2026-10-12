@@ -1,0 +1,6 @@
+{
+  "summary": "Plan d'implémentation pour le Canva de Rédaction d'Attestations de Dépôt : en-têtes officiels républicains centrés, QR code déplacé en haut à droite sous la devise, suppression des mentions superflues de loi et de contrôle, saisie manuelle du numéro de document (sans autogénération imposée), et sélection/extraction directe ou création d'établissement depuis la base de données Firestore.",
+  "updatedAt": "2026-10-12T12:24:37.812415850Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

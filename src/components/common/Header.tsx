@@ -20,8 +20,10 @@ import {
   LogOut as LogOutIcon,
   Search,
   Menu,
+  Database,
 } from 'lucide-react';
 import { UserRole } from '../../types';
+import { FirebaseStatusModal } from './FirebaseStatusModal';
 
 export const Header: React.FC = () => {
   const {
@@ -49,6 +51,8 @@ export const Header: React.FC = () => {
     toggleCommandPalette,
     toggleMobileMenu,
   } = useApp();
+
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = React.useState(false);
 
   const roleLabels: Record<UserRole, { title: string; color: string }> = {
     directeur: { title: 'Directeur Général (Admin)', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
@@ -170,6 +174,17 @@ export const Header: React.FC = () => {
             </>
           )}
         </div>
+
+        {/* Firebase Cloud Live Database Status Button */}
+        <button
+          onClick={() => setIsFirebaseModalOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg border bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-semibold transition cursor-pointer shadow-xs"
+          title="Vérifier la connexion en direct à la base de données Firebase Firestore"
+        >
+          <Database className="w-3.5 h-3.5 text-emerald-500" />
+          <span className="hidden sm:inline">Firebase Connecté</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        </button>
 
         {/* In-app PWA install button */}
         <PWAInstallButton variant="header" />
@@ -315,6 +330,11 @@ export const Header: React.FC = () => {
           </button>
         )}
       </div>
+
+      <FirebaseStatusModal
+        isOpen={isFirebaseModalOpen}
+        onClose={() => setIsFirebaseModalOpen(false)}
+      />
     </header>
   );
 };

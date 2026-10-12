@@ -77,40 +77,65 @@ export async function generateQrCodeDataUrl(text: string, size = 180): Promise<s
   }
 }
 
+export interface AttestationVerificationData {
+  referenceNumero: string;
+  etablissementNom: string;
+  promoteurNom?: string;
+  dateDepot?: string;
+  codeDossier?: string;
+  statut?: string;
+}
+
+/**
+ * Construit l'URL publique de vérification officielle d'une attestation de dépôt
+ * Compatible nativement avec les lecteurs de QR Code de smartphones (iOS / Android)
+ */
+export function getAttestationVerificationUrl(data: AttestationVerificationData): string {
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://ais-pre-ftzn6g7lleao4hsua3ruyd-423672129970.europe-west2.run.app';
+
+  const params = new URLSearchParams();
+  params.set('verify', 'attestation');
+  params.set('ref', data.referenceNumero || 'N°042/MCAPNIT/DGL/DPN/DDL-PN');
+  params.set('etab', data.etablissementNom || 'LE ROCHER');
+  if (data.promoteurNom) params.set('prom', data.promoteurNom);
+  if (data.dateDepot) params.set('date', data.dateDepot);
+  if (data.codeDossier) params.set('code', data.codeDossier);
+  if (data.statut) params.set('statut', data.statut);
+
+  return `${origin}/?${params.toString()}`;
+}
+
+/**
+ * Génère le QR Code officiel d'une attestation de dépôt renvoyant vers la page publique de certification
+ */
+export async function generateAttestationQrCode(data: AttestationVerificationData, size = 180): Promise<string> {
+  const verificationUrl = getAttestationVerificationUrl(data);
+  return generateQrCodeDataUrl(verificationUrl, size);
+}
+
 /**
  * Génère le QR Code de certification officielle d'une quittance de régie SAF
  */
 export async function generateReceiptQrCode(receipt: CashReceipt): Promise<string> {
-  const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://ddlpn.loisirs.gouv.cg';
-  const verifyUrl = `${origin}?verify=receipt&num=${encodeURIComponent(receipt.numeroQuittance)}`;
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://ddlpn.loisirs.gouv.cg';
 
-  const verificationPayload = JSON.stringify({
-    emetteur: 'DDL-PN / REGIE SAF TRESOR',
-    quittance: receipt.numeroQuittance,
-    etablissement: receipt.etablissementNom,
-    montant: `${receipt.montantVerse} FCFA`,
-    date: receipt.datePaiement,
-    scellement: receipt.quittanceHash || 'SEAL-SHA256-AUTHENTICATED',
-    url: verifyUrl,
-  });
-
-  return generateQrCodeDataUrl(verificationPayload, 160);
+  const verificationUrl = `${origin}/?verify=receipt&num=${encodeURIComponent(receipt.numeroQuittance)}&etab=${encodeURIComponent(receipt.etablissementNom)}&montant=${encodeURIComponent(receipt.montantVerse)}`;
+  return generateQrCodeDataUrl(verificationUrl, 160);
 }
 
 /**
- * Génère le QR Code d'une attestation provisoire ou d'un acte juridique
+ * Génère le QR Code d'une attestation provisoire ou d'un acte juridique pointant vers une URL scannable
  */
 export async function generateLegalActQrCode(referenceNumero: string, etablissementNom: string, hash: string): Promise<string> {
-  const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://ddlpn.loisirs.gouv.cg';
-  const verifyUrl = `${origin}?verify=act&ref=${encodeURIComponent(referenceNumero)}`;
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://ddlpn.loisirs.gouv.cg';
 
-  const verificationPayload = JSON.stringify({
-    emetteur: 'DDL-PN / POLICE ADMINISTRATIVE',
-    reference: referenceNumero,
-    etablissement: etablissementNom,
-    hash: hash,
-    url: verifyUrl,
-  });
-
-  return generateQrCodeDataUrl(verificationPayload, 160);
+  const verificationUrl = `${origin}/?verify=act&ref=${encodeURIComponent(referenceNumero)}&etab=${encodeURIComponent(etablissementNom)}&hash=${encodeURIComponent(hash)}`;
+  return generateQrCodeDataUrl(verificationUrl, 160);
 }
+

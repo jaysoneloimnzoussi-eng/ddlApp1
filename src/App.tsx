@@ -82,19 +82,66 @@ const MainContent: React.FC = () => {
   );
 };
 
+import { AttestationVerificationView } from './components/public/AttestationVerificationView';
+
 const AppContent: React.FC = () => {
   const { theme, isAuthenticated, activeModule, isCalendarFullScreen } = useApp();
   const [forceAgentLogin, setForceAgentLogin] = React.useState(false);
+  const [showAttestationVerify, setShowAttestationVerify] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const search = window.location.search;
+    const hash = window.location.hash;
+    return (
+      search.includes('verify=attestation') ||
+      search.includes('verify-attestation') ||
+      hash.includes('verify-attestation')
+    );
+  });
 
-  // Détection d'un scan QR code citoyen / promoteur / police
-  const isVerificationScan = typeof window !== 'undefined' && (
-    window.location.search.includes('verify=') ||
+  const isReceiptScan = typeof window !== 'undefined' && (
+    window.location.search.includes('verify=receipt') ||
+    window.location.search.includes('verify=act') ||
     window.location.search.includes('num=') ||
     window.location.search.includes('ref=')
   );
 
+  // Écouter les changements d'URL / hash pour naviguer vers la certification d'attestation
+  React.useEffect(() => {
+    const handleUrlCheck = () => {
+      const search = window.location.search;
+      const hash = window.location.hash;
+      const isVerify =
+        search.includes('verify=attestation') ||
+        search.includes('verify-attestation') ||
+        hash.includes('verify-attestation');
+      setShowAttestationVerify(isVerify);
+    };
+
+    window.addEventListener('popstate', handleUrlCheck);
+    window.addEventListener('hashchange', handleUrlCheck);
+    return () => {
+      window.removeEventListener('popstate', handleUrlCheck);
+      window.removeEventListener('hashchange', handleUrlCheck);
+    };
+  }, []);
+
+  // Scan public d'attestation : affichage direct sans invite PWA
+  if (showAttestationVerify) {
+    return (
+      <AttestationVerificationView
+        onBackToApp={() => {
+          setShowAttestationVerify(false);
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', window.location.pathname);
+          }
+        }}
+      />
+    );
+  }
+
+  // Scan public de quittance ou acte : affichage direct sans invite PWA
   if (!isAuthenticated) {
-    if (isVerificationScan && !forceAgentLogin) {
+    if (isReceiptScan && !forceAgentLogin) {
       return <PublicDocumentVerification onGoToLogin={() => setForceAgentLogin(true)} />;
     }
 
@@ -108,6 +155,7 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
+
 
   const isFullScreenCalendar = activeModule === 'MOD-03' && isCalendarFullScreen;
 
