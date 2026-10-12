@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   FileText,
@@ -19,11 +19,16 @@ import {
   ExternalLink,
   ShieldCheck,
   QrCode,
+  Building2,
+  Search,
+  PlusCircle,
+  Check,
 } from 'lucide-react';
 import { OfficialDocumentHeader } from '../common/OfficialDocumentHeader';
 import { printHtmlElement } from '../../services/printService';
 import { generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
 import { generateAttestationQrCode, getAttestationVerificationUrl } from '../../services/qrService';
+import { Arrondissement, EstablishmentCategory, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
 
 export type AdminDocType =
   | 'lettre_transmission'
@@ -43,12 +48,11 @@ interface DocumentSectionItem {
 }
 
 export const AdministrativeDraftingCanvaModule: React.FC = () => {
-  const { showNotification, setActiveModule } = useApp();
+  const { establishments, addEstablishment, showNotification, setActiveModule } = useApp();
 
   // Selected template type
   const [docType, setDocType] = useState<AdminDocType>('attestation_depot');
   const [attestationQrCodeUrl, setAttestationQrCodeUrl] = useState<string>('');
-
 
   // Interactive margin controls (Congolese official standard: Left 2.5cm, Right 2.0cm, Top 2.0cm, Bottom 2.0cm)
   const [margeGaucheCm, setMargeGaucheCm] = useState<number>(2.5);
@@ -56,36 +60,67 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
   const [margeHautCm, setMargeHautCm] = useState<number>(2.0);
   const [margeBasCm, setMargeBasCm] = useState<number>(2.0);
 
-  // Form fields with authentic DDL-PN defaults (Modèle Officiel Attestation de Dépôt LE ROCHER)
-  const [numeroActe, setNumeroActe] = useState<string>('N°042/MCAPNIT/DGL/DPN/DDL-PN/2026');
+  // Form fields : Numéro d'acte NON généré automatiquement (saisie manuelle par l'agent)
+  const [numeroActe, setNumeroActe] = useState<string>('');
   const [dateLieu, setDateLieu] = useState<string>('Pointe-Noire, le 12 octobre 2026');
   const [emetteurTitre, setEmetteurTitre] = useState<string>('Le Directeur Départemental des Loisirs de Pointe-Noire');
   const [destinataireTitre, setDestinataireTitre] = useState<string>('');
   const [destinataireVille, setDestinataireVille] = useState<string>('');
   const [titreCentral, setTitreCentral] = useState<string>('ATTESTATION DE DÉPÔT');
   const [objet, setObjet] = useState<string>("Dépôt de dossier technique d'agrément d'établissement de loisirs");
-  const [reference, setReference] = useState<string>('Loi N° 21-2019 du 13 juin 2019 fixant les règles applicables aux activités de loisirs en République du Congo');
+  const [reference, setReference] = useState<string>('');
   const [formuleAppel, setFormuleAppel] = useState<string>('');
   const [signataireNom, setSignataireNom] = useState<string>('Jean Richard NTSEKE NGOUAKA');
   const [signataireTitre, setSignataireTitre] = useState<string>('Le Directeur Départemental des Loisirs de Pointe-Noire');
-  const [piecesJointes, setPiecesJointes] = useState<string>('Récépissé de versement SAF N° 2026/042 et Quittance de régularisation.');
+  const [piecesJointes, setPiecesJointes] = useState<string>('Récépissé de versement SAF et Quittance de régularisation.');
   const [ampliations, setAmpliations] = useState<string>(
     '- DGL / Brazzaville\n- Préfecture du Département de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Brigade de Salubrité Acoustique (SAA)\n- Archives / Chrono'
   );
 
-  // Sections of document body (Modèle intégral officiel LE ROCHER)
+  // Établissement actif lié (pour le texte et le QR code de certification)
+  const [currentEstDetails, setCurrentEstDetails] = useState<{
+    nom: string;
+    promoteur: string;
+    codeDossier: string;
+    arrondissement: string;
+    quartier: string;
+    categorie: string;
+  }>({
+    nom: 'LE ROCHER',
+    promoteur: 'Monsieur Jack MATOKO',
+    codeDossier: 'DDL-PN-2026-REC-042',
+    arrondissement: 'Tié-Tié',
+    quartier: 'Fond Tié-Tié',
+    categorie: 'Bar Dancing / Cabaret',
+  });
+
+  // Mode de gestion établissement dans le Canva
+  const [etablissementSourceMode, setEtablissementSourceMode] = useState<'select_db' | 'create_db' | 'manual'>('select_db');
+  const [selectedEstablishmentId, setSelectedEstablishmentId] = useState<string>('');
+  const [etablissementSearch, setEtablissementSearch] = useState<string>('');
+
+  // Formulaire d'enregistrement rapide d'un nouvel espace dans la base de données
+  const [newEstNom, setNewEstNom] = useState<string>('');
+  const [newEstPromoteur, setNewEstPromoteur] = useState<string>('');
+  const [newEstTelephone, setNewEstTelephone] = useState<string>('');
+  const [newEstArrondissement, setNewEstArrondissement] = useState<Arrondissement>('Tié-Tié');
+  const [newEstQuartier, setNewEstQuartier] = useState<string>('Fond Tié-Tié');
+  const [newEstCategorie, setNewEstCategorie] = useState<EstablishmentCategory>('Bar Dancing / Cabaret');
+  const [isSavingNewEst, setIsSavingNewEst] = useState<boolean>(false);
+
+  // Sections of document body (Modèle sans statut de loi non vérifié)
   const [sections, setSections] = useState<DocumentSectionItem[]>([
     {
       id: '1',
       titre: '',
       contenu:
-        "Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « LE ROCHER », exploité par Monsieur Jack MATOKO, relevant de la catégorie Bar-Dancing / Établissement de Loisirs, sis à Pointe-Noire, Arrondissement 3 Tié-Tié, a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.",
+        "Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « LE ROCHER », exploité par Monsieur Jack MATOKO, relevant de la catégorie Bar Dancing / Cabaret, sis à Pointe-Noire, Arrondissement Tié-Tié (Quartier Fond Tié-Tié), a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.",
     },
     {
       id: '2',
       titre: '',
       contenu:
-        "La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions de la Loi N° 21-2019, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la stricte limitation des émergences sonores nocturnes.",
+        "La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions réglementaires en vigueur, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la préservation de la tranquillité publique.",
     },
     {
       id: '3',
@@ -95,18 +130,18 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
     },
   ]);
 
-  // Synchronisation dynamique du QR Code scannable officiel
+  // Synchronisation dynamique du QR Code scannable officiel (placé en haut à droite)
   useEffect(() => {
     let isMounted = true;
     const updateQr = async () => {
       try {
         const qrUrl = await generateAttestationQrCode(
           {
-            referenceNumero: numeroActe || 'N°042/MCAPNIT/DGL/DPN/DDL-PN/2026',
-            etablissementNom: 'LE ROCHER',
-            promoteurNom: 'Monsieur Jack MATOKO',
+            referenceNumero: numeroActe.trim() || 'RÉFÉRENCE EN COURS D\'ENREGISTREMENT',
+            etablissementNom: currentEstDetails.nom,
+            promoteurNom: currentEstDetails.promoteur,
             dateDepot: dateLieu,
-            codeDossier: 'DDL-PN-2026-REC-042',
+            codeDossier: currentEstDetails.codeDossier,
             statut: 'CONFORME ET REGULIER',
           },
           160
@@ -122,24 +157,146 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [numeroActe, dateLieu]);
+  }, [numeroActe, dateLieu, currentEstDetails]);
+
+  // Injecte les données d'un établissement dans le texte de l'attestation
+  const applyEstablishmentData = (data: {
+    nom: string;
+    promoteur: string;
+    arrondissement: string;
+    quartier?: string;
+    categorie: string;
+    codeDossier?: string;
+  }) => {
+    setCurrentEstDetails({
+      nom: data.nom,
+      promoteur: data.promoteur,
+      codeDossier: data.codeDossier || 'DDL-PN-REC-2026',
+      arrondissement: data.arrondissement,
+      quartier: data.quartier || '',
+      categorie: data.categorie,
+    });
+
+    const quartierText = data.quartier ? ` (Quartier ${data.quartier})` : '';
+
+    setSections((prev) => {
+      const updated = [...prev];
+      if (updated[0]) {
+        updated[0] = {
+          ...updated[0],
+          contenu: `Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « ${data.nom.toUpperCase()} », exploité par ${data.promoteur}, relevant de la catégorie ${data.categorie}, sis à Pointe-Noire, Arrondissement ${data.arrondissement}${quartierText}, a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.`,
+        };
+      }
+      return updated;
+    });
+  };
+
+  // Sélection d'un établissement existant depuis la base de données
+  const handleSelectFromDb = (estId: string) => {
+    setSelectedEstablishmentId(estId);
+    const est = establishments.find((e) => e.id === estId);
+    if (!est) return;
+
+    applyEstablishmentData({
+      nom: est.nomCommercial,
+      promoteur: est.promoteurNom,
+      arrondissement: est.arrondissement,
+      quartier: est.quartier,
+      categorie: est.categorie,
+      codeDossier: est.codeDossier,
+    });
+
+    showNotification('info', `Données de « ${est.nomCommercial} » extraites de la base de données.`);
+  };
+
+  // Enregistrement in situ d'un nouvel établissement en base de données + injection attestation
+  const handleCreateAndApplyNewEstablishment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEstNom.trim()) {
+      showNotification('warning', "Veuillez renseigner le nom commercial de l'établissement.");
+      return;
+    }
+
+    setIsSavingNewEst(true);
+    try {
+      const created = await addEstablishment({
+        nomCommercial: newEstNom.trim(),
+        promoteurNom: newEstPromoteur.trim() || 'Promoteur non renseigné',
+        promoteurTelephone: newEstTelephone.trim() || '06 000 00 00',
+        arrondissement: newEstArrondissement,
+        quartier: newEstQuartier.trim() || 'Centre',
+        adresseExacte: `${newEstArrondissement}, ${newEstQuartier}`,
+        categorie: newEstCategorie,
+        regimeFiscal: 'informel_forfaitaire',
+        surfaceM2: 120,
+        montantRedevanceAnnuelle: 150000,
+        montantEncaisse: 50000,
+        soldeRestantDu: 100000,
+        statut: 'attestation_provisoire',
+        latitude: -4.77,
+        longitude: 11.86,
+        niveauDecibelsMoyen: 65,
+        limiteurInstalle: false,
+        dateRecensement: new Date().toISOString().split('T')[0],
+        recensePar: 'Direction Départementale des Loisirs',
+        agentAssigneId: 'stf-001',
+        agentAssigneNom: 'Direction Centrale DDL-PN',
+      });
+
+      setSelectedEstablishmentId(created.id);
+      applyEstablishmentData({
+        nom: created.nomCommercial,
+        promoteur: created.promoteurNom,
+        arrondissement: created.arrondissement,
+        quartier: created.quartier,
+        categorie: created.categorie,
+        codeDossier: created.codeDossier,
+      });
+
+      // Réinitialiser les champs de création
+      setNewEstNom('');
+      setNewEstPromoteur('');
+      setNewEstTelephone('');
+      setEtablissementSourceMode('select_db');
+
+      showNotification('success', `Nouvel établissement « ${created.nomCommercial} » enregistré en base de données et lié à l'attestation !`);
+    } catch (err) {
+      console.error("Erreur enregistrement établissement:", err);
+      showNotification('error', "Échec de l'enregistrement de l'établissement en base de données.");
+    } finally {
+      setIsSavingNewEst(false);
+    }
+  };
+
+  // Liste filtrée des établissements pour recherche rapide
+  const filteredEstablishments = useMemo(() => {
+    if (!etablissementSearch.trim()) return establishments;
+    const q = etablissementSearch.toLowerCase();
+    return establishments.filter(
+      (e) =>
+        e.nomCommercial.toLowerCase().includes(q) ||
+        e.promoteurNom.toLowerCase().includes(q) ||
+        e.arrondissement.toLowerCase().includes(q) ||
+        (e.quartier && e.quartier.toLowerCase().includes(q))
+    );
+  }, [establishments, etablissementSearch]);
 
   // Quick preset loader with authentic administrative content
   const handleLoadPreset = (type: AdminDocType) => {
     setDocType(type);
     if (type === 'attestation_depot') {
-      setNumeroActe('N°042/MCAPNIT/DGL/DPN/DDL-PN/2026');
+      setNumeroActe(''); // Numéro vide pour saisie manuelle sans autogénération
       setDateLieu('Pointe-Noire, le 12 octobre 2026');
       setEmetteurTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
       setDestinataireTitre('');
       setDestinataireVille('');
       setTitreCentral('ATTESTATION DE DÉPÔT');
       setObjet("Dépôt de dossier technique d'agrément d'établissement de loisirs");
-      setReference('Loi N° 21-2019 du 13 juin 2019 fixant les règles applicables aux activités de loisirs en République du Congo');
+      setReference(''); // Référence non obligatoire / sans lois arbitraires
       setFormuleAppel('');
       setSignataireTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
       setSignataireNom('Jean Richard NTSEKE NGOUAKA');
-      setPiecesJointes('Récépissé de versement SAF N° 2026/042 et Quittance de régularisation.');
+      setPiecesJointes('Récépissé de versement SAF et Quittance de régularisation.');
       setAmpliations(
         '- DGL / Brazzaville\n- Préfecture du Département de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Brigade de Salubrité Acoustique (SAA)\n- Archives / Chrono'
       );
@@ -147,14 +304,13 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
         {
           id: '1',
           titre: '',
-          contenu:
-            "Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « LE ROCHER », exploité par Monsieur Jack MATOKO, relevant de la catégorie Bar-Dancing / Établissement de Loisirs, sis à Pointe-Noire, Arrondissement 3 Tié-Tié, a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.",
+          contenu: `Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « ${currentEstDetails.nom.toUpperCase()} », exploité par ${currentEstDetails.promoteur}, relevant de la catégorie ${currentEstDetails.categorie}, sis à Pointe-Noire, Arrondissement ${currentEstDetails.arrondissement}${currentEstDetails.quartier ? ` (Quartier ${currentEstDetails.quartier})` : ''}, a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.`,
         },
         {
           id: '2',
           titre: '',
           contenu:
-            "La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions de la Loi N° 21-2019, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la stricte limitation des émergences sonores nocturnes.",
+            "La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions réglementaires en vigueur, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la préservation de la tranquillité publique.",
         },
         {
           id: '3',
@@ -646,14 +802,234 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
           </div>
 
           <div className="space-y-3 text-xs">
-            {/* Act Number & Date/Location */}
+            {/* LIAISON ÉTABLISSEMENT : BASE DE DONNÉES SOUVERAINE DDL-PN */}
+            {docType === 'attestation_depot' && (
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-emerald-900/50 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                    <Building2 className="w-4 h-4" />
+                    <span>Établissement (Base DDL-PN)</span>
+                  </div>
+                  <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setEtablissementSourceMode('select_db')}
+                      className={`px-2 py-1 rounded text-[10px] font-bold transition cursor-pointer flex items-center gap-1 ${
+                        etablissementSourceMode === 'select_db'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Search className="w-3 h-3" />
+                      <span>Extraire (Base)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEtablissementSourceMode('create_db')}
+                      className={`px-2 py-1 rounded text-[10px] font-bold transition cursor-pointer flex items-center gap-1 ${
+                        etablissementSourceMode === 'create_db'
+                          ? 'bg-indigo-600 text-white shadow'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <PlusCircle className="w-3 h-3" />
+                      <span>Nouvel Espace</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Badge de l'établissement actuellement lié */}
+                <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 text-[11px]">
+                  <span className="text-slate-400">Établissement lié :</span>
+                  <span className="font-bold text-emerald-300 truncate max-w-[210px]">
+                    « {currentEstDetails.nom} » ({currentEstDetails.promoteur})
+                  </span>
+                </div>
+
+                {/* MODE 1 : RECHERCHE ET EXTRACTION DANS LA BASE */}
+                {etablissementSourceMode === 'select_db' && (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-500" />
+                      <input
+                        type="text"
+                        value={etablissementSearch}
+                        onChange={(e) => setEtablissementSearch(e.target.value)}
+                        placeholder="Rechercher par nom, promoteur, quartier..."
+                        className="w-full pl-8 pr-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 placeholder:text-slate-500 text-xs"
+                      />
+                    </div>
+
+                    <div className="max-h-40 overflow-y-auto space-y-1 pr-1 border border-slate-800 rounded-lg p-1 bg-slate-900/50">
+                      {filteredEstablishments.length === 0 ? (
+                        <p className="text-[10px] text-slate-500 text-center py-2">
+                          Aucun établissement trouvé dans la base.
+                        </p>
+                      ) : (
+                        filteredEstablishments.slice(0, 15).map((est) => {
+                          const isSelected = selectedEstablishmentId === est.id;
+                          return (
+                            <button
+                              key={est.id}
+                              type="button"
+                              onClick={() => handleSelectFromDb(est.id)}
+                              className={`w-full text-left p-2 rounded-lg transition flex items-center justify-between gap-2 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-emerald-950/70 border border-emerald-600/50 text-white'
+                                  : 'hover:bg-slate-800 text-slate-300'
+                              }`}
+                            >
+                              <div className="truncate flex-1">
+                                <p className="font-bold text-[11px] text-slate-100 truncate">
+                                  {est.nomCommercial}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {est.promoteurNom} • {est.arrondissement} {est.quartier ? `(${est.quartier})` : ''}
+                                </p>
+                              </div>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0 font-mono">
+                                {est.categorie}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE 2 : ENREGISTREMENT RAPIDE D'UN NOUVEL ESPACE DANS LA BASE */}
+                {etablissementSourceMode === 'create_db' && (
+                  <form onSubmit={handleCreateAndApplyNewEstablishment} className="space-y-2.5">
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                        Nom Commercial de l'Établissement *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newEstNom}
+                        onChange={(e) => setNewEstNom(e.target.value)}
+                        placeholder="Ex: LE ROCHER / VIP LOUNGE"
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs font-bold"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                          Nom du Gérant / Promoteur
+                        </label>
+                        <input
+                          type="text"
+                          value={newEstPromoteur}
+                          onChange={(e) => setNewEstPromoteur(e.target.value)}
+                          placeholder="Ex: Monsieur Jack MATOKO"
+                          className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                          Téléphone Promoteur
+                        </label>
+                        <input
+                          type="text"
+                          value={newEstTelephone}
+                          onChange={(e) => setNewEstTelephone(e.target.value)}
+                          placeholder="06 000 00 00"
+                          className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                          Arrondissement
+                        </label>
+                        <select
+                          value={newEstArrondissement}
+                          onChange={(e) => {
+                            const arr = e.target.value as Arrondissement;
+                            setNewEstArrondissement(arr);
+                            const qList = QUARTIERS_PAR_ARRONDISSEMENT[arr];
+                            if (qList && qList.length > 0) setNewEstQuartier(qList[0]);
+                          }}
+                          className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                        >
+                          <option value="Lumumba">Lumumba</option>
+                          <option value="Mvou-Mvou">Mvou-Mvou</option>
+                          <option value="Tié-Tié">Tié-Tié</option>
+                          <option value="Loandjili">Loandjili</option>
+                          <option value="Mongo-Mpoukou">Mongo-Mpoukou</option>
+                          <option value="Ngoyo">Ngoyo</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                          Quartier
+                        </label>
+                        <select
+                          value={newEstQuartier}
+                          onChange={(e) => setNewEstQuartier(e.target.value)}
+                          className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                        >
+                          {(QUARTIERS_PAR_ARRONDISSEMENT[newEstArrondissement] || []).map((q) => (
+                            <option key={q} value={q}>{q}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] text-slate-400 font-semibold mb-0.5">
+                        Catégorie d'Activité
+                      </label>
+                      <select
+                        value={newEstCategorie}
+                        onChange={(e) => setNewEstCategorie(e.target.value as EstablishmentCategory)}
+                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
+                      >
+                        <option value="Bar Dancing / Cabaret">Bar Dancing / Cabaret</option>
+                        <option value="Discothèque / Night-club">Discothèque / Night-club</option>
+                        <option value="Lounge Bar & Terrasse">Lounge Bar & Terrasse</option>
+                        <option value="Snack-Bar Sonorisé">Snack-Bar Sonorisé</option>
+                        <option value="Espace Récréatif & Salle Polyvalente">Espace Récréatif & Salle Polyvalente</option>
+                        <option value="Complexe de Loisirs & Piscine">Complexe de Loisirs & Piscine</option>
+                        <option value="Autre établissement de loisirs">Autre établissement de loisirs</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSavingNewEst}
+                      className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {isSavingNewEst ? (
+                        <span>Enregistrement en cours...</span>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Enregistrer en Base & Appliquer à l'Attestation</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Act Number & Date/Location - Saisie Manuelle sans autogénération */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Numéro d&apos;Acte / Réf.</label>
+                <label className="block text-slate-400 font-semibold mb-1">
+                  Numéro d&apos;Acte / Réf. (Saisie Manuelle)
+                </label>
                 <input
                   type="text"
                   value={numeroActe}
                   onChange={(e) => setNumeroActe(e.target.value)}
+                  placeholder="Ex: N°042/MCAPNIT/DGL/DPN/DDL-PN/2026"
                   className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 font-mono"
                 />
               </div>
@@ -847,11 +1223,11 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
             <div className="flex items-center gap-2">
               <a
                 href={getAttestationVerificationUrl({
-                  referenceNumero: numeroActe,
-                  etablissementNom: 'LE ROCHER',
-                  promoteurNom: 'Monsieur Jack MATOKO',
+                  referenceNumero: numeroActe.trim() || 'RÉFÉRENCE EN COURS D\'ENREGISTREMENT',
+                  etablissementNom: currentEstDetails.nom,
+                  promoteurNom: currentEstDetails.promoteur,
                   dateDepot: dateLieu,
-                  codeDossier: 'DDL-PN-2026-REC-042',
+                  codeDossier: currentEstDetails.codeDossier,
                   statut: 'CONFORME ET REGULIER',
                 })}
                 target="_blank"
@@ -890,14 +1266,15 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
               paddingRight: `${margeDroiteCm}cm`,
             }}
           >
-            {/* EN-TÊTE OFFICIEL EXCLUSIF DE LA DIRECTION */}
+            {/* EN-TÊTE OFFICIEL EXCLUSIF DE LA DIRECTION (AVEC QR CODE EN HAUT À DROITE SOUS LA DEVISE) */}
             <OfficialDocumentHeader
-              numeroActe={numeroActe}
+              numeroActe={numeroActe || undefined}
               emetteurTitre={emetteurTitre}
               destinataireTitre={destinataireTitre || undefined}
               destinataireVille={destinataireVille || undefined}
               showDestinataire={Boolean(destinataireTitre)}
               dateLieu={dateLieu}
+              qrCodeUrl={docType === 'attestation_depot' ? attestationQrCodeUrl : undefined}
             />
 
             {/* TITRE CENTRAL SI PRÉSENT */}
@@ -949,35 +1326,6 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
                 </div>
               ))}
             </div>
-
-            {/* BLOC SÉCURITÉ & QR CODE DE CONFORMITÉ SCANNABLE POUR ATTESTATION DE DÉPÔT */}
-            {attestationQrCodeUrl && (
-              <div className="mt-8 p-3 rounded-lg border border-slate-300 bg-slate-50/90 flex items-center justify-between gap-4 font-mono text-[9.5pt] text-slate-800">
-                <div className="space-y-0.5 flex-1 not-italic">
-                  <div className="flex items-center gap-1.5 font-bold text-slate-950 text-[10pt]">
-                    <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
-                    <span>Contrôle Officiel de Salubrité Acoustique & de Conformité</span>
-                  </div>
-                  <p className="text-[9pt] text-slate-700">
-                    Scannez ce QR Code avec tout smartphone pour certifier l&apos;authenticité de l&apos;acte sur la page officielle DDL-PN.
-                  </p>
-                  <p className="text-[8.5pt] text-emerald-800 font-bold">
-                    • Statut : ACTE RÉGULIER ENREGISTRÉ (Loi N° 21-2019 du 13 juin 2019)
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-center shrink-0">
-                  <img
-                    src={attestationQrCodeUrl}
-                    alt="QR Code Attestation DDL-PN"
-                    className="w-18 h-18 object-contain p-1 border border-slate-300 rounded bg-white shadow-xs"
-                  />
-                  <span className="text-[7pt] font-bold text-slate-600 uppercase mt-0.5">
-                    Scan Officiel
-                  </span>
-                </div>
-              </div>
-            )}
 
             {/* BLOC SIGNATURE OFFICIELLE */}
             <div className="mt-10 mr-4 flex flex-col items-end text-center">

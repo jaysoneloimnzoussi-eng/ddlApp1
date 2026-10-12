@@ -75,84 +75,98 @@ export async function generateAttestationDocx(etablissement: Establishment): Pro
                     width: { size: 55, type: WidthType.PERCENTAGE },
                     children: [
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'MINISTÈRE DE LA CULTURE, DES ARTS,', bold: true, font: 'Garamond', size: 24 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'DU PATRIMOINE NATIONAL ET DE', bold: true, font: 'Garamond', size: 24 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'L\'INDUSTRIE TOURISTIQUE', bold: true, font: 'Garamond', size: 24 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: '———', font: 'Garamond', size: 20 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'DIRECTION GÉNÉRALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: '———', font: 'Garamond', size: 20 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'DÉPARTEMENT DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: '———', font: 'Garamond', size: 20 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'DIRECTION DÉPARTEMENTALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 }),
                         ],
                       }),
                       new Paragraph({
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 }),
                         ],
                       }),
-                      new Paragraph({
-                        children: [
-                          new TextRun({ text: '———', font: 'Garamond', size: 20 }),
-                        ],
-                      }),
-                      new Paragraph({
-                        children: [
-                          new TextRun({ text: 'N°042/MCAPNIT/DGL/DPN/DDL-PN', bold: true, font: 'Garamond', size: 22 }),
-                        ],
-                      }),
+                      ...(etablissement.numeroAttestation ? [
+                        new Paragraph({
+                          alignment: AlignmentType.CENTER,
+                          children: [
+                            new TextRun({ text: '———', font: 'Garamond', size: 20 }),
+                          ],
+                        }),
+                        new Paragraph({
+                          alignment: AlignmentType.CENTER,
+                          children: [
+                            new TextRun({ text: `N° ${etablissement.numeroAttestation}/MCAPNIT/DGL/DPN/DDL-PN`, bold: true, font: 'Garamond', size: 22 }),
+                          ],
+                        }),
+                      ] : []),
                     ],
                   }),
                   new TableCell({
                     width: { size: 45, type: WidthType.PERCENTAGE },
                     children: [
                       new Paragraph({
-                        alignment: AlignmentType.RIGHT,
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'RÉPUBLIQUE DU CONGO', bold: true, size: 20 }),
                         ],
                       }),
                       new Paragraph({
-                        alignment: AlignmentType.RIGHT,
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: 'Unité - Travail - Progrès', italics: true, size: 18 }),
                         ],
                       }),
                       new Paragraph({
-                        alignment: AlignmentType.RIGHT,
+                        alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({ text: '--------------------', size: 16 }),
                         ],
@@ -253,7 +267,7 @@ export async function generateAttestationDocx(etablissement: Establishment): Pro
             spacing: { line: 360, after: 240 },
             children: [
               new TextRun({
-                text: `La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance formelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage solennellement à respecter les normes prescrites par la Loi N° 21-2019, notamment en matière de salubrité publique, de sécurité des usagers et de maîtrise des décibels sonores.`,
+                text: `La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance formelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage solennellement à respecter les prescriptions réglementaires en vigueur, notamment en matière de salubrité publique, de sécurité des usagers et de préservation de la tranquillité publique.`,
                 size: 22,
               }),
             ],
@@ -883,18 +897,20 @@ export async function generateUniversalAdministrativeDocx(data: UniversalAdminis
                   new TableCell({
                     width: { size: 55, type: WidthType.PERCENTAGE },
                     children: [
-                      new Paragraph({ children: [new TextRun({ text: 'MINISTÈRE DE LA CULTURE, DES ARTS,', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: 'DU PATRIMOINE NATIONAL ET DE', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: 'L\'INDUSTRIE TOURISTIQUE', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
-                      new Paragraph({ children: [new TextRun({ text: 'DIRECTION GÉNÉRALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
-                      new Paragraph({ children: [new TextRun({ text: 'DÉPARTEMENT DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
-                      new Paragraph({ children: [new TextRun({ text: 'DIRECTION DÉPARTEMENTALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: 'DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 })] }),
-                      new Paragraph({ children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
-                      new Paragraph({ children: [new TextRun({ text: data.numeroActe, bold: true, font: 'Garamond', size: 24 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'MINISTÈRE DE LA CULTURE, DES ARTS,', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DU PATRIMOINE NATIONAL ET DE', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'L\'INDUSTRIE TOURISTIQUE', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DIRECTION GÉNÉRALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DÉPARTEMENT DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DIRECTION DÉPARTEMENTALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 })] }),
+                      ...(data.numeroActe ? [
+                        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
+                        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: data.numeroActe, bold: true, font: 'Garamond', size: 24 })] }),
+                      ] : []),
                     ],
                   }),
                   new TableCell({

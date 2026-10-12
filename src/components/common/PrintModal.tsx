@@ -144,117 +144,49 @@ export const PrintModal: React.FC = () => {
           {/* 1. ATTESTATION DE DÉPÔT A4 OFFICIELLE */}
           {printMode === 'a4_attestation' && (
             <div className="page-a4 bg-white text-slate-950 p-8 md:p-12 rounded shadow-2xl max-w-[210mm] w-full border border-slate-300 font-garamond leading-relaxed text-[13pt]">
-              {/* Header with 2 columns exact official format */}
-              <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6 gap-3">
-                <div className="text-left text-[11pt] font-bold text-slate-900 uppercase space-y-0.5 flex-1">
-                  <p>Ministère de la Culture, des Arts,</p>
-                  <p>du Patrimoine National et de</p>
-                  <p>l'Industrie Touristique</p>
-                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
-                  <p>Direction Générale des Loisirs</p>
-                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
-                  <p>Département de Pointe-Noire</p>
-                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
-                  <p className="text-slate-950 font-black">
-                    Direction Départementale des Loisirs
-                  </p>
-                  <p className="text-slate-950 font-black">
-                    de Pointe-Noire
-                  </p>
-                  <p className="text-[10pt] font-semibold tracking-widest text-slate-700">———</p>
-                  <p className="font-mono text-[10.5pt] text-slate-700 not-italic pt-0.5">
-                    N° {printData.numeroAttestation || '042'}/MCAPNIT/DGL/DPN/DDL-PN
-                  </p>
-                </div>
-
-                {/* Official Sceau / Logo */}
-                <div className="flex flex-col items-center justify-center shrink-0 px-2 pt-1">
-                  <DdlLogo size="lg" rounded="xl" bordered={false} className="w-16 h-16 shadow-none ring-1 ring-slate-400" />
-                  <span className="text-[8px] font-mono uppercase tracking-widest text-slate-700 font-bold mt-1">
-                    SCEAU DDL-PN
-                  </span>
-                </div>
-
-                <div className="text-right text-xs uppercase space-y-0.5 flex-1">
-                  <p className="font-bold text-sm text-slate-950">
-                    RÉPUBLIQUE DU CONGO
-                  </p>
-                  <p className="italic font-garamond text-[12pt] text-slate-800 normal-case">
-                    Unité – Travail – Progrès
-                  </p>
-                  <p className="text-[10px] tracking-widest text-slate-400">————————</p>
-                  <p className="text-[12pt] font-medium text-slate-800 pt-2 normal-case font-garamond">
-                    Pointe-Noire, le{' '}
-                    <span className="font-bold underline">
-                      {new Date().toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Reference */}
-              <div className="mb-6 font-mono text-xs font-bold text-slate-900 bg-slate-100 p-2 border-l-4 border-slate-900">
-                RÉFÉRENCE : N° {printData.numeroAttestation || '042'}/MCAPNIT/DGL/DPN/DDL-PN/2026
-              </div>
+              {/* En-tête officiel centré avec QR Code en haut à droite sous la devise */}
+              <OfficialDocumentHeader
+                numeroActe={printData.numeroAttestation ? `N° ${printData.numeroAttestation}/MCAPNIT/DGL/DPN/DDL-PN` : undefined}
+                dateLieu={`Pointe-Noire, le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`}
+                qrCodeUrl={qrCodeUrl}
+                className="mb-6"
+              />
 
               {/* Title en police officielle Garamond */}
-              <div className="text-center my-6">
-                <h1 className="font-garamond text-2xl font-bold uppercase tracking-wider text-slate-950 underline decoration-2 underline-offset-4">
-                  ATTESTATION PROVISOIRE DE DÉPÔT ET DE CONFORMITÉ
+              <div className="text-center my-6 py-2 border-y-2 border-slate-900 bg-slate-50/50">
+                <h1 className="font-garamond text-xl font-bold uppercase tracking-wider text-slate-950">
+                  ATTESTATION DE DÉPÔT
                 </h1>
-                <p className="text-xs font-garamond italic text-slate-600 mt-1">
-                  Valable pour l'exploitation transitoire - Titre N° 2026/{printData.codeDossier?.substring(11)}
+                <p className="text-xs font-garamond italic text-slate-600 mt-0.5">
+                  Valable pour l'exploitation transitoire • Dossier N° {printData.codeDossier || 'REC-2026'}
                 </p>
               </div>
 
               {/* Paragraphe 1 */}
-              <p className="text-justify mb-4 text-[13px] leading-6">
+              <p className="text-justify mb-4 text-[13pt] leading-7" style={{ textIndent: '1.5cm' }}>
                 Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé{' '}
-                <strong className="font-black uppercase tracking-wide">
+                <strong className="font-bold uppercase tracking-wide">
                   « {printData.nomCommercial} »
                 </strong>
                 , exploité par{' '}
                 <strong className="font-bold">{printData.promoteurNom}</strong>, relevant de la catégorie{' '}
                 <em>{printData.categorie}</em>, sis à Pointe-Noire, Arrondissement{' '}
-                <strong className="underline">
-                  {printData.arrondissement} (Quartier {printData.quartier}, {printData.adresseExacte})
+                <strong>
+                  {printData.arrondissement} ({printData.quartier ? `Quartier ${printData.quartier}, ` : ''}{printData.adresseExacte})
                 </strong>
                 , a régulièrement déposé auprès de nos services son dossier technique de régularisation et s'est acquitté des redevances départementales requises par la Régie Financière.
               </p>
 
               {/* Paragraphe 2 */}
-              <p className="text-justify mb-4 text-[13px] leading-6">
-                La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions de la Loi N° 21-2019, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la stricte limitation des émergences sonores nocturnes.
+              <p className="text-justify mb-4 text-[13pt] leading-7" style={{ textIndent: '1.5cm' }}>
+                La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions réglementaires en vigueur, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la préservation de la tranquillité publique.
               </p>
 
               {/* Paragraphe 3 */}
-              <p className="text-justify mb-8 text-[13px] leading-6">
+              <p className="text-justify mb-8 text-[13pt] leading-7" style={{ textIndent: '1.5cm' }}>
                 Délivrée pour valoir et servir ce que de droit, la présente attestation est valable pour une période de{' '}
                 <strong>quatre-vingt-dix (90) jours renouvelable</strong> à compter de sa signature, et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.
               </p>
-
-              {/* Security watermark, QR Code and Hash */}
-              <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-[9px] text-slate-600 flex justify-between items-center mb-8">
-                <div className="space-y-0.5">
-                  <p><strong className="text-slate-800">Code Sécurisé :</strong> {printData.codeDossier}</p>
-                  <p><strong className="text-slate-800">Statut Républicain :</strong> {printData.statut?.toUpperCase()}</p>
-                  <p><strong className="text-slate-800">Scellement Numérique :</strong> Conforme Loi 21-2019</p>
-                </div>
-                {qrCodeUrl && (
-                  <div className="flex flex-col items-center">
-                    <img
-                      src={qrCodeUrl}
-                      alt="QR Sceau Officiel"
-                      className="w-18 h-18 object-contain p-1 border border-slate-300 rounded-lg bg-white shadow-xs"
-                    />
-                    <span className="text-[7px] text-slate-500 mt-0.5 font-sans">Contrôle QR Officiel</span>
-                  </div>
-                )}
-              </div>
 
               {/* Signatures */}
               <div className="flex justify-between items-end pt-4 mt-6">
