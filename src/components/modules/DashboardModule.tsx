@@ -41,6 +41,7 @@ import { formatCfa } from '../../services/crypto';
 import { Arrondissement, ComplianceStatus, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
 import { D3ArrondissementChart } from '../dashboard/D3ArrondissementChart';
 import { AdvancedAdminAnalytics } from '../dashboard/AdvancedAdminAnalytics';
+import { ExecutiveInfographicDashboard } from '../dashboard/ExecutiveInfographicDashboard';
 import { CountdownTimer72h } from '../common/CountdownTimer72h';
 import { FieldAgentExclusiveDashboard } from './FieldAgentExclusiveDashboard';
 
@@ -70,6 +71,7 @@ export const DashboardModule: React.FC = () => {
   const [selectedQuartier, setSelectedQuartier] = useState<string>('all');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [selectedStatut, setSelectedStatut] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'infographic' | 'detailed'>('infographic');
 
   const isLight = theme === 'light';
 
@@ -563,105 +565,164 @@ export const DashboardModule: React.FC = () => {
         )}
       </div>
 
-      {/* 4. TOP 4 DYNAMIC KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Recettes Encaissées */}
-        <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
-          isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-        }`}>
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Recettes Recouvrées SAF
-            </span>
-            <span className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <TrendingUp className="w-4 h-4" />
-            </span>
+      {/* 3.B SOUVERAINETÉ VISUELLE: SÉLECTEUR DE MODE DU TABLEAU DE BORD */}
+      <div className={`p-2.5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm ${
+        isLight ? 'bg-gradient-to-r from-blue-50/80 via-white to-slate-50 border-blue-200/80' : 'bg-slate-900/90 border-slate-800'
+      }`}>
+        <div className="flex items-center gap-2.5 px-2">
+          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
+            <TrendingUp className="w-4 h-4" />
           </div>
-          <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2 font-mono">
-            {formatCfa(totalRecettes)}
-          </p>
-          <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2">
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Régie Trésor Public
-            </span>
-            <span className="font-mono">Global: {formatCfa(globalRecettes)}</span>
+          <div>
+            <div className="text-xs font-bold font-cinzel text-slate-900 dark:text-white uppercase tracking-wider">
+              Présentation Décisionnelle Haute Définition
+            </div>
+            <div className="text-[10px] text-slate-500 dark:text-slate-400">
+              Basculer entre l'infographie exécutive complète et la vue analytique détaillée
+            </div>
           </div>
         </div>
 
-        {/* Établissements Recensés */}
-        <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
-          isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-        }`}>
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Établissements en Suivi
-            </span>
-            <span className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              <Building2 className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2 font-mono">
-            {totalEtablissements}
-          </p>
-          <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
-            <span className="text-emerald-600 dark:text-emerald-400 font-bold">{enRegleCount} soldés</span>
-            <span>•</span>
-            <span className="text-blue-600 dark:text-blue-400 font-bold">{attestationProvCount} acomptes</span>
-          </div>
-        </div>
-
-        {/* Contentieux & Décibels */}
-        <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
-          isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-        }`}>
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Contentieux & Infractions
-            </span>
-            <span className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-300 mt-2 font-mono">
-            {misesEnDemeureCount + fermesCount}
-          </p>
-          <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
-            <span className="text-amber-600 font-bold">{misesEnDemeureCount} mises en demeure</span>
-            <span>•</span>
-            <span className="text-rose-600 font-bold">{fermesCount} fermés</span>
-          </div>
-        </div>
-
-        {/* Plan de Travail Annuel (PTA) */}
-        <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
-          isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-        }`}>
-          <div className="flex justify-between items-start">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Exécution PTA 2026
-            </span>
-            <span className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
-              <CheckCircle className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-xl md:text-2xl font-bold text-purple-600 dark:text-purple-300 mt-2 font-mono">
-            {ptaMoyenne} %
-          </p>
-          <div className={`w-full h-1.5 rounded-full mt-3 overflow-hidden ${
-            isLight ? 'bg-slate-100' : 'bg-slate-800'
-          }`}>
-            <div
-              className="bg-purple-600 h-full rounded-full transition-all duration-500"
-              style={{ width: `${ptaMoyenne}%` }}
-            />
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">4 axes stratégiques sous contrôle</div>
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setViewMode('infographic')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'infographic'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Infographie Affiche Exécutive (Maquette)</span>
+          </button>
+          <button
+            onClick={() => setViewMode('detailed')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+              viewMode === 'detailed'
+                ? 'bg-emerald-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Analytique D3.js & Tables Détaillées</span>
+          </button>
         </div>
       </div>
 
-      {/* 4.B VISUALISATION ANALYTIQUE 3D DYNAMIQUE & DIAGRAMMES COMPLEXES */}
-      <AdvancedAdminAnalytics establishments={filteredEstablishments} receipts={filteredReceipts} />
+      {/* 4. EXECUTIVE INFOGRAPHIC DASHBOARD (HERO INFOGRAPHIC POSTER) */}
+      {viewMode === 'infographic' ? (
+        <ExecutiveInfographicDashboard
+          establishments={filteredEstablishments}
+          receipts={filteredReceipts}
+          legalActs={legalActs}
+          staff={staff}
+          schedules={schedules}
+          ptaMilestones={ptaMilestones}
+          isLight={isLight}
+        />
+      ) : (
+        <>
+          {/* 4.A TOP 4 DYNAMIC KPI CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Recettes Encaissées */}
+            <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}>
+              <div className="flex justify-between items-start">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Recettes Recouvrées SAF
+                </span>
+                <span className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <TrendingUp className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2 font-mono">
+                {formatCfa(totalRecettes)}
+              </p>
+              <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Régie Trésor Public
+                </span>
+                <span className="font-mono">Global: {formatCfa(globalRecettes)}</span>
+              </div>
+            </div>
+
+            {/* Établissements Recensés */}
+            <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}>
+              <div className="flex justify-between items-start">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Établissements en Suivi
+                </span>
+                <span className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Building2 className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2 font-mono">
+                {totalEtablissements}
+              </p>
+              <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{enRegleCount} soldés</span>
+                <span>•</span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold">{attestationProvCount} acomptes</span>
+              </div>
+            </div>
+
+            {/* Contentieux & Décibels */}
+            <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}>
+              <div className="flex justify-between items-start">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Contentieux & Infractions
+                </span>
+                <span className="p-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-xl md:text-2xl font-bold text-amber-600 dark:text-amber-300 mt-2 font-mono">
+                {misesEnDemeureCount + fermesCount}
+              </p>
+              <div className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
+                <span className="text-amber-600 font-bold">{misesEnDemeureCount} mises en demeure</span>
+                <span>•</span>
+                <span className="text-rose-600 font-bold">{fermesCount} fermés</span>
+              </div>
+            </div>
+
+            {/* Plan de Travail Annuel (PTA) */}
+            <div className={`border rounded-xl p-4 relative overflow-hidden shadow-sm transition ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}>
+              <div className="flex justify-between items-start">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  Exécution PTA 2026
+                </span>
+                <span className="p-2 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                  <CheckCircle className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="text-xl md:text-2xl font-bold text-purple-600 dark:text-purple-300 mt-2 font-mono">
+                {ptaMoyenne} %
+              </p>
+              <div className={`w-full h-1.5 rounded-full mt-3 overflow-hidden ${
+                isLight ? 'bg-slate-100' : 'bg-slate-800'
+              }`}>
+                <div
+                  className="bg-purple-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${ptaMoyenne}%` }}
+                />
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">4 axes stratégiques sous contrôle</div>
+            </div>
+          </div>
+
+          {/* 4.B VISUALISATION ANALYTIQUE 3D DYNAMIQUE & DIAGRAMMES COMPLEXES */}
+          <AdvancedAdminAnalytics establishments={filteredEstablishments} receipts={filteredReceipts} />
+        </>
+      )}
 
       {/* 5. DIAGRAMMES DIVERS ET VARIABLES (LIGNE 1 : D3 ARRONDISSEMENTS + SUIVI PAR AGENT EXCLUSIF) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
