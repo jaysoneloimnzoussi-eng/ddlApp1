@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   LayoutDashboard,
   MapPinPlus,
@@ -419,6 +420,11 @@ export const Sidebar: React.FC = () => {
               <span className="text-[10px] font-mono font-bold">100% Autonome</span>
             </div>
           )}
+
+          {/* Bouton d'installation PC & Android */}
+          <div className="mb-2.5">
+            <PWAInstallButton variant="sidebar" />
+          </div>
 
           {authenticatedUser && (
             <div className="flex items-center justify-between gap-2">

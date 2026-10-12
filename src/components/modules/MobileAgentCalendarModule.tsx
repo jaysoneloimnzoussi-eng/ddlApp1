@@ -43,8 +43,10 @@ import {
   ClipboardPaste,
   Database,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import { InspectionSchedule, Establishment, CashReceipt } from '../../types';
+import { InspectionSchedule, Establishment, CashReceipt, Arrondissement, QUARTIERS_PAR_ARRONDISSEMENT, EstablishmentCategory } from '../../types';
 import {
   createGoogleCalendarEvent,
   listGoogleCalendarEvents,
@@ -84,6 +86,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
     isCalendarFullScreen,
     setIsCalendarFullScreen,
     setActiveModule,
+    setSelectedEstablishmentForRecensement,
   } = useApp();
 
   const isLight = theme === 'light';
@@ -112,7 +115,15 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [createEstId, setCreateEstId] = useState<string>('');
   const [isCustomEst, setIsCustomEst] = useState<boolean>(false);
   const [customEstNom, setCustomEstNom] = useState<string>('');
-  const [createArrondissement, setCreateArrondissement] = useState<string>('Tié-Tié');
+  const [createArrondissement, setCreateArrondissement] = useState<Arrondissement>('Tié-Tié');
+  const [createQuartier, setCreateQuartier] = useState<string>(QUARTIERS_PAR_ARRONDISSEMENT['Tié-Tié'][0]);
+  const [createCustomQuartier, setCreateCustomQuartier] = useState<string>('');
+  const [createMontantAPayer, setCreateMontantAPayer] = useState<number | string>(50000);
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState<boolean>(false);
+  const [createPromoteurNom, setCreatePromoteurNom] = useState<string>('');
+  const [createPromoteurTel, setCreatePromoteurTel] = useState<string>('');
+  const [createCategorie, setCreateCategorie] = useState<EstablishmentCategory>('Bar Dancing / Cabaret');
+  const [createRepereLocal, setCreateRepereLocal] = useState<string>('');
   const [createDate, setCreateDate] = useState<string>(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -125,6 +136,16 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [createNotes, setCreateNotes] = useState<string>('Tournée de recouvrement SAA');
   const [isCreatingSchedule, setIsCreatingSchedule] = useState<boolean>(false);
 
+  // Synchronise le quartier par défaut lors du changement d'arrondissement
+  const handleArrondissementChange = (newArr: Arrondissement) => {
+    setCreateArrondissement(newArr);
+    const quartiers = QUARTIERS_PAR_ARRONDISSEMENT[newArr] || [];
+    if (quartiers.length > 0) {
+      setCreateQuartier(quartiers[0]);
+    }
+    setCreateCustomQuartier('');
+  };
+
   // Auto-sync available establishments for selection
   const availableEstablishments = useMemo(() => {
     return visibleEstablishments.length > 0 ? visibleEstablishments : establishments;
@@ -133,8 +154,18 @@ export const MobileAgentCalendarModule: React.FC = () => {
   useEffect(() => {
     if (!createEstId && availableEstablishments.length > 0) {
       setCreateEstId(availableEstablishments[0].id);
+      setCreateMontantAPayer(availableEstablishments[0].soldeRestantDu > 0 ? availableEstablishments[0].soldeRestantDu : 50000);
     }
   }, [availableEstablishments, createEstId]);
+
+  useEffect(() => {
+    if (createEstId) {
+      const selected = availableEstablishments.find((e) => e.id === createEstId);
+      if (selected && !isCustomEst) {
+        setCreateMontantAPayer(selected.soldeRestantDu > 0 ? selected.soldeRestantDu : 50000);
+      }
+    }
+  }, [createEstId, availableEstablishments, isCustomEst]);
 
   // Google Calendar 2026 Import Modal States
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -486,21 +517,42 @@ export const MobileAgentCalendarModule: React.FC = () => {
                           authenticatedUser ||
                           defaultSAA;
 
-      if (isCustomEst && customEstNom.trim()) {
+      const montantNumerique = typeof createMontantAPayer === 'string'
+        ? parseInt(createMontantAPayer.replace(/\s+/g, ''), 10) || 0
+        : Number(createMontantAPayer) || 0;
+
+      if (isCustomEst) {
+        if (!customEstNom.trim()) {
+          showNotification('warning', "Veuillez renseigner le nom commercial de l'établissement.");
+          return;
+        }
+
+        const effectiveQuartier = createQuartier.startsWith('Autre quartier')
+          ? (createCustomQuartier.trim() || createQuartier)
+          : createQuartier;
+
+        const finalQuartier = createRepereLocal.trim()
+          ? `${effectiveQuartier} (${createRepereLocal.trim()})`
+          : effectiveQuartier;
+
+        const baseMontant = montantNumerique > 0 ? montantNumerique : 50000;
+
         const newEstData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'> = {
           nomCommercial: customEstNom.trim(),
-          promoteurNom: `Promoteur ${customEstNom.trim()}`,
-          promoteurTelephone: '+242 06 600 00 00',
+          promoteurNom: createPromoteurNom.trim() || `Promoteur ${customEstNom.trim()}`,
+          promoteurTelephone: createPromoteurTel.trim() || '+242 06 000 00 00',
           promoteurEmail: '',
-          arrondissement: (createArrondissement as any) || 'Tié-Tié',
-          quartier: 'Centre-Ville',
-          adresseExacte: `${createArrondissement || 'Tié-Tié'}, Pointe-Noire`,
-          categorie: 'Bar Dancing / Cabaret',
+          arrondissement: createArrondissement,
+          quartier: finalQuartier,
+          adresseExacte: createRepereLocal.trim()
+            ? `${createRepereLocal.trim()}, ${createArrondissement}, Pointe-Noire`
+            : `${finalQuartier}, ${createArrondissement}, Pointe-Noire`,
+          categorie: createCategorie,
           regimeFiscal: 'informel_forfaitaire',
           surfaceM2: 80,
-          montantRedevanceAnnuelle: 60000,
+          montantRedevanceAnnuelle: baseMontant,
           montantEncaisse: 0,
-          soldeRestantDu: 60000,
+          soldeRestantDu: baseMontant,
           statut: 'mise_en_demeure',
           latitude: -4.78 + (Math.random() - 0.5) * 0.05,
           longitude: 11.87 + (Math.random() - 0.5) * 0.05,
@@ -523,6 +575,10 @@ export const MobileAgentCalendarModule: React.FC = () => {
         return;
       }
 
+      const acompteAttendu = montantNumerique > 0
+        ? montantNumerique
+        : (est.soldeRestantDu > 0 ? est.soldeRestantDu : undefined);
+
       const newSchedule = await addSchedule({
         dateTournee: createDate,
         heure: createHeure,
@@ -533,7 +589,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
         inspecteurChef: activeAgent.nomComplet,
         agentId: activeAgent.id,
         typeMission: createMotif,
-        montantAcompteAttendu: est.soldeRestantDu > 0 ? est.soldeRestantDu : undefined,
+        montantAcompteAttendu: acompteAttendu,
         notes: createNotes,
         statut: 'planifie',
       });
@@ -553,8 +609,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
           const endIso = `${createDate}T${endHour}:${createHeure.split(':')[1]}:00`;
           await createGoogleCalendarEvent(googleAccessToken, {
             summary: `[DDL-PN] ${createMotif} : ${est.nomCommercial}`,
-            description: `${createNotes}. Agent : ${activeAgent.nomComplet}`,
-            location: `${est.nomCommercial}, ${est.arrondissement}, Pointe-Noire`,
+            description: `${createNotes}. Quartier : ${est.quartier || 'Centre'}. Agent : ${activeAgent.nomComplet}`,
+            location: `${est.nomCommercial}, ${est.quartier || ''}, ${est.arrondissement}, Pointe-Noire`,
             startDateTime: startIso,
             endDateTime: endIso,
           });
@@ -563,10 +619,18 @@ export const MobileAgentCalendarModule: React.FC = () => {
         }
       }
 
-      showNotification('success', `Rendez-vous planifié au ${createDate} (${createHeure}) pour ${est.nomCommercial} et affiché dans l'agenda.`);
+      showNotification(
+        'success',
+        `Descente planifiée pour « ${est.nomCommercial} » (${est.arrondissement} - Quartier ${est.quartier || 'Centre'}). Enregistré dans la base Firestore.`
+      );
       setIsCreateModalOpen(false);
       setCustomEstNom('');
+      setCreatePromoteurNom('');
+      setCreatePromoteurTel('');
+      setCreateRepereLocal('');
+      setCreateCustomQuartier('');
       setIsCustomEst(false);
+      setIsDetailsExpanded(false);
     } catch (err: any) {
       showNotification('error', `Erreur de planification: ${err.message}`);
     } finally {
@@ -1748,11 +1812,31 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 </span>
               </div>
 
-              {/* Location */}
+              {/* Location & Quartier */}
               <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
                 <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>Arrondissement de {selectedSchedule.arrondissement}, Pointe-Noire</span>
+                <span>
+                  Arrondissement de {selectedSchedule.arrondissement}
+                  {(() => {
+                    const matched = visibleEstablishments.find((e) => e.id === selectedSchedule.etablissementId) ||
+                                    establishments.find((e) => e.id === selectedSchedule.etablissementId);
+                    return matched?.quartier ? ` • Quartier ${matched.quartier}` : '';
+                  })()}
+                  , Pointe-Noire
+                </span>
               </div>
+
+              {selectedSchedule.montantAcompteAttendu && selectedSchedule.montantAcompteAttendu > 0 && (
+                <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                  <DollarSign className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>
+                    Montant exigible / à recouvrer pour cette descente :{' '}
+                    <strong className="font-mono font-bold text-emerald-800 dark:text-emerald-300">
+                      {formatCfa(selectedSchedule.montantAcompteAttendu)}
+                    </strong>
+                  </span>
+                </div>
+              )}
 
               {/* Strict Exclusive Agent Silo Banner */}
               <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-900 text-xs space-y-1">
@@ -1765,7 +1849,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 </p>
               </div>
 
-              {/* Complete Payment History */}
+              {/* Complete Payment History & Direct Recensement Access */}
               {(() => {
                 const targetEst = visibleEstablishments.find((e) => e.id === selectedSchedule.etablissementId) ||
                                   establishments.find((e) => e.id === selectedSchedule.etablissementId) ||
@@ -1774,11 +1858,26 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
                 return (
                   <div className="space-y-2 border-t pt-3 border-slate-200 dark:border-slate-800">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-700 dark:text-slate-300">Situation Fiscale :</span>
-                      <span className="font-mono font-bold text-emerald-600">
-                        Reste dû : {formatCfa(targetEst.soldeRestantDu)} / {formatCfa(targetEst.montantRedevanceAnnuelle)}
-                      </span>
+                    <div className="flex justify-between items-center text-xs flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-700 dark:text-slate-300">Situation Fiscale :</span>
+                        <span className="font-mono font-bold text-emerald-600">
+                          Reste dû : {formatCfa(targetEst.soldeRestantDu)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEstablishmentForRecensement(targetEst.id);
+                          setSelectedSchedule(null);
+                          setActiveModule('MOD-02');
+                        }}
+                        className="px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                        title="Ouvrir la fiche technique dans le Recensement pour ajouter photos, décibels, GPS ou modifier les informations"
+                      >
+                        <Building className="w-3 h-3 text-indigo-600" />
+                        <span>Dossier Recensement (Compléter / Éditer)</span>
+                      </button>
                     </div>
 
                     {targetEst.historiquePaiements && targetEst.historiquePaiements.length > 0 ? (
@@ -2029,66 +2128,225 @@ export const MobileAgentCalendarModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateAppointment} className="p-5 space-y-4 text-xs">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-700 dark:text-slate-300">
                     Établissement concerné :
                   </label>
                   <button
                     type="button"
-                    onClick={() => setIsCustomEst(!isCustomEst)}
-                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-500 underline"
+                    onClick={() => {
+                      setIsCustomEst(!isCustomEst);
+                      if (!isCustomEst) {
+                        setCreateMontantAPayer(50000);
+                      }
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-500 underline cursor-pointer"
                   >
                     {isCustomEst ? "Sélectionner dans la liste existante" : "+ Saisir un autre établissement"}
                   </button>
                 </div>
 
                 {!isCustomEst ? (
-                  <select
-                    value={createEstId}
-                    onChange={(e) => setCreateEstId(e.target.value)}
-                    className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
-                    required={!isCustomEst}
-                  >
-                    {availableEstablishments.length === 0 && (
-                      <option value="">Aucun établissement enregistré</option>
-                    )}
-                    {availableEstablishments.map((est) => (
-                      <option key={est.id} value={est.id}>
-                        {est.nomCommercial} ({est.arrondissement}) - Reste: {formatCfa(est.soldeRestantDu)}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <select
+                      value={createEstId}
+                      onChange={(e) => setCreateEstId(e.target.value)}
+                      className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
+                      required={!isCustomEst}
+                    >
+                      {availableEstablishments.length === 0 && (
+                        <option value="">Aucun établissement enregistré</option>
+                      )}
+                      {availableEstablishments.map((est) => (
+                        <option key={est.id} value={est.id}>
+                          {est.nomCommercial} — {est.arrondissement} ({est.quartier || 'Centre'}) - Solde: {formatCfa(est.soldeRestantDu)}
+                        </option>
+                      ))}
+                    </select>
+
+                    {(() => {
+                      const selected = availableEstablishments.find((e) => e.id === createEstId);
+                      if (!selected) return null;
+                      return (
+                        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">Localisation & Quartier :</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">
+                              {selected.arrondissement} • Quartier {selected.quartier || 'Centre-Ville'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-slate-400 block text-[10px]">Solde exigible :</span>
+                            <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                              {formatCfa(selected.soldeRestantDu)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 ) : (
-                  <div className="space-y-2 p-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">
+                  <div className="space-y-3 p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">
                     <div>
-                      <label className="text-[10px] text-slate-500 font-semibold">Nom commercial de l'établissement :</label>
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                        Nom commercial de l'établissement <span className="text-red-500">*</span> :
+                      </label>
                       <input
                         type="text"
                         required={isCustomEst}
-                        placeholder="Ex: Bar Chez Maman Pauline"
+                        placeholder="Ex: Bar Dancing Chez Maman Pauline"
                         value={customEstNom}
                         onChange={(e) => setCustomEstNom(e.target.value)}
-                        className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                        className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 font-semibold">Arrondissement :</label>
-                      <select
-                        value={createArrondissement}
-                        onChange={(e) => setCreateArrondissement(e.target.value)}
-                        className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                          Arrondissement <span className="text-red-500">*</span> :
+                        </label>
+                        <select
+                          value={createArrondissement}
+                          onChange={(e) => handleArrondissementChange(e.target.value as Arrondissement)}
+                          className="w-full text-xs px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 font-medium"
+                        >
+                          <option value="Lumumba">1 - Lumumba</option>
+                          <option value="Mvou-Mvou">2 - Mvou-Mvou</option>
+                          <option value="Tié-Tié">3 - Tié-Tié</option>
+                          <option value="Loandjili">4 - Loandjili</option>
+                          <option value="Mongo-Mpoukou">5 - Mongo-Mpoukou</option>
+                          <option value="Ngoyo">6 - Ngoyo</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
+                          Quartier <span className="text-red-500">*</span> :
+                        </label>
+                        <select
+                          value={createQuartier}
+                          onChange={(e) => setCreateQuartier(e.target.value)}
+                          className="w-full text-xs px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 font-medium"
+                        >
+                          {(QUARTIERS_PAR_ARRONDISSEMENT[createArrondissement] || []).map((q) => (
+                            <option key={q} value={q}>
+                              {q}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {createQuartier.startsWith('Autre quartier') && (
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">
+                          Préciser le nom du quartier / secteur :
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Secteur Marché Fond Tié-Tié"
+                          value={createCustomQuartier}
+                          onChange={(e) => setCreateCustomQuartier(e.target.value)}
+                          className="w-full text-xs px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                        />
+                      </div>
+                    )}
+
+                    {/* Volet dépliable pour infos complémentaires */}
+                    <div className="pt-1.5 border-t border-blue-200/60 dark:border-blue-900/60">
+                      <button
+                        type="button"
+                        onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                        className="flex items-center justify-between w-full text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-600 py-1 cursor-pointer"
                       >
-                        <option value="Lumumba">1 - Lumumba</option>
-                        <option value="Mvou-Mvou">2 - Mvou-Mvou</option>
-                        <option value="Tié-Tié">3 - Tié-Tié</option>
-                        <option value="Loandjili">4 - Loandjili</option>
-                        <option value="Mongo-Poukou">5 - Mongo-Poukou</option>
-                        <option value="Ngoyo">6 - Ngoyo</option>
-                      </select>
+                        <span>
+                          {isDetailsExpanded ? 'Masquer les informations complémentaires' : '+ Informations complémentaires (Promoteur, Téléphone, Catégorie)'}
+                        </span>
+                        {isDetailsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {isDetailsExpanded && (
+                        <div className="space-y-2.5 pt-2 animate-in fade-in duration-150">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">Nom du promoteur / gérant :</label>
+                              <input
+                                type="text"
+                                placeholder="Ex: M. Jean Moukala"
+                                value={createPromoteurNom}
+                                onChange={(e) => setCreatePromoteurNom(e.target.value)}
+                                className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">Contact téléphonique :</label>
+                              <input
+                                type="text"
+                                placeholder="+242 06 000 00 00"
+                                value={createPromoteurTel}
+                                onChange={(e) => setCreatePromoteurTel(e.target.value)}
+                                className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">Catégorie :</label>
+                              <select
+                                value={createCategorie}
+                                onChange={(e) => setCreateCategorie(e.target.value as EstablishmentCategory)}
+                                className="w-full text-xs px-2 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                              >
+                                <option value="Bar Dancing / Cabaret">Bar Dancing / Cabaret</option>
+                                <option value="Discothèque / Night-club">Discothèque / Night-club</option>
+                                <option value="Lounge Bar & Terrasse">Lounge Bar & Terrasse</option>
+                                <option value="Snack-Bar Sonorisé">Snack-Bar Sonorisé</option>
+                                <option value="Espace Récréatif & Salle Polyvalente">Espace Récréatif</option>
+                                <option value="Complexe de Loisirs & Piscine">Complexe de Loisirs</option>
+                                <option value="Autre établissement de loisirs">Autre établissement</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">Repère local / Adresse :</label>
+                              <input
+                                type="text"
+                                placeholder="Ex: Face marché, ruelle 4"
+                                value={createRepereLocal}
+                                onChange={(e) => setCreateRepereLocal(e.target.value)}
+                                className="w-full text-xs px-2.5 py-1.5 rounded border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
+
+                {/* Saisie manuelle du montant à payer / à recouvrer */}
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                    <span>Montant à recouvrer / exigible lors de la descente (FCFA) :</span>
+                    <span className="text-[10px] font-normal text-slate-400">Enregistré dans la base</span>
+                  </label>
+                  <div className="relative mt-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step={5000}
+                      required
+                      value={createMontantAPayer}
+                      onChange={(e) => setCreateMontantAPayer(e.target.value)}
+                      className="w-full text-xs font-mono font-semibold px-3 py-2 pl-7 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                      placeholder="Ex: 50000"
+                    />
+                    <span className="absolute left-2.5 top-2 text-xs text-slate-400 font-bold">F</span>
+                    <span className="absolute right-3 top-2 text-[10px] text-slate-400 font-semibold">FCFA</span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -200,7 +200,12 @@ export const AgentLoginConsole: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex items-center justify-center p-3 sm:p-4 md:p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-3 sm:p-4 md:p-8 max-w-5xl mx-auto w-full">
+        {/* Prominent PWA & Android Native Install Banner */}
+        <div className="w-full mb-4">
+          <PWAInstallButton variant="banner" />
+        </div>
+
         <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
           {/* Left Column: Official Context */}
           <div

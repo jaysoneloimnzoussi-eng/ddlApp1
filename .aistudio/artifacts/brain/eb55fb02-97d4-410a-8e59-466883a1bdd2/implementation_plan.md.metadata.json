@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan d'intégration des quartiers, de l'enregistrement automatique des nouveaux établissements dans Firestore, de la saisie manuelle du montant à recouvrer et du lien direct vers la fiche de recensement dans le formulaire de programmation des descentes.",
+  "updatedAt":  "2026-10-12T07:44:21.520902122Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

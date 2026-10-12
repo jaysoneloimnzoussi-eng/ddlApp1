@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Establishment, CashReceipt } from '../../types';
 import { formatCfa } from '../../services/crypto';
+import { PWAInstallButton } from '../common/PWAInstallButton';
 
 export const FieldAgentExclusiveDashboard: React.FC = () => {
   const {
@@ -245,6 +246,7 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <PWAInstallButton variant="header" />
             <button
               onClick={() => setActiveModule('MOD-02')}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs shadow-lg transition flex items-center gap-2 cursor-pointer"

@@ -146,6 +146,10 @@ interface AppContextType {
   printData: any;
   openPrintModal: (mode: AppContextType['printMode'], data: any) => void;
   closePrintModal: () => void;
+
+  // Cible de recherche ou édition pour le Recensement
+  selectedEstablishmentForRecensement: string | null;
+  setSelectedEstablishmentForRecensement: (idOrName: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -245,6 +249,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Google Calendar Full Screen State (Default true for maximum workspace)
   const [isCalendarFullScreen, setIsCalendarFullScreen] = useState<boolean>(true);
+
+  // Navigation ciblée vers un établissement dans le Recensement
+  const [selectedEstablishmentForRecensement, setSelectedEstablishmentForRecensement] = useState<string | null>(null);
 
   // Command Palette (Ctrl+K)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
@@ -1810,6 +1817,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         printData,
         openPrintModal,
         closePrintModal,
+        selectedEstablishmentForRecensement,
+        setSelectedEstablishmentForRecensement,
       }}
     >
       {children}
