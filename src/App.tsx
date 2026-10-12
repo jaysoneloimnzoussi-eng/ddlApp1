@@ -81,8 +81,56 @@ const MainContent: React.FC = () => {
   );
 };
 
+import { AttestationVerificationView } from './components/public/AttestationVerificationView';
+
 const AppContent: React.FC = () => {
   const { theme, isAuthenticated, activeModule, isCalendarFullScreen } = useApp();
+  const [showVerificationPage, setShowVerificationPage] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const search = window.location.search;
+    const hash = window.location.hash;
+    return (
+      search.includes('verify=attestation') ||
+      search.includes('verify-attestation') ||
+      hash.includes('verify-attestation') ||
+      search.includes('verify=act')
+    );
+  });
+
+  // Écouter les changements d'URL / hash pour naviguer vers la certification
+  React.useEffect(() => {
+    const handleUrlCheck = () => {
+      const search = window.location.search;
+      const hash = window.location.hash;
+      const isVerify =
+        search.includes('verify=attestation') ||
+        search.includes('verify-attestation') ||
+        hash.includes('verify-attestation') ||
+        search.includes('verify=act');
+      setShowVerificationPage(isVerify);
+    };
+
+    window.addEventListener('popstate', handleUrlCheck);
+    window.addEventListener('hashchange', handleUrlCheck);
+    return () => {
+      window.removeEventListener('popstate', handleUrlCheck);
+      window.removeEventListener('hashchange', handleUrlCheck);
+    };
+  }, []);
+
+  // Si l'utilisateur ou un smartphone scanne le QR code, afficher directement la page de certification publique
+  if (showVerificationPage) {
+    return (
+      <AttestationVerificationView
+        onBackToApp={() => {
+          setShowVerificationPage(false);
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', window.location.pathname);
+          }
+        }}
+      />
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -95,6 +143,7 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
+
 
   const isFullScreenCalendar = activeModule === 'MOD-03' && isCalendarFullScreen;
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   FileText,
@@ -17,13 +17,17 @@ import {
   FileCheck,
   AlertCircle,
   ExternalLink,
+  ShieldCheck,
+  QrCode,
 } from 'lucide-react';
 import { OfficialDocumentHeader } from '../common/OfficialDocumentHeader';
 import { printHtmlElement } from '../../services/printService';
 import { generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
+import { generateAttestationQrCode, getAttestationVerificationUrl } from '../../services/qrService';
 
 export type AdminDocType =
   | 'lettre_transmission'
+  | 'attestation_depot'
   | 'rapport_activite'
   | 'convocation'
   | 'invitation'
@@ -42,7 +46,9 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
   const { showNotification, setActiveModule } = useApp();
 
   // Selected template type
-  const [docType, setDocType] = useState<AdminDocType>('lettre_transmission');
+  const [docType, setDocType] = useState<AdminDocType>('attestation_depot');
+  const [attestationQrCodeUrl, setAttestationQrCodeUrl] = useState<string>('');
+
 
   // Interactive margin controls (Congolese official standard: Left 2.5cm, Right 2.0cm, Top 2.0cm, Bottom 2.0cm)
   const [margeGaucheCm, setMargeGaucheCm] = useState<number>(2.5);
@@ -50,50 +56,117 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
   const [margeHautCm, setMargeHautCm] = useState<number>(2.0);
   const [margeBasCm, setMargeBasCm] = useState<number>(2.0);
 
-  // Form fields with authentic DDL-PN defaults
-  const [numeroActe, setNumeroActe] = useState<string>('N°035/MCAPNIT/DGL/DPN/DDL-PN');
-  const [dateLieu, setDateLieu] = useState<string>('Pointe-Noire, le 08 octobre 2026');
+  // Form fields with authentic DDL-PN defaults (Modèle Officiel Attestation de Dépôt LE ROCHER)
+  const [numeroActe, setNumeroActe] = useState<string>('N°042/MCAPNIT/DGL/DPN/DDL-PN/2026');
+  const [dateLieu, setDateLieu] = useState<string>('Pointe-Noire, le 12 octobre 2026');
   const [emetteurTitre, setEmetteurTitre] = useState<string>('Le Directeur Départemental des Loisirs de Pointe-Noire');
-  const [destinataireTitre, setDestinataireTitre] = useState<string>('Madame la Directrice Générale des Loisirs');
-  const [destinataireVille, setDestinataireVille] = useState<string>('Brazzaville');
-  const [titreCentral, setTitreCentral] = useState<string>('');
-  const [objet, setObjet] = useState<string>("Transmission du Rapport d'Activités du 3ème Trimestre 2026.");
-  const [reference, setReference] = useState<string>('N°033/MCAPNIT/DGL/DPN/DDL-PN du 23 septembre 2026.');
-  const [formuleAppel, setFormuleAppel] = useState<string>('Madame la Directrice Générale,');
+  const [destinataireTitre, setDestinataireTitre] = useState<string>('');
+  const [destinataireVille, setDestinataireVille] = useState<string>('');
+  const [titreCentral, setTitreCentral] = useState<string>('ATTESTATION DE DÉPÔT');
+  const [objet, setObjet] = useState<string>("Dépôt de dossier technique d'agrément d'établissement de loisirs");
+  const [reference, setReference] = useState<string>('Loi N° 21-2019 du 13 juin 2019 fixant les règles applicables aux activités de loisirs en République du Congo');
+  const [formuleAppel, setFormuleAppel] = useState<string>('');
   const [signataireNom, setSignataireNom] = useState<string>('Jean Richard NTSEKE NGOUAKA');
   const [signataireTitre, setSignataireTitre] = useState<string>('Le Directeur Départemental des Loisirs de Pointe-Noire');
-  const [piecesJointes, setPiecesJointes] = useState<string>("Rapport d'Activités du 3ème Trimestre 2026.");
+  const [piecesJointes, setPiecesJointes] = useState<string>('Récépissé de versement SAF N° 2026/042 et Quittance de régularisation.');
   const [ampliations, setAmpliations] = useState<string>(
-    '- DGL / Brazzaville\n- Préfecture du Département de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Archives / Chrono'
+    '- DGL / Brazzaville\n- Préfecture du Département de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Brigade de Salubrité Acoustique (SAA)\n- Archives / Chrono'
   );
 
-  // Sections of document body
+  // Sections of document body (Modèle intégral officiel LE ROCHER)
   const [sections, setSections] = useState<DocumentSectionItem[]>([
     {
       id: '1',
       titre: '',
       contenu:
-        "J'ai l'honneur de vous transmettre, ci-joint, le Rapport d'Activités du troisième trimestre 2026 de la Direction Départementale des Loisirs de Pointe-Noire, couvrant la période du 1er juillet au 30 septembre 2026.",
+        "Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « LE ROCHER », exploité par Monsieur Jack MATOKO, relevant de la catégorie Bar-Dancing / Établissement de Loisirs, sis à Pointe-Noire, Arrondissement 3 Tié-Tié, a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.",
     },
     {
       id: '2',
       titre: '',
       contenu:
-        "Ce rapport rend fidèlement compte des réalisations des quatre services techniques (SAA, SAF, SPA, SSI), de notre participation aux cérémonies officielles départementales du mois de septembre, ainsi que des contraintes logistiques dont le dénouement requiert votre bienveillant arbitrage.",
+        "La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions de la Loi N° 21-2019, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la stricte limitation des émergences sonores nocturnes.",
     },
     {
       id: '3',
       titre: '',
       contenu:
-        "Veuillez agréer, Madame la Directrice Générale, l'expression de ma considération très distinguée.",
+        "Délivrée pour valoir et servir ce que de droit, la présente attestation est valable pour une période de quatre-vingt-dix (90) jours renouvelable à compter de sa signature, et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.",
     },
   ]);
+
+  // Synchronisation dynamique du QR Code scannable officiel
+  useEffect(() => {
+    let isMounted = true;
+    const updateQr = async () => {
+      try {
+        const qrUrl = await generateAttestationQrCode(
+          {
+            referenceNumero: numeroActe || 'N°042/MCAPNIT/DGL/DPN/DDL-PN/2026',
+            etablissementNom: 'LE ROCHER',
+            promoteurNom: 'Monsieur Jack MATOKO',
+            dateDepot: dateLieu,
+            codeDossier: 'DDL-PN-2026-REC-042',
+            statut: 'CONFORME ET REGULIER',
+          },
+          160
+        );
+        if (isMounted) {
+          setAttestationQrCodeUrl(qrUrl);
+        }
+      } catch (err) {
+        console.error('Erreur génération QR Code Attestation:', err);
+      }
+    };
+    updateQr();
+    return () => {
+      isMounted = false;
+    };
+  }, [numeroActe, dateLieu]);
 
   // Quick preset loader with authentic administrative content
   const handleLoadPreset = (type: AdminDocType) => {
     setDocType(type);
-    if (type === 'lettre_transmission') {
+    if (type === 'attestation_depot') {
+      setNumeroActe('N°042/MCAPNIT/DGL/DPN/DDL-PN/2026');
+      setDateLieu('Pointe-Noire, le 12 octobre 2026');
+      setEmetteurTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
+      setDestinataireTitre('');
+      setDestinataireVille('');
+      setTitreCentral('ATTESTATION DE DÉPÔT');
+      setObjet("Dépôt de dossier technique d'agrément d'établissement de loisirs");
+      setReference('Loi N° 21-2019 du 13 juin 2019 fixant les règles applicables aux activités de loisirs en République du Congo');
+      setFormuleAppel('');
+      setSignataireTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
+      setSignataireNom('Jean Richard NTSEKE NGOUAKA');
+      setPiecesJointes('Récépissé de versement SAF N° 2026/042 et Quittance de régularisation.');
+      setAmpliations(
+        '- DGL / Brazzaville\n- Préfecture du Département de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Brigade de Salubrité Acoustique (SAA)\n- Archives / Chrono'
+      );
+      setSections([
+        {
+          id: '1',
+          titre: '',
+          contenu:
+            "Le Directeur Départemental des Loisirs de Pointe-Noire soussigné atteste par la présente que l'établissement de loisirs dénommé « LE ROCHER », exploité par Monsieur Jack MATOKO, relevant de la catégorie Bar-Dancing / Établissement de Loisirs, sis à Pointe-Noire, Arrondissement 3 Tié-Tié, a régulièrement déposé auprès de nos services son dossier technique de régularisation et d'obtention de l'agrément d'exploitation, et s'est acquitté des redevances départementales requises auprès de la Régie Financière.",
+        },
+        {
+          id: '2',
+          titre: '',
+          contenu:
+            "La présente attestation confère au promoteur la faculté de poursuivre ses activités à titre strictement transitoire, en attendant la délivrance solennelle de l'Agrément Ministériel Définitif instruit par la Direction Générale des Loisirs à Brazzaville. L'exploitant s'engage expressément à respecter les prescriptions de la Loi N° 21-2019, notamment en ce qui concerne la salubrité des lieux, la sécurité physique des usagers et la stricte limitation des émergences sonores nocturnes.",
+        },
+        {
+          id: '3',
+          titre: '',
+          contenu:
+            "Délivrée pour valoir et servir ce que de droit, la présente attestation est valable pour une période de quatre-vingt-dix (90) jours renouvelable à compter de sa signature, et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.",
+        },
+      ]);
+    } else if (type === 'lettre_transmission') {
       setNumeroActe('N°035/MCAPNIT/DGL/DPN/DDL-PN');
+      setDateLieu('Pointe-Noire, le 08 octobre 2026');
+      setEmetteurTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
       setDestinataireTitre('Madame la Directrice Générale des Loisirs');
       setDestinataireVille('Brazzaville');
       setTitreCentral('');
@@ -449,6 +522,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-1.5">
           {[
+            { id: 'attestation_depot', label: 'Attestation de Dépôt (LE ROCHER)', icon: ShieldCheck },
             { id: 'lettre_transmission', label: 'Lettre de Transmission', icon: Send },
             { id: 'rapport_activite', label: 'Rapport d\'Activités / Bilan', icon: FileText },
             { id: 'convocation', label: 'Convocation Officielle', icon: FileCheck },
@@ -463,7 +537,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
               onClick={() => handleLoadPreset(item.id as AdminDocType)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
                 docType === item.id
-                  ? 'bg-indigo-600 text-white shadow'
+                  ? 'bg-emerald-600 text-white shadow ring-2 ring-emerald-400/40'
                   : 'bg-slate-950/70 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
               }`}
             >
@@ -771,6 +845,23 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
               </span>
             </span>
             <div className="flex items-center gap-2">
+              <a
+                href={getAttestationVerificationUrl({
+                  referenceNumero: numeroActe,
+                  etablissementNom: 'LE ROCHER',
+                  promoteurNom: 'Monsieur Jack MATOKO',
+                  dateDepot: dateLieu,
+                  codeDossier: 'DDL-PN-2026-REC-042',
+                  statut: 'CONFORME ET REGULIER',
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-[11px] shadow transition flex items-center gap-1 cursor-pointer"
+                title="Tester la page publique de certification liée au QR Code"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Tester Vérification QR</span>
+              </a>
               <button
                 onClick={handleDownloadDocx}
                 className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] shadow transition flex items-center gap-1 cursor-pointer"
@@ -859,9 +950,38 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
               ))}
             </div>
 
+            {/* BLOC SÉCURITÉ & QR CODE DE CONFORMITÉ SCANNABLE POUR ATTESTATION DE DÉPÔT */}
+            {attestationQrCodeUrl && (
+              <div className="mt-8 p-3 rounded-lg border border-slate-300 bg-slate-50/90 flex items-center justify-between gap-4 font-mono text-[9.5pt] text-slate-800">
+                <div className="space-y-0.5 flex-1 not-italic">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-950 text-[10pt]">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>Contrôle Officiel de Salubrité Acoustique & de Conformité</span>
+                  </div>
+                  <p className="text-[9pt] text-slate-700">
+                    Scannez ce QR Code avec tout smartphone pour certifier l&apos;authenticité de l&apos;acte sur la page officielle DDL-PN.
+                  </p>
+                  <p className="text-[8.5pt] text-emerald-800 font-bold">
+                    • Statut : ACTE RÉGULIER ENREGISTRÉ (Loi N° 21-2019 du 13 juin 2019)
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center shrink-0">
+                  <img
+                    src={attestationQrCodeUrl}
+                    alt="QR Code Attestation DDL-PN"
+                    className="w-18 h-18 object-contain p-1 border border-slate-300 rounded bg-white shadow-xs"
+                  />
+                  <span className="text-[7pt] font-bold text-slate-600 uppercase mt-0.5">
+                    Scan Officiel
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* BLOC SIGNATURE OFFICIELLE */}
-            <div className="mt-14 mr-4 flex flex-col items-end text-center">
-              <div className="w-80 space-y-18">
+            <div className="mt-10 mr-4 flex flex-col items-end text-center">
+              <div className="w-80 space-y-14">
                 <p className="font-bold text-[12pt] text-slate-950">
                   {signataireTitre}
                 </p>
@@ -874,7 +994,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
             </div>
 
             {/* PIÈCES JOINTES & AMPLIATIONS EN BAS */}
-            <div className="mt-12 pt-4 border-t border-slate-200/80 text-[11pt] text-slate-800 space-y-3">
+            <div className="mt-10 pt-4 border-t border-slate-200/80 text-[11pt] text-slate-800 space-y-3">
               {piecesJointes && (
                 <p className="italic">
                   <span className="font-bold not-italic">Pièce(s) jointe(s) : </span>

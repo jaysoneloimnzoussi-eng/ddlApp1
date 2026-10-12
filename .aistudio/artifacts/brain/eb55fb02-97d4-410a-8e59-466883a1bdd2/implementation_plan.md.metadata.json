@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan d'intégration des quartiers, de l'enregistrement automatique des nouveaux établissements dans Firestore, de la saisie manuelle du montant à recouvrer et du lien direct vers la fiche de recensement dans le formulaire de programmation des descentes.",
-  "updatedAt":  "2026-10-12T07:44:21.520902122Z",
+  "summary":  "Plan d'implémentation pour l'intégration fidèle du modèle officiel de l'Attestation de Dépôt dans le canva de rédaction administrative et les impressions, avec typographie Garamond intégrale et système de certification par QR Code menant à une page web publique avec sceau et conformité républicaine.",
+  "updatedAt":  "2026-10-12T11:45:30.914488904Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

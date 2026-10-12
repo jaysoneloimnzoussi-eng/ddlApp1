@@ -1,142 +1,92 @@
-# Plan d'Implémentation : Enrichissement du Formulaire de Programmation des Descentes de Terrain (Quartiers, Base Firestore, Saisie Manuelle du Montant & Complément de Fiche)
+# Modèle Officiel d'Attestation de Dépôt & Système de Vérification QR Code
 
-Ce plan détaille l'intégration de la sélection dynamique des quartiers de Pointe-Noire, la persistance automatique en temps réel dans Firestore de tout nouvel établissement créé depuis l'agenda, la saisie manuelle personnalisée du montant à recouvrer lors de la descente, ainsi que le lien d'accès direct vers le module de recensement pour compléter les informations ultérieurement.
+Ce plan détaille l'intégration fidèle et rigoureuse du modèle officiel d'Attestation de Dépôt dans le Canva de Rédaction et les impressions avec la police officielle Garamond, accompagné d'un QR Code scannable redirigeant vers une page publique de certification de conformité munie du sceau officiel républicain.
 
-## Décisions Clés & Retours Utilisateur
+## Décisions Clés Validées
 
 > [!IMPORTANT]
-> Les options validées lors du recueil des besoins :
-> - **Présentation du formulaire** : Formulaire compact avec volet dépliable (*accordeon*) pour les informations complémentaires (catégorie d'établissement, promoteur, téléphone, repère local).
-> - **Traitement du montant saisi** : Enregistré à la fois comme solde / redevance exigible sur l'établissement et comme `montantAcompteAttendu` assigné à la mission de descente.
-> - **Accès ultérieur aux modifications** : Bouton d'accès direct et intuitif vers le module de Recensement (`MOD-02`) et la fiche complète de l'établissement (via toast de confirmation et fiche détaillée de la descente).
+> Les choix suivants ont été confirmés par l'utilisateur :
+> - **Emplacement** : Intégration directe dans le module **Canva de Rédaction Administrative** et dans le système central d'**Impression officielle (PrintModal)**.
+> - **Typographie** : Utilisation stricte de la police officielle **Garamond** (`EB Garamond`), police réglementaire de la Direction Départementale des Loisirs.
+> - **Vérification** : Création d'une **page web publique de certification** dédiée, accessible sans authentification par tout smartphone scannant le QR Code officiel.
+> - **Fidélité au modèle** : Respect strict du modèle « LE ROCHER » sans ajout ni suppression de formules administratives.
 
 ---
 
-## 1. Vue d'Ensemble & Fonctionnalités Clés
+## 1. Présentation & Objectifs
 
-### Objectifs
-1. **Sélection dynamique des Quartiers** :
-   - Associer à chaque arrondissement de Pointe-Noire (Lumumba, Mvou-Mvou, Tié-Tié, Loandjili, Mongo-Mpoukou, Ngoyo) sa liste officielle de quartiers issue du dictionnaire `QUARTIERS_PAR_ARRONDISSEMENT`.
-   - Permettre la sélection rapide du quartier et la saisie libre si un quartier non répertorié ou un repère local spécifique est nécessaire.
-
-2. **Enregistrement Immédiat et Souverain dans Firestore** :
-   - Lorsqu'un agent ou inspecteur choisit « *+ Saisir un autre établissement* », l'établissement créé est immédiatement enregistré dans la collection Firestore `establishments` via `addEstablishment()` avec génération automatique du code dossier DDL-PN officiel (ex: `PN-TT-2026-XXXX`).
-   - Disponibilité instantanée dans l'ensemble des modules (SIG Cartographie, Recouvrement SAF, Recensement terrain).
-
-3. **Saisie Manuelle du Montant à Payer / Recouvrer** :
-   - Ajout d'un champ numérique dédié au montant exigible / à recouvrer lors de la descente (en FCFA).
-   - Prise en compte immédiate pour les nouveaux établissements (initialisation de la redevance / solde restant dû) et personnalisation de l'acompte attendu pour les établissements existants.
-
-4. **Volet Dépliable pour Informations Complémentaires** :
-   - Dépliage fluide (*toggle accordéon*) pour renseigner : promoteur / gérant, contact téléphonique, catégorie (Bar Dancing, Discothèque, Lounge, etc.), repère ou adresse exacte.
-
-5. **Passerelle Rapide vers le Recensement Terrain** :
-   - Action directe « *Compléter la fiche au Recensement* » dans l'agenda pour permettre l'ajout futur de photos, coordonnées GPS précises, relevés de décibels au sonomètre et pièces justificatives.
+- **Fonctionnalité** : Permettre aux agents habilités de rédiger, personnaliser et imprimer l'Attestation de Dépôt officielle selon le modèle exact du dossier LE ROCHER, tout en apposant automatiquement un QR Code scannable menant vers une page de vérification garantissant l'authenticité républicaine du document.
+- **Utilisateurs cibles** : Direction Départementale des Loisirs de Pointe-Noire (Directeur, chefs de service, inspecteurs) et public/autorités de contrôle vérifiant les documents sur le terrain.
+- **Bénéfice majeur** : Conformité administrative absolue, zéro falsification grâce au sceau et à la page publique de certification en ligne.
 
 ---
 
-## 2. Expérience Utilisateur & Design d'Interface
+## 2. Expérience Utilisateur & Design Visuel
 
-### Parcours Utilisateur
-```
-[Bouton "+ Programmer une descente"]
-              │
-              ▼
-    [Modale de Programmation]
-              │
-    ┌─────────┴──────────────────────────────────────────┐
-    ▼                                                    ▼
-[Établissement existant]                     [+ Saisir un autre établissement]
-- Sélecteur d'établissement                  - Nom commercial
-- Affichage solde & quartier                 - Arrondissement (1 à 6)
-- Montant à recouvrer ajustable              - Quartier (liste filtrée selon arrondissement)
-                                             - Montant à recouvrer (FCFA)
-                                             - [Volet dépliable] Infos complémentaires
-                                               (Promoteur, Téléphone, Catégorie, Adresse)
-              │                                          │
-              └───────────────────┬──────────────────────┘
-                                  ▼
-           [Date, Heure, Nature mission & Notes]
-                                  │
-                                  ▼
-               [Bouton "Programmer cette descente"]
-                                  │
-                                  ▼
-              ┌──────────────────────────────────────────┐
-              │ 1. Sauvegarde Firestore 'establishments' │
-              │ 2. Sauvegarde Firestore 'schedules'      │
-              │ 3. Sync optionnelle Google Agenda        │
-              │ 4. Toast de succès avec lien Recensement │
-              └──────────────────────────────────────────┘
-```
+- **Parcours Utilisateur** :
+  1. *Dans le Canva de Rédaction* : L'utilisateur choisit le modèle « Attestation de Dépôt ». Le texte officiel complet s'affiche instantanément dans la police **Garamond**, structuré avec le format officiel (en-tête républicain, références juridiques, informations de l'établissement LE ROCHER, formule d'attestation, mention de validité et bloc signature avec sceau).
+  2. *Génération du QR Code* : Le QR Code est calculé en temps réel avec l'URL publique de vérification de l'attestation (`https://.../#verify-attestation?ref=...`).
+  3. *Impression A4 / Export* : L'impression génère une feuille A4 impeccable avec la police Garamond et le QR Code haute résolution.
+  4. *Scan par un tiers* : Tout smartphone (appareil photo standard) scannant le QR Code ouvre instantanément la page publique de conformité affichant un badge vert de certification, le sceau républicain et les données du document.
 
-### Directives Visuelles & Ergonomie
-- **Design Institutionnel DDL-PN** : Typographie lisible, fond blanc / ardoise respectant le mode clair/sombre.
-- **Micro-interactions compactes** :
-  - Sélecteur en deux volets coordonnées Arrondissement $\rightarrow$ Quartier avec actualisation instantanée.
-  - Champ de montant avec séparateur automatique des milliers et libellé clair `FCFA`.
-  - Bouton accordéon épuré `+ Ajouter plus de détails (Promoteur, Téléphone, Catégorie)` sans alourdir le flux de programmation rapide.
+- **Identité Visuelle & Typographie** :
+  - **Police d'écriture** : `EB Garamond` / `Garamond` appliquée à l'intégralité du document (titres, corps, mentions, signatures).
+  - **Mise en page solennelle** : Marges républicaines équilibrées, armoiries / en-tête officiel DDL-PN, devise « Unité – Travail – Progrès », sceau d'État officiel.
+  - **Page publique de certification** : Design sobre, institutionnel et responsive avec carte de sécurité, sceau officiel de la République du Congo, horodatage certifié et badge de validation vert.
 
 ---
 
-## 3. Architecture Technique & Flux de Données
+## 3. Choix Techniques & Arbitrages
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        MobileAgentCalendarModule                       │
-│                                                                        │
-│   state: isCustomEst, createArrondissement, createQuartier,             │
-│          createMontantAPayer, isDetailsExpanded, ...                   │
-│                                                                        │
-│   ┌────────────────────────────────────────────────────────────────┐   │
-│   │                    handleCreateAppointment()                   │   │
-│   │                                                                │   │
-│   │  if (isCustomEst):                                             │   │
-│   │    1. newEst = await addEstablishment({                        │   │
-│   │         nomCommercial, arrondissement, quartier,               │   │
-│   │         montantRedevanceAnnuelle: createMontantAPayer,         │   │
-│   │         soldeRestantDu: createMontantAPayer,                   │   │
-│   │         promoteurNom, promoteurTelephone, categorie, ...       │   │
-│   │       })                                                       │   │
-│   │                                                                │   │
-│   │  2. await addSchedule({                                        │   │
-│   │       etablissementId: newEst.id,                              │   │
-│   │       montantAcompteAttendu: createMontantAPayer,              │   │
-│   │       arrondissement, ...                                      │   │
-│   │     })                                                         │   │
-│   └────────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────┬───────────────────────────────────┘
-                                     │
-                                     ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                               AppContext                               │
-│                                                                        │
-│   addEstablishment()  ──► Firestore: /establishments/{estId}           │
-│   addSchedule()       ──► Firestore: /schedules/{scheduleId}           │
-│   setActiveModule()   ──► Navigation fluide vers MOD-02 (Recensement)   │
-└────────────────────────────────────────────────────────────────────────┘
-```
+- **Format de l'URL du QR Code** :
+  - *Choix retenu* : URL web absolue basée sur l'URL courante de l'application (ex. `window.location.origin + '/#verify-attestation?ref=...'`) encodant les paramètres essentiels (numéro de référence, nom de l'établissement, date de dépôt, hash d'intégrité).
+  - *Raison* : Permet une lecture native immédiate par n'importe quelle caméra de smartphone (iOS/Android) sans nécessiter d'application tierce.
+- **Accès public sans authentification** :
+  - *Choix retenu* : Route publique dédiée dans l'application accessible directement sans exiger de connexion ou de mot de passe.
+  - *Raison* : Un inspecteur ou une autorité de contrôle doit pouvoir scanner et constater immédiatement la validité du document sur le terrain.
+- **Typographie Garamond** :
+  - *Choix retenu* : Import Google Fonts `@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap');` combiné avec les polices système de secours (`Garamond, 'Times New Roman', serif`).
+  - *Raison* : Garantit un rendu identique sur tous les navigateurs et lors de l'impression PDF/papier.
 
 ---
 
-## 4. Plan d'Exécution par Étapes
+## 4. Architecture Technique & Flux de Données
 
-1. **Intégration du sélecteur de quartier & état local** :
-   - Importer `QUARTIERS_PAR_ARRONDISSEMENT` dans `MobileAgentCalendarModule.tsx`.
-   - Initialiser l'état `createQuartier` synchronisé avec le changement d'`arrondissement`.
-   - Ajouter l'option de saisie libre si "Autre quartier" est retenu.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          FLUX TECHNIQUE ATTESTATION                         │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-2. **Champs de montant et volet dépliable** :
-   - Ajouter l'input `createMontantAPayer` (valeur par défaut suggérée, ex: `50000` FCFA).
-   - Intégrer les champs complémentaires repliables : `promoteurNom`, `promoteurTelephone`, `categorie`, `repereLocal` ou `adresseExacte`.
+  ┌─────────────────────────────────┐
+  │ Module Canva de Rédaction       │
+  │ (AdministrativeDraftingCanva)   │
+  │ • Sélection "Attestation Dépôt" │
+  │ • Typographie Garamond intégrale│
+  │ • Édition texte modèle LE ROCHER│
+  └────────────────┬────────────────┘
+                   │
+                   ▼
+  ┌─────────────────────────────────┐
+  │ Service QR Code (qrService.ts)  │
+  │ • Génération URL de vérification│
+  │ • Encodage QR haute résolution  │
+  └────────────────┬────────────────┘
+                   │
+       ┌───────────┴───────────┐
+       ▼                       ▼
+┌──────────────────┐   ┌──────────────────────────────────────────────┐
+│ Impression A4    │   │ Page Publique de Certification               │
+│ (PrintModal.tsx) │   │ (AttestationVerificationView.tsx)            │
+│ • Police Garamond│   │ • Détection ?verify-attestation ou hash      │
+│ • QR Code réel   │   │ • Badge vert : "Document Certifié Conforme"  │
+│ • Sceau officiel │   │ • Données : Établissement, Réf, DDL-PN, Sceau│
+└──────────────────┘   └──────────────────────────────────────────────┘
+```
 
-3. **Enregistrement Firestore complet & chaînage de mission** :
-   - Mettre à jour `handleCreateAppointment` pour persister l'établissement complet avec son quartier sélectionné et ses montants financiers.
-   - Associer le montant à recouvrer directement à la descente créée (`montantAcompteAttendu`).
-
-4. **Passerelle de navigation vers le Recensement** :
-   - Proposer une action de redirection directe vers `MOD-02` avec pré-sélection de l'établissement créé.
-   - Ajouter un bouton dans la vue détaillée de la descente programmée permettant d'accéder d'un clic au dossier de recensement pour modification.
-
-5. **Validation et Compilation** :
-   - Vérifier la conformité TypeScript et compiler avec `compile_applet`.
+### Plan de Déploiement & Vérification
+1. Mettre à jour `index.html` et `src/index.css` pour inclure toutes les graisses de la police `EB Garamond`.
+2. Mettre à jour `src/services/qrService.ts` avec la fonction de génération de lien de vérification scannable universel.
+3. Créer la vue publique de certification `src/components/public/AttestationVerificationView.tsx`.
+4. Intégrer la route publique dans `src/App.tsx`.
+5. Intégrer le modèle officiel d'Attestation de Dépôt dans `AdministrativeDraftingCanvaModule.tsx` et `PrintModal.tsx`.
+6. Valider le build avec `compile_applet`.

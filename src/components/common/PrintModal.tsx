@@ -6,7 +6,7 @@ import { generateAttestationDocx, generateLegalActDocx, generateUniversalAdminis
 import { printHtmlElement } from '../../services/printService';
 import { OfficialDocumentHeader } from './OfficialDocumentHeader';
 import { formatCfa } from '../../services/crypto';
-import { generateReceiptQrCode, generateLegalActQrCode } from '../../services/qrService';
+import { generateReceiptQrCode, generateLegalActQrCode, generateAttestationQrCode } from '../../services/qrService';
 
 export const PrintModal: React.FC = () => {
   const { printMode, printData, closePrintModal } = useApp();
@@ -22,11 +22,16 @@ export const PrintModal: React.FC = () => {
         if (printMode === 'pos_receipt') {
           url = await generateReceiptQrCode(printData);
         } else if (printMode === 'a4_attestation') {
-          url = await generateLegalActQrCode(
-            printData.codeDossier || 'DDL-2026',
-            printData.nomCommercial || '',
-            printData.quittanceHash || printData.codeDossier || ''
-          );
+          url = await generateAttestationQrCode({
+            referenceNumero: printData.numeroAttestation
+              ? `N°${printData.numeroAttestation}/MCAPNIT/DGL/DPN/DDL-PN/2026`
+              : (printData.codeDossier || 'N°042/MCAPNIT/DGL/DPN/DDL-PN/2026'),
+            etablissementNom: printData.nomCommercial || 'LE ROCHER',
+            promoteurNom: printData.promoteurNom || 'Monsieur Jack MATOKO',
+            dateDepot: new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }),
+            codeDossier: printData.codeDossier || 'DDL-PN-2026-REC-042',
+            statut: printData.statut || 'CONFORME ET REGULIER',
+          });
         } else if (printMode === 'a4_legal_act') {
           url = await generateLegalActQrCode(
             printData.referenceNumero || 'ACTE-2026',
@@ -39,6 +44,7 @@ export const PrintModal: React.FC = () => {
         console.warn('QR Code load error:', err);
       }
     };
+
 
     loadQr();
     return () => {
@@ -195,12 +201,12 @@ export const PrintModal: React.FC = () => {
                 RÉFÉRENCE : N° {printData.numeroAttestation || '042'}/MCAPNIT/DGL/DPN/DDL-PN/2026
               </div>
 
-              {/* Title */}
+              {/* Title en police officielle Garamond */}
               <div className="text-center my-6">
-                <h1 className="font-cinzel text-xl font-black uppercase tracking-wider text-slate-950 underline decoration-2 underline-offset-4">
+                <h1 className="font-garamond text-2xl font-bold uppercase tracking-wider text-slate-950 underline decoration-2 underline-offset-4">
                   ATTESTATION PROVISOIRE DE DÉPÔT ET DE CONFORMITÉ
                 </h1>
-                <p className="text-xs font-mono text-slate-600 mt-1">
+                <p className="text-xs font-garamond italic text-slate-600 mt-1">
                   Valable pour l'exploitation transitoire - Titre N° 2026/{printData.codeDossier?.substring(11)}
                 </p>
               </div>
