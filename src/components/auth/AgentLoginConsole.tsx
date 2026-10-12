@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from '../common/DdlLogo';
-import { PWAInstallButton } from '../common/PWAInstallButton';
 import {
   Lock,
   User,
@@ -169,9 +168,6 @@ export const AgentLoginConsole: React.FC = () => {
               </>
             )}
           </div>
-
-          {/* PWA Install Button */}
-          <PWAInstallButton />
 
           {/* Theme switch */}
           <button

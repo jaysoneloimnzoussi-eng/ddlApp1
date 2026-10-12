@@ -227,14 +227,14 @@ export const PrintModal: React.FC = () => {
 
               {/* Paragraphe 3 */}
               <p className="text-justify mb-8 text-[13px] leading-6">
-                Délivrée pour valoir et servir ce que de droit, la présente attestation est valable pour une période de{' '}
-                <strong>quatre-vingt-dix (90) jours renouvelable</strong> à compter de sa signature, et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.
+                Délivrée pour valoir et servir ce que de droit, la présente attestation d'autorisation d'exploitation est valable pour une période d'<strong>UN (01) AN renouvelable</strong> à compter de son premier versement ou de son règlement intégral conformément à la Loi N° 21-2019. L'échéance de son prochain renouvellement annuel est fixée au jour anniversaire de son premier paiement ({printData.renouvellementAnnuelDate || printData.prochainRdvDate || printData.premierAcompteDate || 'Exercice N+1'}), et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.
               </p>
 
               {/* Security watermark, QR Code and Hash */}
               <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl font-mono text-[9px] text-slate-600 flex justify-between items-center mb-8">
                 <div className="space-y-0.5">
                   <p><strong className="text-slate-800">Code Sécurisé :</strong> {printData.codeDossier}</p>
+                  <p><strong className="text-slate-800">Validité :</strong> 1 AN RENOUVELABLE</p>
                   <p><strong className="text-slate-800">Statut Républicain :</strong> {printData.statut?.toUpperCase()}</p>
                   <p><strong className="text-slate-800">Scellement Numérique :</strong> Conforme Loi 21-2019</p>
                 </div>
@@ -245,7 +245,7 @@ export const PrintModal: React.FC = () => {
                       alt="QR Sceau Officiel"
                       className="w-18 h-18 object-contain p-1 border border-slate-300 rounded-lg bg-white shadow-xs"
                     />
-                    <span className="text-[7px] text-slate-500 mt-0.5 font-sans">Contrôle QR Officiel</span>
+                    <span className="text-[7px] text-slate-500 mt-0.5 font-sans font-medium">Contrôle QR Officiel</span>
                   </div>
                 )}
               </div>
@@ -290,71 +290,117 @@ export const PrintModal: React.FC = () => {
             </div>
           )}
 
-          {/* 2. REÇU THERMIQUE POS 58MM */}
+          {/* 2. REÇU THERMIQUE POS 58MM - DESIGN MODERNE ÉPURÉ */}
           {printMode === 'pos_receipt' && (
-            <div className="receipt-58mm bg-white text-slate-950 p-4 rounded shadow-2xl w-[58mm] font-mono text-[10px] leading-tight border border-slate-300">
-              <div className="text-center mb-2 flex flex-col items-center">
-                <DdlLogo size="xs" rounded="md" bordered={false} className="w-8 h-8 mb-1" />
-                <p className="font-bold text-xs">RÉPUBLIQUE DU CONGO</p>
-                <p className="text-[8px]">MCAPNIT / DGL / DDL-PN</p>
-                <p className="font-bold text-[9px] mt-0.5">RÉGIE DES RECETTES SAF</p>
-                <p className="text-[8px]">BRIGADE MOBILE DE RECOUVREMENT</p>
-                <p className="text-[8px] my-1">==============================</p>
+            <div className="receipt-58mm bg-white text-slate-900 p-4 rounded-xl shadow-2xl w-[58mm] font-sans text-[10px] leading-tight border border-slate-200">
+              {/* Ruban Tricolore National */}
+              <div className="h-1.5 w-full rounded-full flex overflow-hidden mb-3">
+                <div className="flex-1 bg-[#009543]" />
+                <div className="flex-1 bg-[#fbde4a]" />
+                <div className="flex-1 bg-[#dc241f]" />
               </div>
 
-              <div className="space-y-1 my-2">
-                <p className="font-bold text-[11px]">QUITTANCE N° :</p>
-                <p className="font-black text-xs">{printData.numeroQuittance}</p>
-                <p className="text-[9px]">Date : {printData.datePaiement}</p>
-                <p className="text-[9px]">Arrondissement : {printData.arrondissement}</p>
+              {/* En-tête institutionnel moderne */}
+              <div className="text-center pb-2 border-b border-slate-200 flex flex-col items-center">
+                <DdlLogo size="xs" rounded="lg" bordered={false} className="w-9 h-9 mb-1.5 shadow-xs" />
+                <p className="font-bold text-[11px] uppercase tracking-wide text-slate-950">RÉPUBLIQUE DU CONGO</p>
+                <p className="text-[7.5px] italic text-slate-500 font-serif">Unité • Travail • Progrès</p>
+                <p className="text-[8px] font-medium text-slate-600 mt-1">MCAPNIT • DGL</p>
+                <p className="font-bold text-[9px] text-emerald-800 mt-0.5 uppercase tracking-tight">Direction des Loisirs • Pointe-Noire</p>
+                <span className="mt-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[8px] uppercase tracking-wider">
+                  Régie des Recettes SAF
+                </span>
               </div>
 
-              <div className="border-t border-b border-dashed border-slate-800 py-1.5 my-2 space-y-1">
-                <p className="font-bold truncate">Établissement :</p>
-                <p className="font-bold uppercase text-[11px]">{printData.etablissementNom}</p>
-                <p className="truncate">Promoteur : {printData.promoteurNom}</p>
-                <p className="text-[9px] italic">Nature : {printData.natureRecette}</p>
+              {/* Bloc Quittance N° */}
+              <div className="my-2.5 p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="flex justify-between items-center text-[8px] text-slate-500">
+                  <span>QUITTANCE N°</span>
+                  <span className="font-mono">{printData.datePaiement}</span>
+                </div>
+                <p className="font-mono font-bold text-[11px] text-slate-950">{printData.numeroQuittance}</p>
+                <div className="text-[8.5px] text-slate-600 flex justify-between pt-0.5 border-t border-slate-200/60">
+                  <span>Arrondissement :</span>
+                  <span className="font-semibold">{printData.arrondissement}</span>
+                </div>
               </div>
 
-              <div className="space-y-1 text-right my-2">
-                <p className="text-[9px]">Mode : {printData.modePaiement?.toUpperCase()}</p>
-                <p className="text-xs">MONTANT VERSÉ :</p>
-                <p className="font-black text-sm">{formatCfa(printData.montantVerse)}</p>
-                <p className="text-[9px] text-slate-700">
-                  Reste à payer : {formatCfa(printData.resteAPayer || 0)}
-                </p>
+              {/* Bloc Redevable */}
+              <div className="py-2 border-b border-slate-200 space-y-1 text-[9px]">
+                <div>
+                  <span className="text-[8px] text-slate-400 uppercase font-semibold">Établissement</span>
+                  <p className="font-bold text-[11px] text-slate-950 truncate uppercase leading-snug">{printData.etablissementNom}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] text-slate-400 uppercase font-semibold">Promoteur</span>
+                  <p className="font-semibold text-slate-800 truncate">{printData.promoteurNom}</p>
+                </div>
+                <div className="flex justify-between items-center pt-0.5 text-[8px]">
+                  <span className="text-slate-500">Nature recette :</span>
+                  <span className="font-medium text-slate-800 truncate max-w-[120px]">{printData.natureRecette}</span>
+                </div>
               </div>
 
-              <div className="border-t border-dashed border-slate-800 pt-2 my-2 text-center text-[8px] space-y-1">
-                <p>Agent : {printData.inspecteurOuCaissier}</p>
-                <p className="font-mono truncate text-[7px]">Hash: {printData.quittanceHash?.substring(0, 24)}...</p>
+              {/* Bloc Montants & Règlement */}
+              <div className="my-2.5 p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/70 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-[8.5px] text-slate-600 font-semibold uppercase">Mode :</span>
+                  <span className="text-[8.5px] font-mono uppercase px-1.5 py-0.2 bg-white rounded border border-slate-300 font-bold text-slate-800">
+                    {printData.modePaiement?.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="flex justify-between items-baseline pt-1 border-t border-emerald-200/50">
+                  <span className="text-[9px] font-bold text-slate-700 uppercase">Montant Versé :</span>
+                  <span className="font-mono font-black text-sm text-emerald-800">{formatCfa(printData.montantVerse)}</span>
+                </div>
+                <div className="flex justify-between items-center text-[8.5px] pt-0.5">
+                  <span className="text-slate-600">Solde restant dû :</span>
+                  <span className={`font-mono font-bold ${Number(printData.resteAPayer || 0) === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {Number(printData.resteAPayer || 0) === 0 ? '0 FCFA (Soldé)' : formatCfa(printData.resteAPayer || 0)}
+                  </span>
+                </div>
+              </div>
 
+              {/* Règle de validité légale 1 an renouvelable */}
+              <div className="p-1.5 rounded-md bg-slate-50 border border-slate-200 text-[7.5px] text-slate-600 leading-tight space-y-0.5 mb-2">
+                <p><strong>Validité :</strong> Autorisation d'exploiter <strong>1 AN renouvelable</strong> (Loi 21-2019).</p>
+                <p>Prochain renouvellement au jour anniversaire de votre 1er versement.</p>
+              </div>
+
+              {/* QR Code Tricolore & Sécurité */}
+              <div className="text-center pt-1 border-t border-slate-200 space-y-1.5">
                 {qrCodeUrl && (
-                  <div className="my-2 flex flex-col items-center">
-                    <img
-                      src={qrCodeUrl}
-                      alt="QR Code Contrôle DDL-PN"
-                      className="w-24 h-24 object-contain p-1 border border-slate-300 rounded bg-white shadow-xs"
-                    />
-                    <span className="text-[7px] text-slate-500 font-mono mt-0.5">
-                      Scannez pour certifier l&apos;authenticité
+                  <div className="my-1.5 flex flex-col items-center">
+                    <div className="p-1.5 bg-white border border-slate-200 rounded-xl shadow-xs">
+                      <img
+                        src={qrCodeUrl}
+                        alt="QR Code Contrôle DDL-PN"
+                        className="w-24 h-24 object-contain"
+                      />
+                    </div>
+                    <span className="text-[7px] text-slate-500 font-medium mt-1">
+                      Scanner pour contrôle d'authenticité officiel
                     </span>
                   </div>
                 )}
 
                 {printData.signatureUrl && (
-                  <div className="my-1.5 p-1 bg-slate-50 border border-slate-200 rounded">
-                    <p className="text-[7px] font-bold text-slate-600 mb-0.5">Émargement Déclarant :</p>
+                  <div className="my-1 p-1 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-[7px] font-bold text-slate-500 mb-0.5">Émargement / Signature :</p>
                     <img
                       src={printData.signatureUrl}
-                      alt="Signature Déclarant"
-                      className="h-9 mx-auto object-contain"
+                      alt="Signature"
+                      className="h-8 mx-auto object-contain"
                     />
                   </div>
                 )}
 
-                <p className="font-bold mt-1">CONSERVEZ CETTE QUITTANCE</p>
-                <p>À présenter à toute réquisition des Brigades SAA</p>
+                <div className="text-[7px] text-slate-500 space-y-0.5 pt-1 border-t border-slate-100">
+                  <p className="truncate">Caissier : <span className="font-semibold text-slate-700">{printData.inspecteurOuCaissier}</span></p>
+                  <p className="font-mono truncate text-[6.5px] text-slate-400">Empreinte SHA-256 : {printData.quittanceHash?.substring(0, 20)}...</p>
+                  <p className="font-bold text-slate-800 uppercase tracking-tight pt-1">Document libératoire officiel</p>
+                  <p className="text-[6.5px]">À présenter à toute réquisition des Brigades de contrôle</p>
+                </div>
               </div>
             </div>
           )}

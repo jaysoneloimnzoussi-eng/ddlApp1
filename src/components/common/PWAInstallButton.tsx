@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
+import { useApp } from '../../context/AppContext';
 import { Download, Smartphone, X, CheckCircle2, Shield } from 'lucide-react';
 
 interface Props {
@@ -9,12 +10,13 @@ interface Props {
 
 export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'header' }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const { isAuthenticated } = useApp();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [showManualGuide, setShowManualGuide] = useState(false);
 
-  // If already running as an installed standalone PWA, hide the button
-  if (isInstalled) {
+  // Outil interne d'État : Ne JAMAIS afficher la suggestion PWA aux visiteurs ou lors du scan public d'un document !
+  if (!isAuthenticated || isInstalled) {
     return null;
   }
 

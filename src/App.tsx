@@ -9,6 +9,7 @@ import { CommandPalette } from './components/common/CommandPalette';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { AgentLoginConsole } from './components/auth/AgentLoginConsole';
+import { PublicDocumentVerification } from './components/common/PublicDocumentVerification';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
@@ -83,8 +84,20 @@ const MainContent: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const { theme, isAuthenticated, activeModule, isCalendarFullScreen } = useApp();
+  const [forceAgentLogin, setForceAgentLogin] = React.useState(false);
+
+  // Détection d'un scan QR code citoyen / promoteur / police
+  const isVerificationScan = typeof window !== 'undefined' && (
+    window.location.search.includes('verify=') ||
+    window.location.search.includes('num=') ||
+    window.location.search.includes('ref=')
+  );
 
   if (!isAuthenticated) {
+    if (isVerificationScan && !forceAgentLogin) {
+      return <PublicDocumentVerification onGoToLogin={() => setForceAgentLogin(true)} />;
+    }
+
     return (
       <div className={`min-h-screen ${
         theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'

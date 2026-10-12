@@ -1104,6 +1104,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const statut = solde === 0 ? 'en_regle' : (est.statut === 'attestation_provisoire' ? 'attestation_provisoire' : est.statut || 'mise_en_demeure');
           const premierAcompte = est.premierAcompteDate || (recData.datePaiement ? recData.datePaiement.substring(0, 10) : new Date().toISOString().substring(0, 10));
 
+          // Logique d'autorisation annuelle renouvelable (Loi N° 21-2019) :
+          // L'échéance du prochain paiement est exactement 1 an après le jour du 1er acompte ou du solde
+          let renouvellementAnnuelDate = est.renouvellementAnnuelDate;
+          if (solde === 0 && !renouvellementAnnuelDate) {
+            const baseDate = new Date(premierAcompte);
+            baseDate.setFullYear(baseDate.getFullYear() + 1);
+            renouvellementAnnuelDate = baseDate.toISOString().substring(0, 10);
+          }
+
           const historyItem = {
             id: 'hist-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
             date: datePaiement,
@@ -1120,6 +1129,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             soldeRestantDu: solde,
             statut,
             premierAcompteDate: premierAcompte,
+            renouvellementAnnuelDate,
+            prochainRdvDate: solde === 0 ? (renouvellementAnnuelDate || est.prochainRdvDate) : est.prochainRdvDate,
             historiquePaiements: [historyItem, ...(est.historiquePaiements || [])],
           };
         }

@@ -15,6 +15,10 @@ import {
   FileSpreadsheet,
   Building,
   MessageSquare,
+  BarChart3,
+  ShieldCheck,
+  ShieldAlert,
+  Award,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { printHtmlElement } from '../../services/printService';
@@ -22,10 +26,10 @@ import { openWhatsAppReceipt } from '../../services/whatsappService';
 import { CashReceipt } from '../../types';
 
 export const SafRegieRecettesModule: React.FC = () => {
-  const { receipts, establishments, openPrintModal, showNotification, theme } = useApp();
+  const { receipts, establishments, legalActs, openPrintModal, showNotification, theme } = useApp();
   const isLight = theme === 'light';
 
-  const [activeTab, setActiveTab] = useState<'journal' | 'rapprochement' | 'cloture'>('journal');
+  const [activeTab, setActiveTab] = useState<'journal' | 'rapprochement' | 'cloture' | 'bilan_annuel'>('journal');
   const [dateFilter, setDateFilter] = useState('');
   const [modeFilter, setModeFilter] = useState<string>('all');
   const [isClotureDone, setIsClotureDone] = useState(false);
@@ -48,6 +52,44 @@ export const SafRegieRecettesModule: React.FC = () => {
     cheque_tresor: receipts.filter((r) => r.modePaiement === 'cheque_tresor').reduce((s, r) => s + r.montantVerse, 0),
     virement: receipts.filter((r) => r.modePaiement === 'virement').reduce((s, r) => s + r.montantVerse, 0),
   };
+
+  // Grand Bilan Annuel d'Exercice (Clôture et Arrêté au 25 Décembre)
+  const totalResteDu = establishments.reduce((sum, e) => sum + (e.soldeRestantDu || 0), 0);
+  const totalPotentielAnnuel = totalRecettes + totalResteDu;
+  const tauxRecouvrementGlobal = totalPotentielAnnuel > 0
+    ? ((totalRecettes / totalPotentielAnnuel) * 100).toFixed(1)
+    : '100';
+
+  const arrList: ('Lumumba' | 'Mvou-Mvou' | 'Tié-Tié' | 'Loandjili' | 'Mongo-Mpoukou' | 'Ngoyo')[] = [
+    'Lumumba',
+    'Mvou-Mvou',
+    'Tié-Tié',
+    'Loandjili',
+    'Mongo-Mpoukou',
+    'Ngoyo',
+  ];
+
+  const bilanArrondissements = arrList.map((arr) => {
+    const etabs = establishments.filter((e) => e.arrondissement === arr);
+    const recs = receipts.filter((r) => r.arrondissement === arr);
+    const encaisse = recs.reduce((s, r) => s + r.montantVerse, 0);
+    const reste = etabs.reduce((s, e) => s + (e.soldeRestantDu || 0), 0);
+    const total = encaisse + reste;
+    const taux = total > 0 ? Math.round((encaisse / total) * 100) : 100;
+    return {
+      arrondissement: arr,
+      totalEtabs: etabs.length,
+      enRegle: etabs.filter((e) => e.statut === 'en_regle').length,
+      misesEnDemeure: etabs.filter((e) => e.statut === 'mise_en_demeure').length,
+      encaisse,
+      reste,
+      taux,
+    };
+  });
+
+  const totalActesPolice = legalActs.length;
+  const totalMisesEnDemeure = legalActs.filter((a) => a.type === 'mise_en_demeure').length;
+  const totalArretesFermeture = legalActs.filter((a) => a.type === 'arrete_fermeture').length;
 
   const filteredReceipts = receipts.filter((r) => {
     const matchMode = modeFilter === 'all' || r.modePaiement === modeFilter;
@@ -250,6 +292,18 @@ export const SafRegieRecettesModule: React.FC = () => {
         >
           <Lock className="w-4 h-4" />
           <span>Procès-Verbal de Clôture Journalière</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('bilan_annuel')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition ${
+            activeTab === 'bilan_annuel'
+              ? 'border-emerald-500 text-emerald-400 font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <span>Bilan Annuel & Arrêté au 25 Décembre</span>
         </button>
       </div>
 
@@ -510,6 +564,271 @@ export const SafRegieRecettesModule: React.FC = () => {
                 <p className="font-bold text-xs uppercase mb-12">Vu et vérifié, Le Directeur Départemental</p>
                 <p className="font-bold text-xs">Pour le Trésor Public</p>
                 <p className="text-[10px] text-slate-600">Direction Départementale</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: GRAND BILAN ANNUEL & ARRÊTÉ AU 25 DÉCEMBRE */}
+      {activeTab === 'bilan_annuel' && (
+        <div className="space-y-6">
+          {/* Top National Ribbon & Title */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            <div className="h-1.5 w-full -mt-6 -mx-6 mb-6 flex overflow-hidden">
+              <div className="flex-1 bg-[#009543]" />
+              <div className="flex-1 bg-[#fbde4a]" />
+              <div className="flex-1 bg-[#dc241f]" />
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    ARRÊTÉ DU 25 DÉCEMBRE
+                  </span>
+                  <h2 className="font-cinzel text-lg md:text-xl font-bold text-slate-100">
+                    Grand Bilan Annuel d'Exercice & Chiffre d'Affaires DDL-PN
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Clôture officielle de l'exercice au 25 décembre 2026 • Chiffre d'affaires, créances, ventilation territoriale et conformité républicaine
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => printHtmlElement('bilan-annuel-officiel-pv', 'PV_Arrete_Annuel_25_Decembre_DDL_PN_2026')}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Imprimer le PV Officiel A4</span>
+                </button>
+                <button
+                  onClick={handleExportCsv}
+                  className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Exporter Données Annuelles (CSV)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Grand KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+              <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-1">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Chiffre d'Affaires Recouvré</span>
+                <p className="font-mono text-xl font-black text-emerald-400">{formatCfa(totalRecettes)}</p>
+                <p className="text-[10px] text-slate-500">{receipts.length} quittances émises</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-1">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Créances Restantes (Reste Dû)</span>
+                <p className="font-mono text-xl font-black text-amber-400">{formatCfa(totalResteDu)}</p>
+                <p className="text-[10px] text-slate-500">Solde à recouvrer pour 2026</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-blue-500/30 space-y-1">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Potentiel Budgétaire Annuel</span>
+                <p className="font-mono text-xl font-black text-blue-400">{formatCfa(totalPotentielAnnuel)}</p>
+                <p className="text-[10px] text-slate-500">Assiette fiscale départementale</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/30 space-y-1">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase">Taux d'Efficacité Recouvrement</span>
+                <p className="font-mono text-xl font-black text-purple-400">{tauxRecouvrementGlobal}%</p>
+                <p className="text-[10px] text-slate-500">Performance financière globale</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tableaux Statistiques Annuels */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* 1. Répartition par Arrondissement (7 cols) */}
+            <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                  <Building className="w-4 h-4 text-emerald-400" />
+                  <span>Statistiques & Recettes par Arrondissement</span>
+                </h3>
+                <span className="text-[10px] font-mono text-slate-400">Pointe-Noire</span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="p-2.5">Arrondissement</th>
+                      <th className="p-2.5 text-center">Établissements</th>
+                      <th className="p-2.5 text-right">Recouvert</th>
+                      <th className="p-2.5 text-right">Reste Dû</th>
+                      <th className="p-2.5 text-center">Taux</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {bilanArrondissements.map((row) => (
+                      <tr key={row.arrondissement} className="hover:bg-slate-800/40 text-slate-200">
+                        <td className="p-2.5 font-bold text-slate-100">{row.arrondissement}</td>
+                        <td className="p-2.5 text-center">
+                          <span className="font-mono font-semibold">{row.totalEtabs}</span>
+                          <span className="text-[10px] text-emerald-400 ml-1">({row.enRegle} soldés)</span>
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-emerald-400 font-bold">{formatCfa(row.encaisse)}</td>
+                        <td className="p-2.5 text-right font-mono text-amber-400">{formatCfa(row.reste)}</td>
+                        <td className="p-2.5 text-center">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300">
+                            {row.taux}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. Ventilation par Moyen de Paiement & Police (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Moyens de paiement */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 pb-2 border-b border-slate-800">
+                  <CreditCard className="w-4 h-4 text-emerald-400" />
+                  <span>Répartition des Canaux d'Encaissement</span>
+                </h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950 border border-slate-800">
+                    <span className="text-slate-300">Espèces (Guichet Caisse SAF)</span>
+                    <span className="font-mono font-bold text-emerald-400">{formatCfa(modeStats.especes)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950 border border-slate-800">
+                    <span className="text-slate-300">Mobile Money (MTN MoMo)</span>
+                    <span className="font-mono font-bold text-amber-400">{formatCfa(modeStats.momo_mtn)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950 border border-slate-800">
+                    <span className="text-slate-300">Airtel Money</span>
+                    <span className="font-mono font-bold text-rose-400">{formatCfa(modeStats.airtel_money)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950 border border-slate-800">
+                    <span className="text-slate-300">Chèques Trésor Public</span>
+                    <span className="font-mono font-bold text-blue-400">{formatCfa(modeStats.cheque_tresor)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 rounded-lg bg-slate-950 border border-slate-800">
+                    <span className="text-slate-300">Virements Bancaires</span>
+                    <span className="font-mono font-bold text-purple-400">{formatCfa(modeStats.virement)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Police administrative & contentieux */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 pb-2 border-b border-slate-800">
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>Actes de Police Administrative Émis</span>
+                </h3>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block">Total Actes</span>
+                    <span className="font-mono font-bold text-base text-slate-100">{totalActesPolice}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] text-amber-400 block">Mises en demeure</span>
+                    <span className="font-mono font-bold text-base text-amber-300">{totalMisesEnDemeure}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                    <span className="text-[10px] text-rose-400 block">Fermetures</span>
+                    <span className="font-mono font-bold text-base text-rose-300">{totalArretesFermeture}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* DOCUMENT IMPRIMABLE A4 : PV OFFICIEL D'ARRÊTÉ AU 25 DÉCEMBRE */}
+          <div id="bilan-annuel-officiel-pv" className="bg-white text-slate-950 p-8 md:p-12 rounded-2xl shadow-2xl max-w-4xl mx-auto border border-slate-300 font-serif leading-relaxed text-xs space-y-6">
+            <div className="text-center space-y-1 pb-4 border-b-2 border-slate-900">
+              <p className="font-bold text-sm uppercase tracking-wide">RÉPUBLIQUE DU CONGO</p>
+              <p className="italic text-[11px] text-slate-700">Unité • Travail • Progrès</p>
+              <p className="text-xs font-semibold text-slate-800">MINISTÈRE DE LA CULTURE, DES ARTS, DU PATRIMOINE NATIONAL ET DU TOURISME</p>
+              <p className="text-xs font-semibold text-slate-800">DIRECTION GÉNÉRALE DES LOISIRS • DÉPARTEMENT DE POINTE-NOIRE</p>
+              <p className="font-bold text-sm uppercase text-emerald-900 pt-2 tracking-tight">
+                DIRECTION DÉPARTEMENTALE DES LOISIRS — RÉGIE DES RECETTES SAF
+              </p>
+              <p className="font-bold text-xs uppercase bg-slate-100 py-1 rounded font-sans border border-slate-300">
+                PROCÈS-VERBAL D'ARRÊTÉ ANNUEL DES COMPTES AU 25 DÉCEMBRE 2026
+              </p>
+            </div>
+
+            <div className="font-sans text-xs space-y-4">
+              <div className="flex justify-between items-center p-2.5 bg-slate-50 border border-slate-300 rounded font-mono text-[11px]">
+                <span>Exercice Budgétaire : 2026</span>
+                <span>Date d'Arrêté Officiel : 25 Décembre 2026</span>
+                <span>Département : Pointe-Noire</span>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-bold uppercase text-slate-900 text-xs">1. Synthèse du Chiffre d'Affaires et des Recettes Liquidées</h4>
+                <div className="grid grid-cols-3 gap-3 font-mono text-xs">
+                  <div className="p-3 bg-slate-50 border rounded">
+                    <span className="text-[10px] text-slate-500 block uppercase">Chiffre d'Affaires Encaissé</span>
+                    <span className="font-bold text-emerald-800 text-sm">{formatCfa(totalRecettes)}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border rounded">
+                    <span className="text-[10px] text-slate-500 block uppercase">Créances Restantes Dues</span>
+                    <span className="font-bold text-amber-800 text-sm">{formatCfa(totalResteDu)}</span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border rounded">
+                    <span className="text-[10px] text-slate-500 block uppercase">Taux Global d'Efficacité</span>
+                    <span className="font-bold text-purple-800 text-sm">{tauxRecouvrementGlobal}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-bold uppercase text-slate-900 text-xs">2. Résultats Détaillés par Arrondissement au 25 Décembre</h4>
+                <table className="w-full text-xs text-left border border-slate-300">
+                  <thead className="bg-slate-100 font-bold border-b border-slate-300">
+                    <tr>
+                      <th className="p-2">Arrondissement</th>
+                      <th className="p-2 text-center">Établissements</th>
+                      <th className="p-2 text-right">Recouvert (FCFA)</th>
+                      <th className="p-2 text-right">Solde Dû (FCFA)</th>
+                      <th className="p-2 text-center">Taux</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                    {bilanArrondissements.map((b) => (
+                      <tr key={b.arrondissement}>
+                        <td className="p-2 font-sans font-semibold">{b.arrondissement}</td>
+                        <td className="p-2 text-center">{b.totalEtabs}</td>
+                        <td className="p-2 text-right font-bold text-emerald-800">{formatCfa(b.encaisse)}</td>
+                        <td className="p-2 text-right text-slate-700">{formatCfa(b.reste)}</td>
+                        <td className="p-2 text-center">{b.taux}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-bold uppercase text-slate-900 text-xs">3. Clôture des Titres et Renouvellement Annuel N+1</h4>
+                <p className="text-[11px] text-slate-700 text-justify leading-relaxed">
+                  Conformément aux dispositions de la Loi N° 21-2019, toutes les autorisations d'exploitation et attestations délivrées sont strictement valables pour une durée d'un (01) an renouvelable. Pour l'exercice 2027 (N+1), chaque établissement s'acquittera de sa redevance d'exploitation au jour anniversaire de son premier paiement ou solde.
+                </p>
+              </div>
+
+              {/* Visas et Paraphes */}
+              <div className="flex justify-between items-end pt-8 mt-6 border-t-2 border-slate-900 font-serif">
+                <div className="text-center w-56">
+                  <p className="font-bold text-xs uppercase mb-12">Le Caissier Régisseur Principal</p>
+                  <p className="font-bold text-xs">Sylvain KIMBEMBE</p>
+                  <p className="text-[10px] text-slate-600">Régie Financière SAF • DDL-PN</p>
+                </div>
+
+                <div className="text-center w-64">
+                  <p className="font-bold text-xs uppercase mb-12">Le Directeur Départemental des Loisirs</p>
+                  <p className="font-bold text-xs">Jean Richard NTSEKE NGOUAKA</p>
+                  <p className="text-[10px] text-slate-600">Pour le Trésor Public & la Direction Générale</p>
+                </div>
               </div>
             </div>
           </div>
