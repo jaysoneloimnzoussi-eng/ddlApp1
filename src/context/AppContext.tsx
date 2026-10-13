@@ -21,6 +21,12 @@ import {
   INITIAL_AUDIT_LOGS,
   INITIAL_SOIT_TRANSMIS,
 } from '../data/seedData';
+import {
+  INITIAL_OFFICIAL_PTA_2026,
+  OfficialPta2026Data,
+  PtaActivityItem,
+  PtaPriorityActivity,
+} from '../data/officialPtaData';
 import { computeSha256, formatCfa } from '../services/crypto';
 import { parseGoogleCalendarEvent } from '../services/googleWorkspace';
 import {
@@ -142,7 +148,7 @@ interface AppContextType {
   removeNotification: (id: string) => void;
 
   // Print Preview state
-  printMode: 'none' | 'a4_attestation' | 'a4_legal_act' | 'a4_report' | 'pos_receipt' | 'staff_badge' | 'spa_diploma';
+  printMode: 'none' | 'a4_attestation' | 'a4_legal_act' | 'a4_report' | 'a4_pta_2026' | 'pos_receipt' | 'staff_badge' | 'spa_diploma';
   printData: any;
   openPrintModal: (mode: AppContextType['printMode'], data: any) => void;
   closePrintModal: () => void;
@@ -150,6 +156,18 @@ interface AppContextType {
   // Cible de recherche ou édition pour le Recensement
   selectedEstablishmentForRecensement: string | null;
   setSelectedEstablishmentForRecensement: (idOrName: string | null) => void;
+
+  // Référentiel Officiel PTA 2026 et Liaison Rapports Trimestriels
+  officialPtaData: OfficialPta2026Data;
+  updateOfficialPtaData: (updater: (prev: OfficialPta2026Data) => OfficialPta2026Data) => void;
+  resetPtaToOfficialModel: () => void;
+  getQuarterPtaActivities: (quarter: 'T1' | 'T2' | 'T3' | 'T4') => PtaActivityItem[];
+  getQuarterPriorityActivities: (quarter: 'T1' | 'T2' | 'T3' | 'T4') => PtaPriorityActivity[];
+  updatePtaActivityProgress: (
+    activityId: string,
+    quarter: 't1' | 't2' | 't3' | 't4',
+    data: { realise: boolean; taux: number; observations: string }
+  ) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -387,6 +405,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [ptaMilestones, setPtaMilestones] = useState<PtaMilestone[]>(INITIAL_PTA_MILESTONES);
+
+  // Référentiel Officiel PTA 2026 Sovereign
+  const [officialPtaData, setOfficialPtaData] = useState<OfficialPta2026Data>(() => {
+    try {
+      const saved = localStorage.getItem('ddl_official_pta_2026_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.tableauxActivites) && Array.isArray(parsed.budgetSections)) {
+          return parsed;
+        }
+      }
+      return INITIAL_OFFICIAL_PTA_2026;
+    } catch {
+      return INITIAL_OFFICIAL_PTA_2026;
+    }
+  });
+
+  // Sauvegarde persistante du PTA 2026
+  useEffect(() => {
+    try {
+      localStorage.setItem('ddl_official_pta_2026_v1', JSON.stringify(officialPtaData));
+    } catch (e) {
+      console.warn('Storage save failed for officialPtaData:', e);
+    }
+  }, [officialPtaData]);
+
+  const updateOfficialPtaData = (updater: (prev: OfficialPta2026Data) => OfficialPta2026Data) => {
+    setOfficialPtaData((prev) => updater(prev));
+  };
+
+  const resetPtaToOfficialModel = () => {
+    setOfficialPtaData(INITIAL_OFFICIAL_PTA_2026);
+    try {
+      localStorage.setItem('ddl_official_pta_2026_v1', JSON.stringify(INITIAL_OFFICIAL_PTA_2026));
+    } catch {}
+    showNotification('success', 'PTA 2026 réinitialisé avec succès au modèle officiel conforme !');
+  };
+
+  const getQuarterPtaActivities = (quarter: 'T1' | 'T2' | 'T3' | 'T4'): PtaActivityItem[] => {
+    const key = quarter.toLowerCase() as 't1' | 't2' | 't3' | 't4';
+    const list: PtaActivityItem[] = [];
+    officialPtaData.tableauxActivites.forEach((tab) => {
+      tab.activites.forEach((act) => {
+        if (act.periodes && act.periodes[key]) {
+          list.push(act);
+        }
+      });
+    });
+    return list;
+  };
+
+  const getQuarterPriorityActivities = (quarter: 'T1' | 'T2' | 'T3' | 'T4'): PtaPriorityActivity[] => {
+    const key = quarter.toLowerCase() as 't1' | 't2' | 't3' | 't4';
+    return officialPtaData.chronogrammePrioritaire.filter((act) => act.periodes && act.periodes[key]);
+  };
+
+  const updatePtaActivityProgress = (
+    activityId: string,
+    quarter: 't1' | 't2' | 't3' | 't4',
+    data: { realise: boolean; taux: number; observations: string }
+  ) => {
+    setOfficialPtaData((prev) => {
+      const nextTabs = prev.tableauxActivites.map((tab) => ({
+        ...tab,
+        activites: tab.activites.map((act) => {
+          if (act.id === activityId) {
+            return {
+              ...act,
+              suiviTrimestriel: {
+                ...(act.suiviTrimestriel || {}),
+                [quarter]: data,
+              },
+            };
+          }
+          return act;
+        }),
+      }));
+      return { ...prev, tableauxActivites: nextTabs };
+    });
+  };
 
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>(() => {
     try {
@@ -1833,6 +1931,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closePrintModal,
         selectedEstablishmentForRecensement,
         setSelectedEstablishmentForRecensement,
+        officialPtaData,
+        updateOfficialPtaData,
+        resetPtaToOfficialModel,
+        getQuarterPtaActivities,
+        getQuarterPriorityActivities,
+        updatePtaActivityProgress,
       }}
     >
       {children}

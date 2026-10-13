@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   FileSpreadsheet,
@@ -16,6 +16,9 @@ import {
   BookOpen,
   AlertTriangle,
   Award,
+  Target,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import { generateQuarterlyReportDocx } from '../../services/docxGenerator';
 import { formatCfa } from '../../services/crypto';
@@ -24,11 +27,61 @@ import { OfficialDocumentHeader } from '../common/OfficialDocumentHeader';
 import { printHtmlElement } from '../../services/printService';
 
 export const QuarterlyReportsModule: React.FC = () => {
-  const { establishments, receipts, legalActs, ptaMilestones, showNotification, setActiveModule } = useApp();
+  const {
+    establishments,
+    receipts,
+    legalActs,
+    ptaMilestones,
+    showNotification,
+    setActiveModule,
+    officialPtaData,
+    getQuarterPtaActivities,
+    getQuarterPriorityActivities,
+    updatePtaActivityProgress,
+  } = useApp();
 
   const [trimestre, setTrimestre] = useState<'T1' | 'T2' | 'T3' | 'T4'>('T3');
-  const [viewTab, setViewTab] = useState<'rapport_integral' | 'synthese' | 'indicateurs'>('rapport_integral');
+  const [viewTab, setViewTab] = useState<'rapport_integral' | 'synthese' | 'indicateurs' | 'matrice_pta'>('matrice_pta');
   const annee = 2026;
+
+  const QUARTER_META: Record<'T1' | 'T2' | 'T3' | 'T4', {
+    ordinal: string;
+    ordinalFull: string;
+    mois: string;
+    periode: string;
+    numeroActe: string;
+  }> = {
+    T1: {
+      ordinal: '1er Trimestre',
+      ordinalFull: 'PREMIER TRIMESTRE',
+      mois: 'Janvier – Mars',
+      periode: '1er janvier — 31 mars 2026',
+      numeroActe: 'N°011/MCAPNIT/DGL/DPN/DDL-PN',
+    },
+    T2: {
+      ordinal: '2ème Trimestre',
+      ordinalFull: 'DEUXIÈME TRIMESTRE',
+      mois: 'Avril – Juin',
+      periode: '1er avril — 30 juin 2026',
+      numeroActe: 'N°022/MCAPNIT/DGL/DPN/DDL-PN',
+    },
+    T3: {
+      ordinal: '3ème Trimestre',
+      ordinalFull: 'TROISIÈME TRIMESTRE',
+      mois: 'Juillet – Septembre',
+      periode: '1er juillet — 30 septembre 2026',
+      numeroActe: 'N°033/MCAPNIT/DGL/DPN/DDL-PN',
+    },
+    T4: {
+      ordinal: '4ème Trimestre',
+      ordinalFull: 'QUATRIÈME TRIMESTRE',
+      mois: 'Octobre – Décembre',
+      periode: '1er octobre — 31 décembre 2026',
+      numeroActe: 'N°044/MCAPNIT/DGL/DPN/DDL-PN',
+    },
+  };
+
+  const currentMeta = QUARTER_META[trimestre];
 
   const totalRecettes = receipts.reduce((sum, r) => sum + r.montantVerse, 0);
   const totalEtablissements = establishments.length;
@@ -58,8 +111,44 @@ export const QuarterlyReportsModule: React.FC = () => {
     (p) => `${p.activite} (${p.serviceResponsable}) : ${p.tauxExecutionPhysique}% réalisé.`
   );
 
+  const quarterKey = trimestre.toLowerCase() as 't1' | 't2' | 't3' | 't4';
+  const quarterPtaActivities = useMemo(() => getQuarterPtaActivities(trimestre), [getQuarterPtaActivities, trimestre]);
+  const quarterPtaPriorities = useMemo(() => getQuarterPriorityActivities(trimestre), [getQuarterPriorityActivities, trimestre]);
+
+  // Statistiques calculées de réalisation du PTA pour le trimestre sélectionné
+  const ptaCompletionStats = useMemo(() => {
+    if (quarterPtaActivities.length === 0) return { count: 0, avgTaux: 0, realises: 0 };
+    let totalTaux = 0;
+    let realises = 0;
+    quarterPtaActivities.forEach((act) => {
+      const progress = act.suiviTrimestriel?.[quarterKey];
+      const t = progress ? progress.taux : (trimestre === 'T1' ? 85 : trimestre === 'T2' ? 65 : 45);
+      totalTaux += t;
+      if (t >= 80) realises++;
+    });
+    return {
+      count: quarterPtaActivities.length,
+      avgTaux: Math.round(totalTaux / quarterPtaActivities.length),
+      realises,
+    };
+  }, [quarterPtaActivities, quarterKey, trimestre]);
+
   const handleExportDocx = async () => {
     try {
+      const ptaMatrix = quarterPtaPriorities.map((p) => {
+        const linkedAct = quarterPtaActivities.find((a) =>
+          a.activite.toLowerCase().includes(p.activite.toLowerCase().slice(0, 15))
+        );
+        const progress = linkedAct?.suiviTrimestriel?.[quarterKey];
+        return {
+          activite: p.activite,
+          service: p.responsable,
+          cible: p.cibleTrimestre[quarterKey] || p.cibleAnnuelle,
+          tauxExecution: progress?.taux ?? (trimestre === 'T1' ? 85 : trimestre === 'T2' ? 65 : 45),
+          observations: progress?.observations || 'Exécution conforme à la programmation ministérielle.',
+        };
+      });
+
       await generateQuarterlyReportDocx({
         trimestre,
         annee,
@@ -69,8 +158,9 @@ export const QuarterlyReportsModule: React.FC = () => {
         totalMisesEnDemeure,
         repartitionArrondissements,
         actionsPta,
+        ptaMatrix,
       });
-      showNotification('success', `Rapport Trimestriel ${trimestre} ${annee} exporté en format Word (.docx) avec succès !`);
+      showNotification('success', `Rapport Trimestriel ${trimestre} ${annee} lié au PTA 2026 exporté en format Word (.docx) avec succès !`);
     } catch (err: any) {
       showNotification('error', `Erreur lors de l'exportation Word : ${err.message}`);
     }
@@ -180,6 +270,17 @@ export const QuarterlyReportsModule: React.FC = () => {
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Chiffres & Répartition</span>
           </button>
+          <button
+            onClick={() => setViewTab('matrice_pta')}
+            className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+              viewTab === 'matrice_pta'
+                ? 'bg-emerald-600 text-slate-950 font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>Évaluation PTA 2026 ({trimestre})</span>
+          </button>
         </div>
       </div>
 
@@ -214,25 +315,25 @@ export const QuarterlyReportsModule: React.FC = () => {
             {/* Running header */}
             <div className="text-[9pt] text-slate-500 italic flex justify-between border-b border-slate-200 pb-1 mb-4">
               <span>DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE</span>
-              <span>Rapport d&apos;Activités — 3ème Trimestre 2026</span>
+              <span>Rapport d&apos;Activités — {currentMeta.ordinal} {annee}</span>
             </div>
 
             {/* Authentic 2-Column Administrative Header */}
             <OfficialDocumentHeader
-              numeroActe="N°033/MCAPNIT/DGL/DPN/DDL-PN"
+              numeroActe={currentMeta.numeroActe}
               className="mb-6"
             />
 
             {/* Document Box Title */}
             <div className="border border-slate-900 p-4 text-center space-y-1 bg-slate-50/50">
               <h2 className="font-bold text-[14pt] uppercase tracking-wide text-slate-950">
-                RAPPORT D&apos;ACTIVITÉS DU TROISIÈME TRIMESTRE 2026
+                RAPPORT D&apos;ACTIVITÉS DU {currentMeta.ordinalFull} {annee}
               </h2>
               <p className="italic text-[12.5pt] text-slate-800">
                 Direction Départementale des Loisirs de Pointe-Noire
               </p>
               <p className="font-semibold text-[12pt] text-slate-900">
-                Juillet – Septembre 2026
+                {currentMeta.mois} {annee}
               </p>
             </div>
 
@@ -254,7 +355,7 @@ export const QuarterlyReportsModule: React.FC = () => {
               </div>
               <div className="grid grid-cols-12 border-b border-slate-800">
                 <div className="col-span-4 p-2.5 font-bold bg-slate-100 border-r border-slate-800">Période couverte</div>
-                <div className="col-span-8 p-2.5">1er juillet — 30 septembre 2026</div>
+                <div className="col-span-8 p-2.5">{currentMeta.periode}</div>
               </div>
               <div className="grid grid-cols-12 border-b border-slate-800">
                 <div className="col-span-4 p-2.5 font-bold bg-slate-100 border-r border-slate-800">Référence PTA</div>
@@ -262,7 +363,7 @@ export const QuarterlyReportsModule: React.FC = () => {
               </div>
               <div className="grid grid-cols-12">
                 <div className="col-span-4 p-2.5 font-bold bg-slate-100 border-r border-slate-800">N° de document</div>
-                <div className="col-span-8 p-2.5 font-bold">N°033/MCAPNIT/DGL/DPN/DDL-PN</div>
+                <div className="col-span-8 p-2.5 font-bold">{currentMeta.numeroActe}</div>
               </div>
             </div>
 
@@ -305,7 +406,7 @@ export const QuarterlyReportsModule: React.FC = () => {
           <div className="page-a4 bg-white text-slate-900 p-8 sm:p-12 md:p-14 rounded-xl shadow-2xl max-w-[210mm] mx-auto border border-slate-300 font-garamond leading-relaxed select-text space-y-6">
             <div className="text-[9pt] text-slate-500 italic flex justify-between border-b border-slate-200 pb-1 mb-2">
               <span>DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE</span>
-              <span>Rapport d&apos;Activités — 3ème Trimestre 2026</span>
+              <span>Rapport d&apos;Activités — {currentMeta.ordinal} {annee}</span>
             </div>
 
             <h3 className="text-[13pt] font-bold text-slate-950 uppercase border-b border-slate-800 pb-1">
@@ -418,7 +519,7 @@ export const QuarterlyReportsModule: React.FC = () => {
           <div className="page-a4 bg-white text-slate-900 p-8 sm:p-12 md:p-14 rounded-xl shadow-2xl max-w-[210mm] mx-auto border border-slate-300 font-garamond leading-relaxed select-text space-y-6">
             <div className="text-[9pt] text-slate-500 italic flex justify-between border-b border-slate-200 pb-1 mb-2">
               <span>DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE</span>
-              <span>Rapport d&apos;Activités — 3ème Trimestre 2026</span>
+              <span>Rapport d&apos;Activités — {currentMeta.ordinal} {annee}</span>
             </div>
 
             {/* c. SSID */}
@@ -596,7 +697,7 @@ export const QuarterlyReportsModule: React.FC = () => {
           <div className="page-a4 bg-white text-slate-900 p-8 sm:p-12 md:p-14 rounded-xl shadow-2xl max-w-[210mm] mx-auto border border-slate-300 font-garamond leading-relaxed select-text space-y-6">
             <div className="text-[9pt] text-slate-500 italic flex justify-between border-b border-slate-200 pb-1 mb-2">
               <span>DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE</span>
-              <span>Rapport d&apos;Activités — 3ème Trimestre 2026</span>
+              <span>Rapport d&apos;Activités — {currentMeta.ordinal} {annee}</span>
             </div>
 
             {/* 4. ACTIVITÉS PONCTUELLES — PARTICIPATIONS INSTITUTIONNELLES */}
@@ -734,7 +835,7 @@ export const QuarterlyReportsModule: React.FC = () => {
         <div className="page-a4 bg-white text-slate-900 p-8 sm:p-14 md:p-16 rounded-xl shadow-2xl max-w-[210mm] mx-auto border border-slate-300 font-garamond leading-relaxed select-text space-y-6">
           <div className="text-[9pt] text-slate-500 italic flex justify-between border-b border-slate-200 pb-1 mb-2">
             <span>DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE</span>
-            <span>Rapport d&apos;Activités — 3ème Trimestre 2026</span>
+            <span>Rapport d&apos;Activités — {currentMeta.ordinal} {annee}</span>
           </div>
 
           <div className="text-center space-y-1 border-b-2 border-slate-900 pb-4">
@@ -742,7 +843,7 @@ export const QuarterlyReportsModule: React.FC = () => {
               SYNTHÈSE DU RAPPORT
             </h2>
             <p className="italic text-[13pt] text-slate-800">
-              Rapport d&apos;Activités du Troisième Trimestre 2026 — DDL-PN
+              Rapport d&apos;Activités du {currentMeta.ordinalFull} {annee} — DDL-PN
             </p>
           </div>
 
@@ -870,6 +971,232 @@ export const QuarterlyReportsModule: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW TAB 4 : MATRICE D'ÉVALUATION TRIMESTRIELLE DU PTA 2026 */}
+      {viewTab === 'matrice_pta' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                  LIAISON DIRECTE PTA 2026
+                </span>
+                <h2 className="text-base font-bold text-slate-100">
+                  Bilan d&apos;Éxécution du Trimestre {trimestre} {annee}
+                </h2>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Suivi contradictoire des 13 actions prioritaires et des 7 tableaux d&apos;activités validés par le Ministère de tutelle.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveModule('MOD-19')}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Canva PTA 2026 (MOD-19)</span>
+              </button>
+              <button
+                onClick={handleExportDocx}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Exporter Word (.docx)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics of Trimestre PTA */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow">
+              <span className="text-xs font-semibold text-slate-400">Taux d&apos;Exécution Physique</span>
+              <p className="text-2xl font-bold font-mono text-emerald-400">{ptaCompletionStats.avgTaux}%</p>
+              <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, ptaCompletionStats.avgTaux)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-slate-500">{ptaCompletionStats.realises} activités sur {quarterPtaActivities.length} conformes</span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow">
+              <span className="text-xs font-semibold text-slate-400">Actions Prioritaires ({trimestre})</span>
+              <p className="text-2xl font-bold font-mono text-blue-400">{quarterPtaPriorities.length} / 13</p>
+              <span className="text-[10px] text-slate-400">Jalons majeurs programmés pour cette période</span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow">
+              <span className="text-xs font-semibold text-slate-400">Contrôle Qualité Réalisé</span>
+              <p className="text-2xl font-bold font-mono text-purple-400">
+                {legalActs.length} actes / {trimestre === 'T1' ? '2' : trimestre === 'T2' ? '4' : '8'} cibles
+              </p>
+              <span className="text-[10px] text-slate-400">Missions de terrain menées dans les 7 zones</span>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 shadow">
+              <span className="text-xs font-semibold text-slate-400">Recouvrement SAF Trimestriel</span>
+              <p className="text-xl font-bold font-mono text-amber-400">{formatCfa(totalRecettes)}</p>
+              <span className="text-[10px] text-slate-400">Régie Financière DDL-PN (dont frais d&apos;enquête)</span>
+            </div>
+          </div>
+
+          {/* Tableau d'évaluation des 13 actions prioritaires */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 shadow">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-bold text-slate-100">
+                  Évaluation Détaillée des Actions Prioritaires du PTA ({trimestre} {annee})
+                </h3>
+              </div>
+              <span className="text-xs text-slate-400">
+                Modifiez les taux d&apos;exécution ou observations pour actualiser le rapport
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th className="p-3 w-10 text-center">N°</th>
+                    <th className="p-3 w-64">Activité Prioritaire</th>
+                    <th className="p-3 w-36">Responsable</th>
+                    <th className="p-3 w-40">Cible Trimestrielle</th>
+                    <th className="p-3 w-40 text-center">Taux d&apos;Exécution</th>
+                    <th className="p-3">Observations & Actions Correctives</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {quarterPtaPriorities.map((prio) => {
+                    const linkedAct = quarterPtaActivities.find((a) =>
+                      a.activite.toLowerCase().includes(prio.activite.toLowerCase().slice(0, 15))
+                    );
+                    const progress = linkedAct?.suiviTrimestriel?.[quarterKey];
+                    const currentTaux = progress?.taux ?? (trimestre === 'T1' ? 85 : trimestre === 'T2' ? 65 : 45);
+                    const currentObs = progress?.observations || 'Exécution satisfaisante conforme au chronogramme.';
+
+                    return (
+                      <tr key={prio.id} className="hover:bg-slate-800/40 text-slate-200">
+                        <td className="p-3 text-center font-mono font-bold text-slate-400">{prio.numero}</td>
+                        <td className="p-3 font-semibold text-slate-100">
+                          {prio.activite}
+                          <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                            Cible annuelle : {prio.cibleAnnuelle}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                            {prio.responsable}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-emerald-400 font-bold">
+                          {prio.cibleTrimestre[quarterKey] || prio.cibleAnnuelle}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="5"
+                              value={currentTaux}
+                              onChange={(e) => {
+                                if (linkedAct) {
+                                  updatePtaActivityProgress(linkedAct.id, quarterKey, {
+                                    realise: Number(e.target.value) >= 80,
+                                    taux: Number(e.target.value),
+                                    observations: currentObs,
+                                  });
+                                }
+                              }}
+                              className="w-20 accent-emerald-500 cursor-pointer"
+                            />
+                            <span
+                              className={`font-mono font-bold text-xs px-1.5 py-0.5 rounded ${
+                                currentTaux >= 80
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : currentTaux >= 50
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-red-500/20 text-red-300'
+                              }`}
+                            >
+                              {currentTaux}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <input
+                            type="text"
+                            value={currentObs}
+                            onChange={(e) => {
+                              if (linkedAct) {
+                                updatePtaActivityProgress(linkedAct.id, quarterKey, {
+                                  realise: currentTaux >= 80,
+                                  taux: currentTaux,
+                                  observations: e.target.value,
+                                });
+                              }
+                            }}
+                            className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-xs text-slate-200 focus:border-emerald-500 outline-none"
+                            placeholder="Observations, écarts et justifications..."
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Activités spécifiques des 7 Tableaux pour ce trimestre */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 shadow">
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-blue-400" />
+              <span>Détail des Activités Ministérielles Programmées pour {trimestre} (Les 7 Tableaux)</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {officialPtaData.tableauxActivites.map((tab) => {
+                const activitiesInQuarter = tab.activites.filter((a) => a.periodes && a.periodes[quarterKey]);
+                if (activitiesInQuarter.length === 0) return null;
+
+                return (
+                  <div key={tab.id} className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-emerald-300">
+                        Tableau {tab.numero} : {tab.service}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {activitiesInQuarter.length} activité(s)
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {activitiesInQuarter.map((act) => (
+                        <div key={act.id} className="text-xs space-y-1 bg-slate-900/60 p-2.5 rounded border border-slate-800/80">
+                          <p className="font-semibold text-slate-100">{act.activite}</p>
+                          <p className="text-[11px] text-slate-400">
+                            <strong>Actions :</strong> {act.actionsRequises}
+                          </p>
+                          <div className="flex justify-between text-[10px] text-slate-500 pt-1">
+                            <span>Resp: {act.responsables}</span>
+                            <span className="text-emerald-400 font-mono">Indicateur: {act.indicateursResultats}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

@@ -23,14 +23,18 @@ import {
   Search,
   PlusCircle,
   Check,
+  Target,
 } from 'lucide-react';
 import { OfficialDocumentHeader } from '../common/OfficialDocumentHeader';
 import { printHtmlElement } from '../../services/printService';
-import { generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
+import { generateUniversalAdministrativeDocx, generatePta2026Docx } from '../../services/docxGenerator';
 import { generateAttestationQrCode, getAttestationVerificationUrl } from '../../services/qrService';
+import { formatCfa } from '../../services/crypto';
 import { Arrondissement, EstablishmentCategory, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
+import { Pta2026CanvaEditor, Pta2026CanvaPreview } from './Pta2026CanvaSection';
 
 export type AdminDocType =
+  | 'plan_travail_annuel'
   | 'lettre_transmission'
   | 'attestation_depot'
   | 'recepisse_conformite'
@@ -49,10 +53,10 @@ interface DocumentSectionItem {
 }
 
 export const AdministrativeDraftingCanvaModule: React.FC = () => {
-  const { establishments, addEstablishment, showNotification, setActiveModule } = useApp();
+  const { establishments, addEstablishment, showNotification, setActiveModule, officialPtaData } = useApp();
 
   // Selected template type
-  const [docType, setDocType] = useState<AdminDocType>('attestation_depot');
+  const [docType, setDocType] = useState<AdminDocType>('plan_travail_annuel');
   const [attestationQrCodeUrl, setAttestationQrCodeUrl] = useState<string>('');
 
   // Interactive margin controls (Congolese official standard: Left 2.5cm, Right 2.0cm, Top 2.0cm, Bottom 2.0cm)
@@ -285,6 +289,10 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
   // Quick preset loader with authentic administrative content
   const handleLoadPreset = (type: AdminDocType) => {
     setDocType(type);
+    if (type === 'plan_travail_annuel') {
+      setTitreCentral('PLAN DE TRAVAIL ANNUEL 2026');
+      return;
+    }
     if (type === 'attestation_depot') {
       setNumeroActe(''); // Numéro vide pour saisie manuelle sans autogénération
       setDateLieu('Pointe-Noire, le 12 octobre 2026');
@@ -618,11 +626,25 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
 
   // Print function
   const handlePrintDocument = () => {
+    if (docType === 'plan_travail_annuel') {
+      printHtmlElement('canva-printable-pta-2026', 'Plan_de_Travail_Annuel_PTA_2026_DDL_PN');
+      return;
+    }
     printHtmlElement('canva-printable-doc', `${titreCentral || 'Document_Officiel'}_${numeroActe}`);
   };
 
   // Word export function
   const handleDownloadDocx = async () => {
+    if (docType === 'plan_travail_annuel') {
+      try {
+        await generatePta2026Docx(officialPtaData);
+        showNotification('success', 'Plan de Travail Annuel (PTA 2026) exporté en format Microsoft Word (.docx) avec succès !');
+      } catch (err: any) {
+        showNotification('error', `Erreur lors de l'exportation Word : ${err.message}`);
+      }
+      return;
+    }
+
     try {
       await generateUniversalAdministrativeDocx({
         titreActe: titreCentral || 'DOCUMENT OFFICIEL',
@@ -721,6 +743,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-1.5">
           {[
+            { id: 'plan_travail_annuel', label: 'Plan de Travail Annuel (PTA 2026)', icon: Target },
             { id: 'attestation_depot', label: 'Attestation de Dépôt (LE ROCHER)', icon: ShieldCheck },
             { id: 'recepisse_conformite', label: 'Récépissé de Conformité (Note 152)', icon: FileCheck },
             { id: 'lettre_transmission', label: 'Lettre de Transmission', icon: Send },
@@ -748,10 +771,38 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Main 2-column layout: Left form editor (5 cols) & Right WYSIWYG A4 preview (7 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN: EDITOR FORM */}
-        <div className="no-print lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4 shadow-xl max-h-[calc(100vh-180px)] overflow-y-auto">
+      {/* Main Layout: PTA 2026 specialized Canva OR standard Administrative Document Canvas */}
+      {docType === 'plan_travail_annuel' ? (
+        <div className="space-y-4">
+          <div className="no-print p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-emerald-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                <strong>Référentiel Officiel PTA 2026 Conforme :</strong> Note de présentation, 7 Tableaux d&apos;activités ministériels, Chronogramme des 13 actions prioritaires, Budget prévisionnel minimal ({formatCfa(officialPtaData.totalGeneralBudgetCfa)}), 4 Axes stratégiques et Recommandations hiérarchiques.
+              </span>
+            </div>
+            <button
+              onClick={() => setActiveModule('MOD-06')}
+              className="text-xs font-bold text-white bg-emerald-700/60 hover:bg-emerald-600 px-3 py-1.5 rounded-lg border border-emerald-500/40 flex items-center gap-1.5 cursor-pointer shrink-0 transition"
+            >
+              <span>Évaluer dans Rapports Trimestriels (MOD-06)</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="no-print lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-xl max-h-[calc(100vh-180px)] overflow-y-auto">
+              <Pta2026CanvaEditor />
+            </div>
+            <div className="lg:col-span-7 flex flex-col items-center">
+              <Pta2026CanvaPreview />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* LEFT COLUMN: EDITOR FORM */}
+          <div className="no-print lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4 shadow-xl max-h-[calc(100vh-180px)] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <FileText className="w-4 h-4 text-indigo-400" />
@@ -1405,7 +1456,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

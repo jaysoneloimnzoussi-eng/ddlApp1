@@ -11,7 +11,7 @@ import {
   WidthType,
   BorderStyle,
 } from 'docx';
-import { Establishment, LegalAct } from '../types';
+import { Establishment, LegalAct, OfficialPta2026Data } from '../types';
 
 export interface QuarterlyReportData {
   trimestre: string;
@@ -22,6 +22,13 @@ export interface QuarterlyReportData {
   totalMisesEnDemeure: number;
   repartitionArrondissements: { nom: string; montant: number; nombre: number }[];
   actionsPta: string[];
+  ptaMatrix?: {
+    activite: string;
+    service: string;
+    cible: string;
+    tauxExecution: number;
+    observations: string;
+  }[];
 }
 
 /**
@@ -481,14 +488,69 @@ export async function generateQuarterlyReportDocx(data: QuarterlyReportData): Pr
               new TextRun({ text: 'III. EXÉCUTION DU PLAN DE TRAVAIL ANNUEL (PTA 2026)', bold: true, size: 22 }),
             ],
           }),
-          ...data.actionsPta.map(
-            (act: string) =>
-              new Paragraph({
-                children: [
-                  new TextRun({ text: `✓ ${act}`, size: 20 }),
-                ],
-              })
-          ),
+          ...(data.ptaMatrix && data.ptaMatrix.length > 0
+            ? [
+                new Table({
+                  width: { size: 100, type: WidthType.PERCENTAGE },
+                  rows: [
+                    new TableRow({
+                      tableHeader: true,
+                      children: [
+                        new TableCell({
+                          children: [new Paragraph({ children: [new TextRun({ text: 'Activité PTA', bold: true, size: 18 })] })],
+                          width: { size: 35, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({ children: [new TextRun({ text: 'Service', bold: true, size: 18 })] })],
+                          width: { size: 15, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({ children: [new TextRun({ text: 'Cible Trimestre', bold: true, size: 18 })] })],
+                          width: { size: 20, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({ children: [new TextRun({ text: 'Taux (%)', bold: true, size: 18 })] })],
+                          width: { size: 12, type: WidthType.PERCENTAGE },
+                        }),
+                        new TableCell({
+                          children: [new Paragraph({ children: [new TextRun({ text: 'Observations', bold: true, size: 18 })] })],
+                          width: { size: 18, type: WidthType.PERCENTAGE },
+                        }),
+                      ],
+                    }),
+                    ...data.ptaMatrix.map(
+                      (item) =>
+                        new TableRow({
+                          children: [
+                            new TableCell({
+                              children: [new Paragraph({ children: [new TextRun({ text: item.activite, size: 16 })] })],
+                            }),
+                            new TableCell({
+                              children: [new Paragraph({ children: [new TextRun({ text: item.service, size: 16 })] })],
+                            }),
+                            new TableCell({
+                              children: [new Paragraph({ children: [new TextRun({ text: item.cible, size: 16 })] })],
+                            }),
+                            new TableCell({
+                              children: [new Paragraph({ children: [new TextRun({ text: `${item.tauxExecution}%`, bold: true, size: 16 })] })],
+                            }),
+                            new TableCell({
+                              children: [new Paragraph({ children: [new TextRun({ text: item.observations || 'En cours', size: 14, italics: true })] })],
+                            }),
+                          ],
+                        })
+                    ),
+                  ],
+                }),
+              ]
+            : data.actionsPta.map(
+                (act: string) =>
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: `✓ ${act}`, size: 20 }),
+                    ],
+                  })
+              )),
 
           new Paragraph({ text: '', spacing: { before: 360, after: 240 } }),
           new Paragraph({
@@ -1099,5 +1161,328 @@ export async function generateLegalActDocx(act: LegalAct): Promise<void> {
       "Archives / Chrono Contentieux",
     ],
   });
+}
+
+/**
+ * Generates official Plan de Travail Annuel (PTA 2026) in native DOCX format
+ * Conforming strictly to DDL-PN administrative standard (20 pages, 7 Tables, Budget 3.696M)
+ */
+export async function generatePta2026Docx(pta: OfficialPta2026Data): Promise<void> {
+  const children: any[] = [];
+
+  // En-tête officiel
+  children.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: {
+        top: { style: BorderStyle.NONE },
+        bottom: { style: BorderStyle.NONE },
+        left: { style: BorderStyle.NONE },
+        right: { style: BorderStyle.NONE },
+        insideHorizontal: { style: BorderStyle.NONE },
+        insideVertical: { style: BorderStyle.NONE },
+      },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: 60, type: WidthType.PERCENTAGE },
+              children: [
+                new Paragraph({ children: [new TextRun({ text: pta.ministere, bold: true, size: 16 })] }),
+                new Paragraph({ children: [new TextRun({ text: '--------------------', size: 14 })] }),
+                new Paragraph({ children: [new TextRun({ text: pta.directionGenerale, bold: true, size: 16 })] }),
+                new Paragraph({ children: [new TextRun({ text: '--------------------', size: 14 })] }),
+                new Paragraph({ children: [new TextRun({ text: pta.directionDepartementale, bold: true, size: 16 })] }),
+              ],
+            }),
+            new TableCell({
+              width: { size: 40, type: WidthType.PERCENTAGE },
+              children: [
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: pta.republique, bold: true, size: 18 })] }),
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: pta.devise, italics: true, size: 16 })] }),
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: '--------------------', size: 14 })] }),
+                new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${pta.lieuSignature}, ${pta.dateSignature}`, size: 16 })] }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    }),
+    new Paragraph({ text: '', spacing: { before: 280, after: 200 } }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ text: pta.titre, bold: true, size: 30 }),
+      ],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ text: pta.directionDepartementale, bold: true, size: 22 }),
+      ],
+    }),
+    new Paragraph({ text: '', spacing: { before: 300, after: 200 } }),
+
+    // NOTE DE PRÉSENTATION
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: 'NOTE DE PRÉSENTATION', bold: true, size: 24 })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.BOTH,
+      spacing: { line: 280, after: 140 },
+      children: [
+        new TextRun({
+          text: `Le Plan de Travail Annuel 2026 de la Direction Départementale des Loisirs de Pointe-Noire s'inscrit dans la continuité de l'exercice 2025 tout en tirant les enseignements des difficultés rencontrées et des opportunités identifiées.`,
+          size: 20,
+        }),
+      ],
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: 'Contexte et Leçons de 2025 :', bold: true, size: 20 })],
+    }),
+    ...pta.notePresentation.contexteLecons2025.map(
+      (c) => new Paragraph({ children: [new TextRun({ text: `• ${c}`, size: 18 })] })
+    ),
+    new Paragraph({
+      spacing: { before: 100, after: 100 },
+      children: [
+        new TextRun({
+          text: `Partenaires stratégiques fiables identifiés : ${pta.notePresentation.partenaires2025.join(', ')}.`,
+          italics: true,
+          size: 18,
+        }),
+      ],
+    }),
+    new Paragraph({
+      children: [new TextRun({ text: 'Orientations Stratégiques 2026 (Les 4 Piliers) :', bold: true, size: 20 })],
+    }),
+    ...pta.notePresentation.orientationsStrategiques4Piliers.map(
+      (p, i) => new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${p}`, size: 18 })] })
+    ),
+    new Paragraph({
+      spacing: { before: 140, after: 140 },
+      alignment: AlignmentType.BOTH,
+      children: [new TextRun({ text: pta.notePresentation.ambitionRealismeResume, size: 18, bold: true })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.BOTH,
+      spacing: { before: 140, after: 240 },
+      children: [new TextRun({ text: pta.notePresentation.objectifGlobal, italics: true, size: 18 })],
+    })
+  );
+
+  // LES 7 TABLEAUX D'ACTIVITÉS
+  pta.tableauxActivites.forEach((tab) => {
+    children.push(
+      new Paragraph({ text: '', spacing: { before: 240, after: 120 } }),
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun({ text: `TABLEAU ${tab.numero} : ${tab.titre}`, bold: true, size: 20 })],
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            tableHeader: true,
+            children: [
+              new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Activités', bold: true, size: 16 })] })] }),
+              new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Objectifs', bold: true, size: 16 })] })] }),
+              new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Résultats attendus', bold: true, size: 16 })] })] }),
+              new TableCell({ width: { size: 20, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Actions requises', bold: true, size: 16 })] })] }),
+              new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Indicateurs', bold: true, size: 16 })] })] }),
+              new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Resp.', bold: true, size: 16 })] })] }),
+              new TableCell({ width: { size: 6, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'T1-T4', bold: true, size: 14 })] })] }),
+            ],
+          }),
+          ...tab.activites.map(
+            (act) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.activite, bold: true, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.objectifs, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.resultatsAttendus, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.actionsRequises, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.indicateursResultats, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: act.responsables, size: 13 })] })] }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: `${act.periodes.t1 ? 'T1 ' : ''}${act.periodes.t2 ? 'T2 ' : ''}${act.periodes.t3 ? 'T3 ' : ''}${act.periodes.t4 ? 'T4' : ''}`,
+                            size: 13,
+                            bold: true,
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              })
+          ),
+        ],
+      })
+    );
+  });
+
+  // CHRONOGRAMME RÉCAPITULATIF DES 13 ACTIVITÉS
+  children.push(
+    new Paragraph({ text: '', spacing: { before: 280, after: 120 } }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: 'CHRONOGRAMME RÉCAPITULATIF DES ACTIVITÉS PRIORITAIRES', bold: true, size: 20 })],
+    }),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: [
+            new TableCell({ width: { size: 6, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'N°', bold: true, size: 16 })] })] }),
+            new TableCell({ width: { size: 54, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Activités prioritaires', bold: true, size: 16 })] })] }),
+            new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'T1', bold: true, size: 16 })] })] }),
+            new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'T2', bold: true, size: 16 })] })] }),
+            new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'T3', bold: true, size: 16 })] })] }),
+            new TableCell({ width: { size: 8, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'T4', bold: true, size: 16 })] })] }),
+            new TableCell({ width: { size: 16, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Responsable', bold: true, size: 16 })] })] }),
+          ],
+        }),
+        ...pta.chronogrammePrioritaire.map(
+          (prio) =>
+            new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.numero.toString(), bold: true, size: 14 })] })] }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.activite, size: 14 })] })] }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.periodes.t1 ? '✓' : '', bold: true, size: 16 })] })] }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.periodes.t2 ? '✓' : '', bold: true, size: 16 })] })] }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.periodes.t3 ? '✓' : '', bold: true, size: 16 })] })] }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.periodes.t4 ? '✓' : '', bold: true, size: 16 })] })] }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: prio.responsable, size: 13 })] })] }),
+              ],
+            })
+        ),
+      ],
+    })
+  );
+
+  // BUDGET PRÉVISIONNEL MINIMAL (3 696 000 FCFA)
+  children.push(
+    new Paragraph({ text: '', spacing: { before: 280, after: 120 } }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: `BUDGET PRÉVISIONNEL MINIMAL 2026 : ${pta.totalGeneralBudgetCfa.toLocaleString('fr-FR')} FCFA`, bold: true, size: 20 })],
+    })
+  );
+
+  pta.budgetSections.forEach((sec) => {
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: `${sec.lettre}. ${sec.titre} (Sous-total : ${sec.sousTotalCfa.toLocaleString('fr-FR')} FCFA)`, bold: true, size: 17 })],
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            tableHeader: true,
+            children: [
+              new TableCell({ width: { size: 40, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Postes', bold: true, size: 15 })] })] }),
+              new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Détail', bold: true, size: 15 })] })] }),
+              new TableCell({ width: { size: 15, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Coût unitaire', bold: true, size: 15 })] })] }),
+              new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Quantité', bold: true, size: 15 })] })] }),
+              new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: 'Total (FCFA)', bold: true, size: 15 })] })] }),
+            ],
+          }),
+          ...sec.lignes.map(
+            (l) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: l.poste, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: l.detail, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: l.coutUnitaire, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: l.quantite, size: 14 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: l.totalCfa.toLocaleString('fr-FR'), bold: true, size: 14 })] })] }),
+                ],
+              })
+          ),
+        ],
+      }),
+      new Paragraph({ text: '', spacing: { before: 80, after: 120 } })
+    );
+  });
+
+  // RECOMMANDATIONS PRIORITAIRES
+  children.push(
+    new Paragraph({ text: '', spacing: { before: 240, after: 120 } }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: 'RECOMMANDATIONS PRIORITAIRES À LA HIÉRARCHIE', bold: true, size: 20 })],
+    }),
+    ...pta.recommandationsHierarchie.map(
+      (rec) =>
+        new Paragraph({
+          spacing: { before: 80, after: 80 },
+          children: [
+            new TextRun({ text: `${rec.numero}. ${rec.titre} [${rec.priorite}] : `, bold: true, size: 17 }),
+            new TextRun({ text: rec.points.join(' ; '), size: 16 }),
+            new TextRun({ text: ` — Justification : ${rec.justification}`, italics: true, size: 15 }),
+          ],
+        })
+    )
+  );
+
+  // CONCLUSION & SIGNATURE
+  children.push(
+    new Paragraph({ text: '', spacing: { before: 240, after: 120 } }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      children: [new TextRun({ text: 'CONCLUSION', bold: true, size: 20 })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.BOTH,
+      spacing: { line: 280, after: 140 },
+      children: [new TextRun({ text: pta.conclusion.paragrapheIntro, size: 18 })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.BOTH,
+      spacing: { line: 280, after: 240 },
+      children: [new TextRun({ text: pta.conclusion.transformation2026, bold: true, size: 18 })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { before: 240, after: 80 },
+      children: [new TextRun({ text: `Fait à ${pta.lieuSignature}, le _____ ${pta.dateSignature}`, size: 18 })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [new TextRun({ text: pta.signataireTitre, bold: true, size: 18 })],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      spacing: { before: 400 },
+      children: [new TextRun({ text: pta.signataireNom, bold: true, underline: {}, size: 20 })],
+    })
+  );
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 1134, // 2.0 cm
+              bottom: 1134, // 2.0 cm
+              left: 1417, // 2.5 cm
+              right: 1134, // 2.0 cm
+            },
+          },
+        },
+        children,
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `PTA_2026_DDL_PN_Officiel.docx`);
 }
 

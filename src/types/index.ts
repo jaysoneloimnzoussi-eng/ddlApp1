@@ -330,3 +330,14 @@ export interface SoitTransmisDgl {
   dateAccuseReception?: string;
   observations?: string;
 }
+
+export type {
+  OfficialPta2026Data,
+  PtaTableSection,
+  PtaActivityItem,
+  PtaBudgetSection,
+  PtaBudgetItem,
+  PtaPriorityActivity,
+  PtaRiskItem,
+  PtaKpiItem,
+} from '../data/officialPtaData';

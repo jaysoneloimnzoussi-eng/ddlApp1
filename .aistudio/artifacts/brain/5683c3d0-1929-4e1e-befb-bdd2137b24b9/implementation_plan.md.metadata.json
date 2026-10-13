@@ -1,6 +1,6 @@
 {
-  "summary": "Plan complet d'harmonisation de l'application DDL-PN intégrant les Notes de Service Ministérielles N° 151/MTL-CAB (barème tarifaire officiel et 50% frais d'étude), N° 152/MTL-CAB (composition des 4 sous-dossiers d'agrément et parrainage) et la Fiche Locale DDL-PN (pièces à fournir et frais d'enquête terrain de 30 000 FCFA) à travers les modules Simulateur Juridique, Recensement Terrain, Régie SAF et Canva Administratif.",
-  "updatedAt": "2026-10-13T10:23:02.174810542Z",
+  "summary": "Plan d'implémentation pour le Canva de Rédaction Rapide du PTA 2026 et la liaison dynamique des Rapports Trimestriels d'Activités : intégration intégrale des 7 tableaux ministériels, du chronogramme des 13 activités prioritaires, du budget minimal de 3 696 000 FCFA, et du calcul automatique des KPI/écarts trimestriels avec exports A4 et Word docx.",
+  "updatedAt": "2026-10-13T11:12:26.642231754Z",
   "requestFeedback": true,
   "userFacing": true
 }

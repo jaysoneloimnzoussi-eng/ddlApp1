@@ -1,158 +1,123 @@
-# Plan d'Harmonisation : Intégration des Notes de Service N° 151, N° 152 & Fiche Locale DDL-PN
+# Plan d'Implémentation : Canva de Rédaction Rapide PTA 2026 & Liaison Dynamique des Rapports Trimestriels
 
-Ce plan détaille l'intégration et l'harmonisation complète des trois documents réglementaires officiels soumis par l'Administration dans l'ensemble des modules opérationnels de l'application DDL-PN :
-1. **Note de Service N° 151/MTL-CAB du 03 août 2022** : Grille tarifaire officielle nationale par m² et forfaits, quote-part de 50% des frais réservée à l'Administration des loisirs pour l'étude de dossier, et liste des activités de loisirs sains exonérées.
-2. **Note de Service N° 152/MTL-CAB du 05 août 2022** : Composition normative des 4 sous-dossiers d'agrément (Demande écrite, Sous-dossier Technique, Sous-dossier Administratif, Sous-dossier Financier) et régime des promoteurs de nationalité étrangère (parrainage congolais obligatoire pour les jeux de hasard).
-3. **Fiche Locale DDL-PN (SAF / Pointe-Noire)** : Checklist réglementaire des pièces exigibles pour l'ouverture d'un débit de boissons/club et frais d'enquête départementale de terrain fixés à **30 000 FCFA** avec visa officiel de la Direction.
+Ce projet met en place le système officiel de rédaction et de suivi du **Plan de Travail Annuel 2026 (PTA 2026)** de la Direction Départementale des Loisirs de Pointe-Noire (DDL-PN), fidèle au document de référence de 20 pages (Note de présentation, 7 Tableaux d'activités, Chronogramme des 13 actions prioritaires, Budget prévisionnel minimal de 3 696 000 FCFA, 4 Axes stratégiques, KPI et Recommandations). Il lie organiquement ce PTA au **Canva de rédaction des Rapports Trimestriels (T1 à T4)** pour pré-remplir automatiquement les indicateurs, calculer les taux d'exécution physique et financière, et exporter les documents officiels aux normes A4 et Word (.docx).
 
 ---
 
-## Retours Utilisateur & Décisions Confirmées
+## Décisions Clés & Choix Confirmés par l'Utilisateur
 
 > [!IMPORTANT]
-> **Choix validés lors de la clarification :**
-> - **Portée de l'harmonisation** : Intégration transversale dans tous les modules clés de l'application (`MOD-12` Simulateur Juridique, `MOD-02` Recensement Terrain, `MOD-10` Régie SAF, `MOD-19` Canva de Rédaction, et impressions officielles).
-> - **Ventilation financière régalienne** : Décomposition rigoureuse des montants sur les quittances et caisses :
->   1. Frais d'enquête terrain DDL-PN : **30 000 FCFA**
->   2. Frais d'étude de dossier (Administration des Loisirs) : **50% du montant d'autorisation**
->   3. Reversé Trésor Public : **50% restant**
->   4. Barème officiel par m² (Discothèques/VIP: 1 500 F/m², Bars/Caves: 1 000 F/m²) ou forfaits (Casinos, Billards, Parcs, Cinémas).
-> - **Acte administratif supplémentaire** : Génération et impression au format officiel A4 d'un **Récépissé de Dépôt de Dossier & Bordereau de Conformité des Pièces** avec cases à cocher, QR code de certification publique et cachet officiel DDL-PN.
+> **Décisions confirmées en Phase 1 :**
+> 1. **Emplacement & Architecture unifiée** : Intégration d'un sous-onglet / canva dédié "PTA 2026" dans le Canva Administratif (MOD-19), et liaison interactive directe dans le module des Rapports Trimestriels (MOD-06) ainsi que le Suivi PTA (MOD-13).
+> 2. **Automatisation des Rapports Trimestriels** : Pré-remplissage automatique des indicateurs cibles du PTA pour le trimestre sélectionné (T1, T2, T3 ou T4), synchronisation avec les données réelles de terrain (établissements recensés, missions de contrôle effectuées, quittances de régie), calcul immédiat des pourcentages d'exécution et des écarts.
+> 3. **Formats d'exportation républicains** : Impression A4 officielle avec en-têtes républicains complets (République du Congo / Unité - Travail - Progrès, Ministère, DGL, DDL-PN, signature de Jean Richard NTSEKE NGOUAKA) et exportation Word (.docx) native complète et éditable.
 
 ---
 
-## 1. Synthèse des Textes Réglementaires Intégrés
+## 1. Vue d'Ensemble & Concept
 
-### A. Grille Tarifaire Officielle (Note N° 151/MTL-CAB)
-- **Débits de boissons (au m²)** :
-  - Discothèque, Night-club, VIP : **1 500 FCFA / m²**
-  - Bar, bar dancing, cabaret : **1 000 FCFA / m²**
-  - Cave, Buvette : **1 000 FCFA / m²**
-  - Snack-Bar : **1 000 FCFA / m²**
-- **Salles de jeux** :
-  - Casino : **5 000 000 FCFA**
-  - Jackpot : **3 500 000 FCFA**
-  - Salle de billard, Bowling : **500 000 FCFA**
-  - Salle de jeux vidéo : **5 000 FCFA / m²**
-- **Salles de cinéma** :
-  - Ciné grand écran : **500 000 FCFA**
-  - Ciné petit écran, Ciné foot : **50 000 FCFA**
-- **Sites de loisirs (Maisons, Centres de vacances, Parcs, Villages, Complexes, Bases nautiques/aquatiques)** : **100 000 FCFA**
-- **Jeux de hasard & Paris** :
-  - Tombola publicitaire : **1 000 000 FCFA** | Loterie publicitaire : **2 000 000 FCFA**
-  - Loterie télévisée, Paris sportifs physiques : **50 000 000 FCFA**
-  - Pari équestre, Jeux en ligne : **80 000 000 FCFA**
-- **Fêtes foraines, Festivals, Kermesses, Cirques, Foires, Rallyes** : **50 000 FCFA**
-- **Exonérations (Loisirs Sains)** : Aires de jeux, ludothèques, clubs de loisirs, loteries et tombolas à but caritatif.
-- **Règle des 50%** : 50% du montant est prélevé pour l'Administration des Loisirs pour l'étude du dossier avant reversement au Trésor Public.
-
-### B. Composition des 4 Sous-Dossiers (Note N° 152/MTL-CAB)
-- **Demande écrite** adressée au Ministre en charge des loisirs.
-- **Sous-dossier Technique** : Plan de masse et plan de situation, règlement intérieur des jeux, quitus sapeurs-pompiers, quitus CNSS, titre de propriété ou contrat de bail (adresse au Congo), organigramme service client (jeux de hasard), contrat de parrainage congolais (si étranger), contrats de travail personnel congolais (si étranger), contrat partenaires locaux.
-- **Sous-dossier Administratif** : CNI/Passeport/Carte séjour, certificat de nationalité, casier judiciaire (< 3 mois), CV du gérant/diplôme/attestation d'expérience, certificat médical hygiène, attestation RCCM, statuts de la société.
-- **Sous-dossier Financier** : Patente de l'année en cours, compte d'exploitation prévisionnel sur 3 ans, reçu de paiement des frais d'autorisation, attestation d'assurance multirisque.
-
-### C. Fiche Locale DDL-PN (Pointe-Noire)
-- Frais d'enquête de terrain : **30 000 FCFA** (mention officielle visée par la Direction Départementale).
-- Spécificités débits de boissons / VIP / Night-clubs.
+### Qu'est-ce que ce système apporte ?
+- **Rédaction et personnalisation rapide du PTA 2026** : Un canva modulaire permettant d'éditer la note de présentation, les 7 tableaux d'activités par service (SAF, Autorisation, Statistiques, Promotion, Partenariats, Institutionnel, Suivi-Évaluation), le chronogramme des 13 activités prioritaires, le budget de 3 696 000 FCFA (Postes A à E) et les recommandations.
+- **Liaison temps réel PTA ↔ Rapports Trimestriels** : Chaque rapport trimestriel (T1, T2, T3, T4) charge automatiquement la matrice du PTA 2026. L'agent sélectionne le trimestre et voit instantanément les activités programmées pour cette période, les objectifs fixés, les réalisations effectives tirées de la base de données (ex: 2 missions de contrôle qualité/trimestre, 100% du recensement en T1-T2, etc.), avec calcul automatique du taux de complétion.
+- **Pérennité et conformité hiérarchique** : Génération de documents administratifs souverains respectant scrupuleusement la typographie républicaine, les mentions légales du Directeur Départemental et le bordereau de transmission à la DGL Brazzaville.
 
 ---
 
-## 2. Expérience Utilisateur & Parcours Opérationnels
+## 2. Expérience Utilisateur & Design Visuel
 
-### Flux 1 : Simulateur Régalien & Textes Juridiques (`MOD-12`)
-- **Onglet Textes Réglementaires** : Consultation intégrale de la Note N° 151, de la Note N° 152 et de la Fiche Locale DDL-PN aux côtés de la Loi N° 21-2019 et de l'Arrêté Préfectoral.
-- **Simulateur Tarifaire Automatisé** :
-  - Sélection de la catégorie exacte selon la nomenclature officielle (I à P).
-  - Calcul dynamique en direct : Saisie de la surface en m² pour les débits de boissons et jeux vidéo, ou application instantanée du forfait officiel.
-  - Panneau récapitulatif avec ventilation triple : Montant total, Quote-part Étude 50% (Administration), Part Trésor Public 50%, et Frais d'enquête terrain (30 000 FCFA).
+### Parcours Utilisateur
+1. **Accès au Canva PTA 2026** :
+   - Depuis le menu principal ou le sélecteur de documents du Canva Administratif (MOD-19), l'utilisateur choisit le modèle *Plan de Travail Annuel (PTA 2026)* ou clique sur le nouveau raccourci *Générer le PTA officiel*.
+   - Le formulaire structuré présente 5 onglets thématiques : *1. Note & Piliers*, *2. 7 Tableaux d'activités*, *3. Chronogramme (T1-T4)*, *4. Budget (3.696.000 FCFA)*, *5. Risques, KPI & Recommandations*.
+2. **Édition Rapide & Pré-remplissage Intelligent** :
+   - Un bouton *Charger le PTA Officiel 2026 Conforme* insère instantanément les 65 actions concrètes, les 7 tableaux ministériels et le budget validé.
+   - L'utilisateur peut adapter les valeurs, ajouter des activités spécifiques ou ajuster les budgets par poste.
+3. **Liaison dans les Rapports Trimestriels (MOD-06)** :
+   - L'utilisateur ouvre le module MOD-06 et sélectionne le trimestre (*T1*, *T2*, *T3* ou *T4*).
+   - Un bloc dédié **Évaluation Trimestrielle calquée sur le PTA 2026** apparaît avec la liste des activités attendues pour ce trimestre.
+   - Chaque ligne affiche : Activité, Service responsable, Cible PTA, Réalisation de terrain (calculée ou ajustable), % d'exécution avec barre de progression colorée (vert ≥ 80%, orange 50-79%, rouge < 50%), et champ de justification des écarts.
+4. **Impression A4 & Export Word (.docx)** :
+   - Bouton d'impression directe A4 ouvrant la mise en page fidèle avec marges républicaines (2,5 cm gauche, 2,0 cm droite/haut/bas).
+   - Bouton de téléchargement Word (`.docx`) structuré avec tableaux natifs, styles hiérarchiques et signature officielle.
 
-### Flux 2 : Fiche Terrain & Recensement (`MOD-02`)
-- **Checklist Interactive des Pièces à Fournir** : Volet rétractable lors du recensement avec suivi des 4 sous-dossiers. L'inspecteur coche les pièces physiquement présentées (Quitus pompiers, RCCM, Casier judiciaire, Bail, Patente, Assurance, etc.).
-- **Calculateur de Redevance Intégré** : Dès la saisie de la surface et de la catégorie, application stricte de la note 151.
-- **Indicateur de Complétude** : Calcul automatique du taux de complétude du dossier (ex: 85% - 11/13 pièces fournies).
-
-### Flux 3 : Régie Financière SAF & Émission de Quittances (`MOD-10`)
-- **Ventilation Réglementaire sur la Quittance POS 58mm et Facture A4** :
-  - Ligne 1 : Frais d'enquête administrative et de terrain (DDL-PN) = 30 000 FCFA
-  - Ligne 2 : Frais d'étude de dossier (50% Note 151) = [Montant] FCFA
-  - Ligne 3 : Redevance annuelle d'exploitation / Trésor (50%) = [Montant] FCFA
-  - Ligne 4 : Total encaissé / Reste à recouvrer.
-- **Registre des Recettes** : Filtrage par nature de recette (Enquête 30k, Étude dossier 50%, Redevance m²).
-
-### Flux 4 : Canva de Rédaction Administrative (`MOD-19`)
-- **Nouveau Modèle d'Acte** : *« Récépissé d'Instruction & Bordereau de Conformité des Pièces »*.
-- **Impression A4 Républicaine** : Document solennel en typographie Garamond avec en-têtes centrés, tableau officiel des pièces vérifiées, visa de conformité, montant des frais d'enquête (30 000 FCFA) et d'autorisation, QR code de vérification public.
+### Identité Visuelle & Typographie
+- **Typographie** : Famille républicaine Garamond (`font-serif`) pour le rendu des documents officiels, et Cinzel/Inter pour l'interface de gestion.
+- **Thématique** : Mode sombre souverain émeraude / ardoise (`bg-slate-950`, bordures `emerald-500/30`, accents or républicain `amber-500`) et bascule instantanée en mode clair fond blanc (`bg-slate-50`).
 
 ---
 
-## 3. Choix Techniques & Arbitrages
+## 3. Décisions Produits & Arbitrages Techniques
 
-- **Centralisation des Données Tarifaires (`src/data/officialTariffs.ts`)** :
-  - *Choix retenu* : Créer un fichier de constantes unifié contenant la nomenclature complète des catégories, les tarifs au m², les forfaits fixes, les pièces des 4 sous-dossiers, et les textes intégraux des notes 151 et 152.
-  - *Bénéfice* : Évite la duplication de code entre le simulateur, le recensement terrain, la régie SAF et le canva administratif.
-- **Compatibilité Descendante des Établissements Existants** :
-  - *Choix retenu* : Conserver les données existantes de la base Firestore tout en leur attribuant la grille tarifaire exacte de la Note 151 lors des calculs de redevance annuelle.
-  - *Bénéfice* : Zéro régression sur les 250+ établissements importés depuis le calendrier et Supabase.
-- **Typographie & Charte Graphique Officielle** :
-  - *Choix retenu* : Respect rigoureux des standards de la DDL-PN : `Plus Jakarta Sans` pour les écrans de gestion, `JetBrains Mono / tabular-nums` pour les montants financiers et surfaces, et `EB Garamond` pour les documents officiels imprimables.
+1. **Source de Vérité du PTA 2026** :
+   - *Choix* : Définir une structure de données TypeScript exhaustive `OfficialPta2026Data` dans `src/data/officialPtaData.ts`, sauvegardée avec persistance locale et synchronisable avec Firestore (`pta/2026`).
+   - *Pourquoi* : Permet une utilisation 100% hors-ligne sur le terrain pour les agents mobiles tout en garantissant une synchronisation centrale pour le Directeur.
+2. **Couplage Dynamique MOD-19 (Canva) et MOD-06 (Rapports)** :
+   - *Choix* : Partager l'état du PTA via le contexte global `AppContext` (`currentPta`, `updatePta`, `getPtaMilestonesForQuarter(quarter)`).
+   - *Pourquoi* : Toute modification apportée au PTA dans le Canva se reflète immédiatement et automatiquement dans les rapports trimestriels sans saisie redondante.
+3. **Moteur d'Export Word (`docx`)** :
+   - *Choix* : Extension de `docxGenerator.ts` avec deux générateurs officiels : `generatePta2026Docx` (document complet de 20 pages avec tous les tableaux) et `generateLinkedQuarterlyReportDocx` (rapport trimestriel avec matrice PTA).
 
 ---
 
-## 4. Architecture Système & Flux de Données
+## 4. Architecture Technique & Flux de Données
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                 RÉFÉRENTIEL OFFICIEL DDL-PN (NOTES 151, 152 & SAF)          │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                      ┌────────────────┴────────────────┐
-                      ▼                                 ▼
-         ┌──────────────────────────┐      ┌──────────────────────────┐
-         │ Note 151/MTL-CAB         │      │ Note 152/MTL-CAB & SAF   │
-         │ • Tarifs m² (1500 / 1000)│      │ • 4 Sous-dossiers        │
-         │ • Forfaits fixes (I à P) │      │ • Pièces à fournir       │
-         │ • 50% Frais d'étude      │      │ • Enquête : 30 000 FCFA  │
-         │ • Exonérations saines    │      │ • Parrainage étrangers   │
-         └────────────┬─────────────┘      └────────────┬─────────────┘
-                      │                                 │
-                      └────────────────┬────────────────┘
-                                       ▼
-                      ┌─────────────────────────────────┐
-                      │    src/data/officialTariffs.ts  │
-                      │  Constantes & Fonctions Calcul  │
-                      └────────────────┬────────────────┘
-                                       │
-         ┌───────────────┬─────────────┼─────────────┬───────────────┐
-         ▼               ▼             ▼             ▼               ▼
-  ┌─────────────┐ ┌─────────────┐ ┌─────────┐ ┌─────────────┐ ┌─────────────┐
-  │   MOD-12    │ │   MOD-02    │ │ MOD-10  │ │   MOD-19    │ │  PrintModal │
-  │ Simulateur  │ │ Recensement │ │  Régie  │ │   Canva     │ │ & POS 58mm  │
-  │  & Textes   │ │  Checklist  │ │   SAF   │ │  Récépissé  │ │ Ventilation │
-  └─────────────┘ └─────────────┘ └─────────┘ └─────────────┘ └─────────────┘
+│                            APPLICATION DDL-PN                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │               RÉFÉRENTIEL OFFICIEL PTA 2026                         │   │
+│   │   (Note de Présentation, 7 Tableaux, 13 Activités, Budget 3.696M)   │   │
+│   └──────────────────────────────────┬──────────────────────────────────┘   │
+│                                      │                                      │
+│                                      ▼                                      │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                 AppContext (Gestion d'État Centralisée)             │   │
+│   │   - ptaData: OfficialPta2026Data                                    │   │
+│   │   - updatePtaSection(section, data)                                 │   │
+│   │   - getQuarterlyPtaActivities(quarter: 'T1'|'T2'|'T3'|'T4')         │   │
+│   │   - syncPtaToFirestore()                                            │   │
+│   └───────────────┬──────────────────────────────────┬──────────────────┘   │
+│                   │                                  │                      │
+│                   ▼                                  ▼                      │
+│   ┌───────────────────────────────┐  ┌──────────────────────────────────┐   │
+│   │   MOD-19 : CANVA DE RÉDACTION │  │   MOD-06 : RAPPORTS TRIMESTRIELS │   │
+│   │   - Modèle officiel PTA 2026  │  │   - Sélecteur de Trimestre (T1-T4│   │
+│   │   - Formulaire d'édition      │  │   - Matrice PTA synchronisée     │   │
+│   │   - Prévisualisation A4       │  │   - Calcul auto % exécution      │   │
+│   │   - Export docx & Print       │  │   - Export docx & Print          │   │
+│   └───────────────────────────────┘  └──────────────────────────────────┘   │
+│                   │                                  │                      │
+│                   └──────────────────┬───────────────┘                      │
+│                                      │                                      │
+│                                      ▼                                      │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │               SERVICES DE SORTIE RÉPUBLICAINE                       │   │
+│   │   - docxGenerator : generatePta2026Docx, generateQuarterlyReportDocx│   │
+│   │   - printService  : printHtmlElement (Format A4 Garamond Officiel)  │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Modules et Composants Impactés :
-1. `src/data/officialTariffs.ts` : Nouveau référentiel unifié des tarifs, sous-dossiers et textes des notes de service 151 et 152.
-2. `src/components/modules/LegalTextsAndSimulatorModule.tsx` : Intégration du simulateur officiel basé sur la Note 151 (m², forfaits, 50% étude, 30 000 FCFA enquête) et ajout des textes intégraux consultables.
-3. `src/components/modules/FieldRecensementModule.tsx` : Intégration du sélecteur de sous-dossiers et checklist de pièces conformes Note 152 + Fiche DDL-PN.
-4. `src/components/modules/SafRegieRecettesModule.tsx` : Mise à niveau de l'encaissement et des modèles de quittance avec ventilation détaillée (Enquête 30 000 FCFA, Frais d'étude 50%, Taxe d'exploitation).
-5. `src/components/modules/AdministrativeDraftingCanvaModule.tsx` : Ajout du modèle d'acte officiel républicain « Récépissé d'Instruction & Contrôle des Pièces ».
-6. `src/services/docxGenerator.ts` & `src/components/common/PrintModal.tsx` : Support de l'impression A4 et POS du nouveau récépissé et des quittances ventilées.
-
----
-
-## 5. Plan de Vérification & Recette
-
-1. **Vérification du Simulateur** :
-   - Tester le calcul d'une discothèque de 200 m² : `200 * 1500 = 300 000 FCFA`, quote-part étude = `150 000 FCFA`, trésor = `150 000 FCFA`, frais d'enquête = `30 000 FCFA`.
-   - Tester un bar dancing de 150 m² : `150 * 1000 = 150 000 FCFA`, quote-part étude = `75 000 FCFA`, trésor = `75 000 FCFA`.
-   - Tester un casino forfaitaire : `5 000 000 FCFA`, quote-part étude = `2 500 000 FCFA`.
-2. **Vérification de la Checklist Dossier** :
-   - Cocher les 4 sous-dossiers et vérifier le calcul du taux de complétude et la détection des pièces obligatoires (ex: quitus pompiers, casier judiciaire, patente).
-3. **Vérification de la Régie SAF** :
-   - Générer une quittance avec ventilation et vérifier l'affichage à l'écran, le ticket POS 58mm et la quittance grand format A4.
-4. **Vérification du Canva & Impressions** :
-   - Visualiser et imprimer le Récépissé Officiel A4 avec QR Code scannable et en-têtes centrés républicains.
-5. **Compilation & Linting** :
-   - Exécution de `compile_applet` et validation du build de production sans régression.
+### Plan d'Exécution Détaillé
+1. **Création du Référentiel de Données `src/data/officialPtaData.ts`** :
+   - Structure complète des 7 tableaux d'activités (SAF, Autorisation, Statistiques, Promotion, Partenariats, Institutionnel, Suivi-Évaluation).
+   - Modélisation du chronogramme récapitulatif des 13 activités avec ciblage par trimestre.
+   - Détail chiffré du budget de 3 696 000 FCFA (Sections A à E).
+   - Liste des 4 axes stratégiques et des 5 recommandations prioritaires de Jean Richard NTSEKE NGOUAKA.
+2. **Enrichissement de `AppContext.tsx` et `src/types/index.ts`** :
+   - Ajout des types `OfficialPtaData`, `PtaTableActivity`, `PtaBudgetSection`, `QuarterlyPtaLink`.
+   - Exposition des fonctions de mise à jour et d'extraction filtrée par trimestre.
+3. **Extension du Canva Administratif (`AdministrativeDraftingCanvaModule.tsx`)** :
+   - Ajout du type de document `plan_travail_annuel` dans le sélecteur.
+   - Interface d'édition rapide avec aperçu direct du document officiel et bouton de restauration du modèle officiel conforme.
+4. **Liaison Dynamique dans les Rapports Trimestriels (`QuarterlyReportsModule.tsx`)** :
+   - Intégration de la matrice d'évaluation trimestrielle liée au PTA avec calcul automatique des réalisations et du taux d'exécution physique/financière.
+   - Affichage synthétique des indicateurs clés (8 missions qualité, 10 points focaux, 3 partenaires, etc.).
+5. **Génération DOCX & Impression A4 (`docxGenerator.ts`)** :
+   - Implémentation de `generatePta2026Docx` produisant le document complet avec les 7 tableaux docx natifs, le budget et la signature républicaine.
+   - Mise à jour de `generateQuarterlyReportDocx` pour intégrer le tableau de bord PTA du trimestre.
+6. **Vérification, Compilation et Tests** :
+   - Validation stricte TypeScript avec `lint_applet` (`tsc --noEmit`) et `compile_applet`.
+   - Test des fonctions d'export et de navigation.
