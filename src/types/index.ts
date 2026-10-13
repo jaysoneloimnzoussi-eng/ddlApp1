@@ -171,6 +171,12 @@ export interface Establishment {
   constateParAgentNom?: string;
   observationsFermeture?: string;
 
+  // Dossier réglementaire Note 152 / SAF
+  dossierChecklist?: Record<string, boolean>;
+  piecesFourniesCount?: number;
+  tauxCompletudeDossier?: number;
+  fraisEnquetePaye?: boolean;
+
   // Preuve visuelle & Signature in situ
   photoUrl?: string;
   signatureUrl?: string;
@@ -191,7 +197,12 @@ export interface CashReceipt {
   inspecteurOuCaissier: string;
   agentId?: string;
   brigadeCode?: string;
-  natureRecette: 'Forfait Informel SAA' | 'Redevance Proportionnelle' | 'Pénalité de retard' | 'Taxe d\'agrément provisoire';
+  natureRecette: 'Forfait Informel SAA' | 'Redevance Proportionnelle' | 'Pénalité de retard' | 'Taxe d\'agrément provisoire' | 'Frais d\'enquête DDL-PN' | 'Frais d\'étude (Note 151)' | 'Redevance Annuelle d\'Exploitation' | string;
+  // Ventilation officielle Note 151 & Fiche SAF
+  fraisEnquete?: number;
+  fraisEtude?: number;
+  partTresor?: number;
+  surfaceM2?: number;
   quittanceHash?: string;
   signatureUrl?: string;
 }

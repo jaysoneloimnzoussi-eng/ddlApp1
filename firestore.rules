@@ -40,7 +40,8 @@ service cloud.firestore {
 
     // Test de connectivité
     match /test/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
   }
 }

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Award,
+  Percent,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { printHtmlElement } from '../../services/printService';
@@ -52,6 +53,11 @@ export const SafRegieRecettesModule: React.FC = () => {
     cheque_tresor: receipts.filter((r) => r.modePaiement === 'cheque_tresor').reduce((s, r) => s + r.montantVerse, 0),
     virement: receipts.filter((r) => r.modePaiement === 'virement').reduce((s, r) => s + r.montantVerse, 0),
   };
+
+  // Ventilation Réglementaire Note N° 151/MTL-CAB & Fiche Locale SAF
+  const partEtudeDossier = Math.round(totalRecettes * 0.5);
+  const partTresorPublic = totalRecettes - partEtudeDossier;
+  const totalEnquetesTerrain = establishments.filter((e) => e.fraisEnquetePaye).length * 30000;
 
   // Grand Bilan Annuel d'Exercice (Clôture et Arrêté au 25 Décembre)
   const totalResteDu = establishments.reduce((sum, e) => sum + (e.soldeRestantDu || 0), 0);
@@ -253,6 +259,37 @@ export const SafRegieRecettesModule: React.FC = () => {
         }`}>
           <span className="text-[10px] text-purple-600 uppercase font-semibold">Virements UBA/BGFI</span>
           <p className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">{formatCfa(modeStats.virement)}</p>
+        </div>
+      </div>
+
+      {/* Ventilation Réglementaire Note N° 151/MTL-CAB & Fiche Locale SAF */}
+      <div className={`p-3.5 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs ${
+        isLight ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950' : 'bg-emerald-950/20 border-emerald-800/60 text-emerald-100'
+      }`}>
+        <div className="space-y-0.5">
+          <span className="font-bold uppercase tracking-wider text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+            <Percent className="w-3.5 h-3.5" />
+            Répartition Réglementaire des Recettes (Note N° 151/MTL-CAB)
+          </span>
+          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+            50% réservé à l'Administration des Loisirs pour l'étude de dossier · 50% reversé au Trésor Public · Frais d'enquête terrain 30 000 FCFA.
+          </p>
+        </div>
+        <div className="flex items-center gap-4 font-mono font-bold text-xs shrink-0 flex-wrap">
+          <div className="text-right">
+            <span className="text-[9px] text-slate-500 block uppercase font-sans font-normal">Étude de Dossier (50%)</span>
+            <span className="text-blue-600 dark:text-blue-400">{formatCfa(partEtudeDossier)}</span>
+          </div>
+          <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+          <div className="text-right">
+            <span className="text-[9px] text-slate-500 block uppercase font-sans font-normal">Trésor Public (50%)</span>
+            <span className="text-emerald-600 dark:text-emerald-400">{formatCfa(partTresorPublic)}</span>
+          </div>
+          <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
+          <div className="text-right">
+            <span className="text-[9px] text-slate-500 block uppercase font-sans font-normal">Frais d'Enquête (30k)</span>
+            <span className="text-amber-600 dark:text-amber-400">{formatCfa(totalEnquetesTerrain)}</span>
+          </div>
         </div>
       </div>
 

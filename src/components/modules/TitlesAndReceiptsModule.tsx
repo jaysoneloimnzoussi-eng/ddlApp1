@@ -329,6 +329,9 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                           isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
                         }`}
                       >
+                        <option value="Redevance Annuelle d'Exploitation (Note 151)">Redevance Annuelle d'Exploitation (Note 151)</option>
+                        <option value="Frais d'Étude de Dossier (50% Note 151)">Frais d'Étude de Dossier (50% Note 151)</option>
+                        <option value="Frais d'Enquête de Terrain DDL-PN (30 000 FCFA)">Frais d'Enquête de Terrain DDL-PN (30 000 FCFA)</option>
                         <option value="Forfait Informel SAA">Forfait Informel SAA (50 000 FCFA)</option>
                         <option value="Redevance Proportionnelle">Redevance Proportionnelle (Surface)</option>
                         <option value="Taxe d'agrément provisoire">Taxe d'agrément provisoire</option>

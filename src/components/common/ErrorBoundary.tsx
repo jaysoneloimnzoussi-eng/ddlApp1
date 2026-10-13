@@ -32,6 +32,19 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({ errorInfo });
+
+    // En cas de micro-coupure réseau sur un import dynamique, tentative de réessai automatique instantanée
+    if (error?.message?.includes('dynamically imported module') || error?.message?.includes('Failed to fetch')) {
+      const hasRetried = sessionStorage.getItem('ddl_chunk_retry');
+      if (!hasRetried) {
+        sessionStorage.setItem('ddl_chunk_retry', 'true');
+        setTimeout(() => {
+          this.setState({ hasError: false, error: null, errorInfo: null });
+        }, 1200);
+      } else {
+        sessionStorage.removeItem('ddl_chunk_retry');
+      }
+    }
   }
 
   handleHardReset = () => {

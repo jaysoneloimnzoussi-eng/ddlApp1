@@ -33,6 +33,7 @@ import { Arrondissement, EstablishmentCategory, QUARTIERS_PAR_ARRONDISSEMENT } f
 export type AdminDocType =
   | 'lettre_transmission'
   | 'attestation_depot'
+  | 'recepisse_conformite'
   | 'rapport_activite'
   | 'convocation'
   | 'invitation'
@@ -317,6 +318,48 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
           titre: '',
           contenu:
             "Délivrée pour valoir et servir ce que de droit, la présente attestation est valable pour une période de quatre-vingt-dix (90) jours renouvelable à compter de sa signature, et demeure révocable sans préavis en cas de constatation d'infraction caractérisée ou de trouble grave à la tranquillité publique.",
+        },
+      ]);
+    } else if (type === 'recepisse_conformite') {
+      setNumeroActe('');
+      setDateLieu(`Pointe-Noire, le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`);
+      setEmetteurTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
+      setDestinataireTitre('');
+      setDestinataireVille('');
+      setTitreCentral('RÉCÉPISSÉ DE DÉPÔT & BORDEREAU DE CONFORMITÉ DES PIÈCES');
+      setObjet("Instruction de dossier technique d'agrément d'établissement de loisirs (Notes N° 151 & 152/MTL-CAB)");
+      setReference('Note de Service N° 151/MTL-CAB du 03 août 2022 et Note de Service N° 152/MTL-CAB du 05 août 2022');
+      setFormuleAppel('');
+      setSignataireTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
+      setSignataireNom('Jean Richard NTSEKE NGOUAKA');
+      setPiecesJointes("Dossier physique relié, Quitus Sapeurs-Pompiers, Quittance SAF d'enquête terrain (30.000 FCFA)");
+      setAmpliations(
+        '- DGL / Brazzaville\n- Préfecture de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Service Administratif et Financier (SAF)\n- Archives / Chrono'
+      );
+      setSections([
+        {
+          id: '1',
+          titre: 'I. IDENTIFICATION DU PROMOTEUR ET DE L\'ESPACE',
+          contenu: `Le Directeur Départemental des Loisirs de Pointe-Noire certifie avoir reçu ce jour le dossier complet de demande d'autorisation d'ouverture et d'exploitation de l'établissement dénommé « ${currentEstDetails.nom.toUpperCase()} », exploité par ${currentEstDetails.promoteur}, relevant de la catégorie ${currentEstDetails.categorie}, sis à Pointe-Noire, Arrondissement ${currentEstDetails.arrondissement}${currentEstDetails.quartier ? ` (Quartier ${currentEstDetails.quartier})` : ''}.`,
+        },
+        {
+          id: '2',
+          titre: 'II. ÉTAT DE CONFORMITÉ DES QUATRE (04) SOUS-DOSSIERS (NOTE 152/MTL-CAB)',
+          contenu: `Après vérification contradictoire au guichet de la Direction Départementale, la composition du dossier est certifiée régulière :
+• DEMANDE ÉCRITE : Demande manuscrite réglementaire adressée au Ministre chargé des loisirs.
+• SOUS-DOSSIER TECHNIQUE : Plan de masse et de situation, règlement intérieur, quitus des sapeurs-pompiers, quitus CNSS, contrat de bail ou titre de propriété en République du Congo.
+• SOUS-DOSSIER ADMINISTRATIF : Pièce d'identité en cours de validité, certificat de nationalité, casier judiciaire datant de moins de 3 mois, CV du gérant, certificat médical délivré par les services d'hygiène, attestation RCCM, statuts notariés.
+• SOUS-DOSSIER FINANCIER : Patente de l'année en cours, compte d'exploitation prévisionnel sur 3 ans, attestation d'assurance multirisque professionnelle.`,
+        },
+        {
+          id: '3',
+          titre: 'III. SITUATION FINANCIÈRE RÉGALIENNE & ENQUÊTE DE TERRAIN',
+          contenu: `Le promoteur s'est acquitté des frais d'enquête de terrain départementale d'un montant de trente mille (30.000) Francs CFA auprès de la Régie SAF (quittance enregistrée), ainsi que des frais d'étude du dossier (taux légal de 50% de la redevance fixé par la Note N° 151/MTL-CAB). La descente sur site de la brigade de contrôle SAA est programmée.`,
+        },
+        {
+          id: '4',
+          titre: 'IV. PORTÉE ET VALEUR DU RÉCÉPISSÉ',
+          contenu: `Le présent récépissé est délivré pour valoir et servir ce que de droit, et atteste de la parfaite recevabilité du dossier instruit par nos services avant transmission hiérarchique à la Direction Générale des Loisirs pour délivrance de l'Agrément Ministériel. Il confère le droit d'exercice transitoire pour une durée maximale de quatre-vingt-dix (90) jours.`,
         },
       ]);
     } else if (type === 'lettre_transmission') {
@@ -679,6 +722,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
         <div className="flex flex-wrap items-center gap-1.5">
           {[
             { id: 'attestation_depot', label: 'Attestation de Dépôt (LE ROCHER)', icon: ShieldCheck },
+            { id: 'recepisse_conformite', label: 'Récépissé de Conformité (Note 152)', icon: FileCheck },
             { id: 'lettre_transmission', label: 'Lettre de Transmission', icon: Send },
             { id: 'rapport_activite', label: 'Rapport d\'Activités / Bilan', icon: FileText },
             { id: 'convocation', label: 'Convocation Officielle', icon: FileCheck },

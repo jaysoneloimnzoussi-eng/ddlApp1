@@ -327,6 +327,79 @@ export const INITIAL_PTA_MILESTONES: PtaMilestone[] = [
 
 export const INITIAL_LEGAL_TEXTS = [
   {
+    id: 'note-151-mtl-cab',
+    titre: 'Note de Service N° 151/MTL-CAB du 03 août 2022 — Grille Tarifaire Officielle Nationale & Quote-part d\'Étude 50%',
+    chapitre: 'Cabinet Ministériel : Frais d\'autorisation d\'ouverture et d\'exploitation des établissements de loisirs',
+    articles: [
+      {
+        numero: 'Section I & J',
+        texte: 'Salles de jeux & cinémas : Casino : 5.000.000 FCFA | Jackpot : 3.500.000 FCFA | Billard & Bowling : 500.000 FCFA | Jeux vidéo : 5.000 FCFA/m² | Ciné grand écran : 500.000 FCFA | Ciné foot & petit écran : 50.000 FCFA.',
+      },
+      {
+        numero: 'Section K',
+        texte: 'Débits de boisson (tarifs au m²) : Discothèque : 1.500 FCFA/m² | Night-club VIP : 1.500 FCFA/m² | Bar, bar dancing, cabaret : 1.000 FCFA/m² | Cave : 1.000 FCFA/m² | Buvette / Snack-bar : 1.000 FCFA/m².',
+      },
+      {
+        numero: 'Section L & M',
+        texte: 'Sites de loisirs : Complexes de loisirs, parcs, villages, maisons de loisirs, bases nautiques : 100.000 FCFA forfaitaire. Jeux de hasard : Tombola publicitaire (1.000.000 FCFA), Loterie publicitaire (2.000.000 FCFA), Paris sportifs physiques (50.000.000 FCFA), Pari équestre & Jeux en ligne (80.000.000 FCFA).',
+      },
+      {
+        numero: 'Section N, O, P',
+        texte: 'Fêtes foraines & Événementiel : Kermesses, cirques, carnavals, foires, festivals et rallyes : 50.000 FCFA forfaitaire.',
+      },
+      {
+        numero: 'Disposition Financière 50%',
+        texte: 'Un taux de 50% des frais inhérents à l\'autorisation d\'ouverture, d\'exploitation des établissements, ou d\'exercice des activités de loisirs, est reversé à l\'Administration des loisirs pour l\'étude du dossier, avant reversement des fonds au trésor public.',
+      },
+      {
+        numero: 'Exonérations Loisirs Sains',
+        texte: 'Dans le cadre de la promotion des activités de loisirs sains, les frais d\'autorisation sont intégralement exonérés pour : les aires de jeux, les ludothèques, les clubs de loisirs, les loteries et tombolas à but caritatif.',
+      },
+    ],
+  },
+  {
+    id: 'note-152-mtl-cab',
+    titre: 'Note de Service N° 152/MTL-CAB du 05 août 2022 — Composition du Dossier d\'Agrément (4 Sous-Dossiers) & Parrainage Étrangers',
+    chapitre: 'Cabinet Ministériel : Procédure d\'instruction des demandes d\'autorisation d\'ouverture et d\'exploitation',
+    articles: [
+      {
+        numero: 'Article 1 - Structure',
+        texte: 'Le dossier de demande d\'autorisation d\'ouverture, d\'exploitation d\'un établissement, ou d\'exercice d\'une activité de loisirs est obligatoirement composé de : 1° Une demande écrite adressée au ministre chargé des loisirs ; 2° Un sous-dossier technique ; 3° Un sous-dossier administratif ; 4° Un sous-dossier financier.',
+      },
+      {
+        numero: 'Sous-Dossier Technique',
+        texte: 'Comprend : Plan de masse et plan de situation de l\'établissement | Règlement intérieur des jeux | Quitus délivré par les services des sapeurs-pompiers | Quitus de la CNSS | Titre de propriété ou contrat de bail (adresse physique au Congo) | Organigramme d\'un service client (jeux de hasard) | Contrat de parrainage avec un congolais (étrangers) | Contrats de travail d\'employés congolais (étrangers) | Contrat avec partenaires locaux.',
+      },
+      {
+        numero: 'Sous-Dossier Administratif',
+        texte: 'Comprend : Copie de la pièce d\'identité (CNI, passeport, carte de résident ou séjour) du promoteur ou gérant | Certificat de nationalité | Casier judiciaire datant de moins de 3 mois | CV du gérant, diplôme ou attestation d\'expérience | Certificat médical délivré par les services d\'hygiène | Photocopie de l\'attestation au RCCM | Statuts notariés pour les sociétés.',
+      },
+      {
+        numero: 'Sous-Dossier Financier',
+        texte: 'Comprend : Photocopie de la patente de l\'année en cours | Compte d\'exploitation prévisionnel sur 3 ans | Reçu de paiement des frais d\'autorisation | Attestation d\'assurance multirisque.',
+      },
+      {
+        numero: 'Condition Promoteurs Étrangers',
+        texte: 'Les citoyens de nationalité étrangère désireux d\'exploiter un établissement de loisirs (principalement jeux de hasard : tombola, loterie, paris sportifs, pari équestre, jeux en ligne) doivent présenter la garantie d\'un parrainage par une personne physique de nationalité congolaise ayant une expérience avérée dans le domaine visé et attestée par le Ministre chargé des Loisirs.',
+      },
+    ],
+  },
+  {
+    id: 'fiche-saf-ddl-pn',
+    titre: 'Fiche Officielle DDL-PN / SAF — Pièces à fournir pour l\'Ouverture & Frais d\'Enquête Terrain (30.000 FCFA)',
+    chapitre: 'Direction Départementale des Loisirs de Pointe-Noire : Service Administratif, Financier et Matériel',
+    articles: [
+      {
+        numero: 'Contrôle Débits & Clubs',
+        texte: 'Pièces requises pour l\'ouverture d\'un VIP, Cave, Bar Dancing, Night-Club, Vidéo Club, Snack-bar, Discothèque : Demande manuscrite au Ministère, Plan de situation, Quitus pompiers, Titre de propriété ou bail, Pièce d\'identité (CNI/Passeport/Séjour), Certificat de nationalité, Casier judiciaire, CV gérant, Certificat médical hygiène, RCCM, Patente, Assurance multirisque, Reçu de paiement des frais.',
+      },
+      {
+        numero: 'Frais d\'Enquête Terrain',
+        texte: 'Frais d\'enquête = 30.000 Fcs (Trente mille Francs CFA). Perçus par la Régie SAF de Pointe-Noire pour couvrir les vérifications techniques contradictoires et descentes de la brigade de contrôle avant transmission ou délivrance du titre.',
+      },
+    ],
+  },
+  {
     id: 'loi-21-2019',
     titre: 'Loi N° 21-2019 du 15 novembre 2019 fixant les règles relatives aux loisirs en République du Congo',
     chapitre: 'Titre II : Des Agréments et de l\'Exploitation des Établissements de Loisirs',

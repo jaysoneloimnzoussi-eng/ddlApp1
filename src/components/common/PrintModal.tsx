@@ -315,12 +315,24 @@ export const PrintModal: React.FC = () => {
                     {Number(printData.resteAPayer || 0) === 0 ? '0 FCFA (Soldé)' : formatCfa(printData.resteAPayer || 0)}
                   </span>
                 </div>
+
+                {/* Ventilation officielle Note 151/MTL-CAB */}
+                <div className="pt-1 border-t border-emerald-200/50 text-[7px] text-slate-600 space-y-0.5 font-mono">
+                  <div className="flex justify-between">
+                    <span className="font-sans">Quote-part Étude (50% Admin) :</span>
+                    <span>{formatCfa(Math.round(printData.montantVerse * 0.5))}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-sans">Part Trésor Public (50%) :</span>
+                    <span>{formatCfa(printData.montantVerse - Math.round(printData.montantVerse * 0.5))}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Règle de validité légale 1 an renouvelable */}
+              {/* Règle de validité légale Note 151 & 152 */}
               <div className="p-1.5 rounded-md bg-slate-50 border border-slate-200 text-[7.5px] text-slate-600 leading-tight space-y-0.5 mb-2">
-                <p><strong>Validité :</strong> Autorisation d'exploiter <strong>1 AN renouvelable</strong> (Loi 21-2019).</p>
-                <p>Prochain renouvellement au jour anniversaire de votre 1er versement.</p>
+                <p><strong>Réglementation :</strong> Notes de Service N° 151 & 152/MTL-CAB et Loi 21-2019.</p>
+                <p>Frais d'enquête terrain DDL-PN : 30 000 FCFA acquittés auprès de la Régie SAF.</p>
               </div>
 
               {/* QR Code Tricolore & Sécurité */}

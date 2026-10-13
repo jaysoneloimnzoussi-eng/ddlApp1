@@ -170,18 +170,16 @@ export interface FirebasePingResult {
 
 export const testFirestoreConnection = async (): Promise<boolean> => {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    console.log("Client en mode hors-ligne : données locales et session souveraine actives.");
     return true;
   }
   try {
     const testDoc = doc(db, 'test', 'connection');
-    await getDocFromServer(testDoc).catch(() => null);
-    console.log("Client connecté à Firestore (ID: " + activeFirebaseConfig.firestoreDatabaseId + ").");
+    await Promise.race([
+      getDocFromServer(testDoc).catch(() => null),
+      new Promise((resolve) => setTimeout(resolve, 2500))
+    ]);
     return true;
-  } catch (error: any) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Client Firestore en mode hors-ligne.");
-    }
+  } catch {
     return true;
   }
 };

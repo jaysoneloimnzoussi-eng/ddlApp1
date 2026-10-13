@@ -13,26 +13,54 @@ import { PublicDocumentVerification } from './components/common/PublicDocumentVe
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
-// Lazy loaded modules for optimal performance & instant mobile startup
-const DashboardModule = lazy(() => import('./components/modules/DashboardModule').then((m) => ({ default: m.DashboardModule })));
-const FieldRecensementModule = lazy(() => import('./components/modules/FieldRecensementModule').then((m) => ({ default: m.FieldRecensementModule })));
-const MobileAgentCalendarModule = lazy(() => import('./components/modules/MobileAgentCalendarModule').then((m) => ({ default: m.MobileAgentCalendarModule })));
-const GoogleWorkspaceGatewayModule = lazy(() => import('./components/modules/GoogleWorkspaceGatewayModule').then((m) => ({ default: m.GoogleWorkspaceGatewayModule })));
-const LegalActsGeneratorModule = lazy(() => import('./components/modules/LegalActsGeneratorModule').then((m) => ({ default: m.LegalActsGeneratorModule })));
-const QuarterlyReportsModule = lazy(() => import('./components/modules/QuarterlyReportsModule').then((m) => ({ default: m.QuarterlyReportsModule })));
-const SigMapModule = lazy(() => import('./components/modules/SigMapModule').then((m) => ({ default: m.SigMapModule })));
-const SpaPromotionModule = lazy(() => import('./components/modules/SpaPromotionModule').then((m) => ({ default: m.SpaPromotionModule })));
-const TransmissionDglModule = lazy(() => import('./components/modules/TransmissionDglModule').then((m) => ({ default: m.TransmissionDglModule })));
-const SafRegieRecettesModule = lazy(() => import('./components/modules/SafRegieRecettesModule').then((m) => ({ default: m.SafRegieRecettesModule })));
-const TitlesAndReceiptsModule = lazy(() => import('./components/modules/TitlesAndReceiptsModule').then((m) => ({ default: m.TitlesAndReceiptsModule })));
-const LegalTextsAndSimulatorModule = lazy(() => import('./components/modules/LegalTextsAndSimulatorModule').then((m) => ({ default: m.LegalTextsAndSimulatorModule })));
-const PtaTrackerModule = lazy(() => import('./components/modules/PtaTrackerModule').then((m) => ({ default: m.PtaTrackerModule })));
-const AdminPersonnelModule = lazy(() => import('./components/modules/AdminPersonnelModule').then((m) => ({ default: m.AdminPersonnelModule })));
-const DocumentArchivingModule = lazy(() => import('./components/modules/DocumentArchivingModule').then((m) => ({ default: m.DocumentArchivingModule })));
-const JointInspectionModule = lazy(() => import('./components/modules/JointInspectionModule').then((m) => ({ default: m.JointInspectionModule })));
-const PromoterFintechPortalModule = lazy(() => import('./components/modules/PromoterFintechPortalModule').then((m) => ({ default: m.PromoterFintechPortalModule })));
-const SupabaseDataImportModule = lazy(() => import('./components/modules/SupabaseDataImportModule').then((m) => ({ default: m.SupabaseDataImportModule })));
-const AdministrativeDraftingCanvaModule = lazy(() => import('./components/modules/AdministrativeDraftingCanvaModule').then((m) => ({ default: m.AdministrativeDraftingCanvaModule })));
+import { AttestationVerificationView } from './components/public/AttestationVerificationView';
+import { DashboardModule } from './components/modules/DashboardModule';
+
+// Resilient lazy loader with automatic retries for offline resilience
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  componentImport: () => Promise<{ default: T }>,
+  retriesLeft = 3,
+  interval = 1200
+): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    new Promise<{ default: T }>((resolve, reject) => {
+      const attempt = (remaining: number) => {
+        componentImport()
+          .then(resolve)
+          .catch((error) => {
+            if (remaining <= 0) {
+              reject(error);
+              return;
+            }
+            setTimeout(() => {
+              attempt(remaining - 1);
+            }, interval);
+          });
+      };
+      attempt(retriesLeft);
+    })
+  );
+}
+
+// Lazy loaded secondary modules with automatic retry
+const FieldRecensementModule = lazyWithRetry(() => import('./components/modules/FieldRecensementModule').then((m) => ({ default: m.FieldRecensementModule })));
+const MobileAgentCalendarModule = lazyWithRetry(() => import('./components/modules/MobileAgentCalendarModule').then((m) => ({ default: m.MobileAgentCalendarModule })));
+const GoogleWorkspaceGatewayModule = lazyWithRetry(() => import('./components/modules/GoogleWorkspaceGatewayModule').then((m) => ({ default: m.GoogleWorkspaceGatewayModule })));
+const LegalActsGeneratorModule = lazyWithRetry(() => import('./components/modules/LegalActsGeneratorModule').then((m) => ({ default: m.LegalActsGeneratorModule })));
+const QuarterlyReportsModule = lazyWithRetry(() => import('./components/modules/QuarterlyReportsModule').then((m) => ({ default: m.QuarterlyReportsModule })));
+const SigMapModule = lazyWithRetry(() => import('./components/modules/SigMapModule').then((m) => ({ default: m.SigMapModule })));
+const SpaPromotionModule = lazyWithRetry(() => import('./components/modules/SpaPromotionModule').then((m) => ({ default: m.SpaPromotionModule })));
+const TransmissionDglModule = lazyWithRetry(() => import('./components/modules/TransmissionDglModule').then((m) => ({ default: m.TransmissionDglModule })));
+const SafRegieRecettesModule = lazyWithRetry(() => import('./components/modules/SafRegieRecettesModule').then((m) => ({ default: m.SafRegieRecettesModule })));
+const TitlesAndReceiptsModule = lazyWithRetry(() => import('./components/modules/TitlesAndReceiptsModule').then((m) => ({ default: m.TitlesAndReceiptsModule })));
+const LegalTextsAndSimulatorModule = lazyWithRetry(() => import('./components/modules/LegalTextsAndSimulatorModule').then((m) => ({ default: m.LegalTextsAndSimulatorModule })));
+const PtaTrackerModule = lazyWithRetry(() => import('./components/modules/PtaTrackerModule').then((m) => ({ default: m.PtaTrackerModule })));
+const AdminPersonnelModule = lazyWithRetry(() => import('./components/modules/AdminPersonnelModule').then((m) => ({ default: m.AdminPersonnelModule })));
+const DocumentArchivingModule = lazyWithRetry(() => import('./components/modules/DocumentArchivingModule').then((m) => ({ default: m.DocumentArchivingModule })));
+const JointInspectionModule = lazyWithRetry(() => import('./components/modules/JointInspectionModule').then((m) => ({ default: m.JointInspectionModule })));
+const PromoterFintechPortalModule = lazyWithRetry(() => import('./components/modules/PromoterFintechPortalModule').then((m) => ({ default: m.PromoterFintechPortalModule })));
+const SupabaseDataImportModule = lazyWithRetry(() => import('./components/modules/SupabaseDataImportModule').then((m) => ({ default: m.SupabaseDataImportModule })));
+const AdministrativeDraftingCanvaModule = lazyWithRetry(() => import('./components/modules/AdministrativeDraftingCanvaModule').then((m) => ({ default: m.AdministrativeDraftingCanvaModule })));
 
 const ModuleLoader: React.FC = () => (
   <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center">
@@ -81,8 +109,6 @@ const MainContent: React.FC = () => {
     </main>
   );
 };
-
-import { AttestationVerificationView } from './components/public/AttestationVerificationView';
 
 const AppContent: React.FC = () => {
   const { theme, isAuthenticated, activeModule, isCalendarFullScreen } = useApp();
