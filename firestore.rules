@@ -13,21 +13,21 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
-    // Quittances de régie SAF Trésor (Données financières sensibles : accès restreint)
+    // Quittances de régie SAF Trésor (Vérification publique pour contrôle d'authenticité par QR code)
     match /receipts/{receiptId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAuthenticated();
     }
 
     // Planning et tournées de terrain des brigades
     match /schedules/{scheduleId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAuthenticated();
     }
 
-    // Actes de police administrative et sanctions
+    // Actes de police administrative et sanctions (Vérification publique par QR code)
     match /legalActs/{legalActId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAuthenticated();
     }
 

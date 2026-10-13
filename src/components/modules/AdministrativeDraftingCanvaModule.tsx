@@ -1316,23 +1316,25 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
               </span>
             </span>
             <div className="flex items-center gap-2">
-              <a
-                href={getAttestationVerificationUrl({
-                  referenceNumero: numeroActe.trim() || 'RÉFÉRENCE EN COURS D\'ENREGISTREMENT',
-                  etablissementNom: currentEstDetails.nom,
-                  promoteurNom: currentEstDetails.promoteur,
-                  dateDepot: dateLieu,
-                  codeDossier: currentEstDetails.codeDossier,
-                  statut: 'CONFORME ET REGULIER',
-                })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2.5 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-[11px] shadow transition flex items-center gap-1 cursor-pointer"
-                title="Tester la page publique de certification liée au QR Code"
-              >
-                <ExternalLink className="w-3 h-3" />
-                <span>Tester Vérification QR</span>
-              </a>
+              {docType === 'attestation_depot' && (
+                <a
+                  href={getAttestationVerificationUrl({
+                    referenceNumero: numeroActe.trim() || 'RÉFÉRENCE EN COURS D\'ENREGISTREMENT',
+                    etablissementNom: currentEstDetails.nom,
+                    promoteurNom: currentEstDetails.promoteur,
+                    dateDepot: dateLieu,
+                    codeDossier: currentEstDetails.codeDossier,
+                    statut: 'CONFORME ET REGULIER',
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-[11px] shadow transition flex items-center gap-1 cursor-pointer"
+                  title="Tester la page publique de certification liée au QR Code"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Tester Vérification QR</span>
+                </a>
+              )}
               <button
                 onClick={handleDownloadDocx}
                 className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] shadow transition flex items-center gap-1 cursor-pointer"
@@ -1456,6 +1458,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );
