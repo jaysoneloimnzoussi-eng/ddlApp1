@@ -50,6 +50,8 @@ export const QuarterlyReportsModule: React.FC = () => {
     mois: string;
     periode: string;
     numeroActe: string;
+    dateSignature: string;
+    nextQuarterName: string;
   }> = {
     T1: {
       ordinal: '1er Trimestre',
@@ -57,6 +59,8 @@ export const QuarterlyReportsModule: React.FC = () => {
       mois: 'Janvier – Mars',
       periode: '1er janvier — 31 mars 2026',
       numeroActe: 'N°011/MCAPNIT/DGL/DPN/DDL-PN',
+      dateSignature: '31 mars 2026',
+      nextQuarterName: 'DEUXIÈME TRIMESTRE 2026',
     },
     T2: {
       ordinal: '2ème Trimestre',
@@ -64,6 +68,8 @@ export const QuarterlyReportsModule: React.FC = () => {
       mois: 'Avril – Juin',
       periode: '1er avril — 30 juin 2026',
       numeroActe: 'N°022/MCAPNIT/DGL/DPN/DDL-PN',
+      dateSignature: '30 juin 2026',
+      nextQuarterName: 'TROISIÈME TRIMESTRE 2026',
     },
     T3: {
       ordinal: '3ème Trimestre',
@@ -71,6 +77,8 @@ export const QuarterlyReportsModule: React.FC = () => {
       mois: 'Juillet – Septembre',
       periode: '1er juillet — 30 septembre 2026',
       numeroActe: 'N°033/MCAPNIT/DGL/DPN/DDL-PN',
+      dateSignature: '23 septembre 2026',
+      nextQuarterName: 'QUATRIÈME TRIMESTRE 2026',
     },
     T4: {
       ordinal: '4ème Trimestre',
@@ -78,6 +86,8 @@ export const QuarterlyReportsModule: React.FC = () => {
       mois: 'Octobre – Décembre',
       periode: '1er octobre — 31 décembre 2026',
       numeroActe: 'N°044/MCAPNIT/DGL/DPN/DDL-PN',
+      dateSignature: '31 décembre 2026',
+      nextQuarterName: 'PREMIER TRIMESTRE 2027 (ET BILAN ANNUEL)',
     },
   };
 
@@ -783,17 +793,17 @@ export const QuarterlyReportsModule: React.FC = () => {
               </div>
             </div>
 
-            {/* 6. SUGGESTIONS POUR LE QUATRIÈME TRIMESTRE 2026 */}
+            {/* 6. SUGGESTIONS POUR LA PÉRIODE SUIVANTE */}
             <div className="space-y-2 pt-2">
               <h3 className="text-[13pt] font-bold text-slate-950 uppercase border-b border-slate-800 pb-1">
-                6. SUGGESTIONS POUR LE QUATRIÈME TRIMESTRE 2026
+                6. SUGGESTIONS POUR LE {currentMeta.nextQuarterName}
               </h3>
               <div className="space-y-2 text-[12.5pt] leading-[1.55] pl-2">
                 <p><strong>I. Obtenir un arbitrage formel sur la Fiche Technique des manques :</strong> Remettre sans délai la Fiche Technique à Monsieur le Ministre dès son arrivée à Pointe-Noire.</p>
                 <p><strong>II. Rédiger et transmettre la note de besoin logistique formelle :</strong> Formaliser une note de besoin logistique autonome adressée à la DGL selon la voie hiérarchique classique.</p>
-                <p><strong>III. Conclure au moins une convention de partenariat :</strong> Viser la signature effective d&apos;au moins une convention dès le T4 2026.</p>
-                <p><strong>IV. Réaliser la 2ème mission de contrôle qualité en priorité absolue :</strong> Solliciter sans délai un nouvel Ordre de Service préfectoral.</p>
-                <p><strong>V. Finaliser les TDR et structurer l&apos;animation de la page Facebook :</strong> Mettre en place un calendrier éditorial régulier.</p>
+                <p><strong>III. Conclure au moins une convention de partenariat :</strong> Viser la signature effective d&apos;au moins une convention de partenariat institutionnel.</p>
+                <p><strong>IV. Réaliser la 2ème mission de contrôle qualité en priorité absolue :</strong> Solliciter sans délai un nouvel Ordre de Service préfectoral et mobiliser les moyens d&apos;intervention.</p>
+                <p><strong>V. Finaliser les TDR et structurer l&apos;animation de la page Facebook :</strong> Mettre en place un calendrier éditorial régulier et valoriser les actions de proximité.</p>
                 <p><strong>VI. Renforcer la coordination interservices et avec les mairies :</strong> Mettre en place la Commission Interservices de Coordination des Loisirs (DDL, DDAT, Sapeurs-Pompiers, Hygiène, Police, Impôts).</p>
               </div>
             </div>
@@ -804,16 +814,16 @@ export const QuarterlyReportsModule: React.FC = () => {
                 7. CONCLUSION
               </h3>
               <p className="text-justify text-[13pt] leading-[1.6]">
-                Le troisième trimestre 2026 s&apos;achève sur un bilan contrasté, dans la continuité directe des deux trimestres précédents. D&apos;un côté, les contraintes structurelles se sont reconduites sans évolution favorable. De l&apos;autre, la DDL-PN a continué d&apos;affirmer sa place institutionnelle avec une représentation soutenue à trois événements officiels de premier plan en septembre et le lancement de sa page Facebook officielle.
+                Le {currentMeta.ordinal.toLowerCase()} {annee} s&apos;achève sur un bilan marquant la continuité de la gestion républicaine de la DDL-PN. D&apos;un côté, les contraintes structurelles se sont poursuivies ; de l&apos;autre, la Direction a affirmé sa place institutionnelle par sa représentation continue, son autorité réglementaire et la tenue rigoureuse des registres légaux.
               </p>
               <p className="text-justify text-[13pt] leading-[1.6]">
-                Le quatrième trimestre 2026 devra être celui de la transformation du plaidoyer en décision. La DDL a démontré sa capacité à assurer sa mission institutionnelle et à documenter rigoureusement ses contraintes ; il appartient désormais aux autorités de tutelle de transformer ce plaidoyer en moyens d&apos;action.
+                La période suivante ({currentMeta.nextQuarterName}) devra consolider la transformation du plaidoyer en moyens concrets d&apos;action. La DDL démontre quotidiennement son dévouement au service public des Loisirs en République du Congo.
               </p>
 
               {/* Signature block */}
               <div className="pt-8 flex justify-end">
                 <div className="text-center w-80 space-y-16">
-                  <p className="text-[12pt] italic">Fait à Pointe-Noire, le 23 septembre 2026</p>
+                  <p className="text-[12pt] italic">Fait à Pointe-Noire, le {currentMeta.dateSignature}</p>
                   <div>
                     <p className="font-bold text-[12.5pt] text-slate-950">
                       Le Directeur départemental des Loisirs
