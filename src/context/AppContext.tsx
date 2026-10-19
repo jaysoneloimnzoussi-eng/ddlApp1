@@ -10,7 +10,17 @@ import {
   SoitTransmisDgl,
   UserRole,
   ComplianceStatus,
+  DepartmentalAuthorization,
+  CampaignBatch,
+  CampaignMessage,
+  CampaignTargetSegment,
+  CampaignType,
+  CommunicationChannel,
 } from '../types';
+import {
+  INITIAL_CAMPAIGN_BATCHES,
+  INITIAL_CAMPAIGN_MESSAGES,
+} from '../data/campaignSeedData';
 import {
   INITIAL_ESTABLISHMENTS,
   INITIAL_RECEIPTS,
@@ -34,8 +44,10 @@ import {
   googleSignIn,
   logout as firebaseLogout,
   db,
+  auth,
   testFirestoreConnection,
   cleanForFirestore,
+  ensureFirebaseAuth,
 } from '../services/firebase';
 import { doc, setDoc, onSnapshot, collection, writeBatch } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -105,6 +117,7 @@ interface AppContextType {
   staff: StaffPersonnel[];
   auditLogs: AuditRecord[];
   soitTransmis: SoitTransmisDgl[];
+  authorizations: DepartmentalAuthorization[];
 
   // Mutators & Business Actions
   addEstablishment: (est: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'>, options?: { silent?: boolean }) => Promise<Establishment>;
@@ -122,6 +135,33 @@ interface AppContextType {
     nextRdvMotif?: string;
     currentScheduleId?: string;
   }) => Promise<{ receipt: CashReceipt; nextSchedule?: InspectionSchedule }>;
+  rescheduleAppointment: (params: {
+    establishmentId: string;
+    scheduleId?: string;
+    nextRdvDate: string;
+    nextRdvHeure?: string;
+    nextRdvMotif?: string;
+    reportObservations?: string;
+  }) => Promise<{ schedule: InspectionSchedule; establishment: Establishment }>;
+
+  // Autorisation d'Exploitation Départementale (MOD-20)
+  issueDepartmentalAuthorization: (authData: Omit<DepartmentalAuthorization, 'id' | 'numeroAutorisation' | 'documentHash'>) => Promise<DepartmentalAuthorization>;
+  signDepartmentalAuthorization: (authId: string, nomSignataire: string, typeSignature?: 'directeur' | 'chef_saa_po', qualitePersonnalisee?: string) => Promise<void>;
+  revokeDepartmentalAuthorization: (authId: string, motif: string) => Promise<void>;
+
+  // Plateforme de Relance & Messagerie Républicaine (MOD-21)
+  campaignBatches: CampaignBatch[];
+  campaignMessages: CampaignMessage[];
+  sendCampaignMessage: (msg: Omit<CampaignMessage, 'id' | 'dateEnvoi' | 'referenceRelance'>) => Promise<CampaignMessage>;
+  sendBatchCampaign: (params: {
+    titre: string;
+    campaignType: CampaignType;
+    channel: CommunicationChannel;
+    messageTemplate: string;
+    targetSegment: CampaignTargetSegment;
+    arrondissementFilter?: string;
+    periodeCible: 'decembre_2026' | 'janvier_2027' | 'courant';
+  }) => Promise<{ sentCount: number; batch: CampaignBatch }>;
 
   addAuditLog: (action: string, typeEntite: string, referenceId: string, details: string) => Promise<void>;
   createSoitTransmis: (bordereau: Omit<SoitTransmisDgl, 'id' | 'numeroBordereau'>) => Promise<SoitTransmisDgl>;
@@ -148,7 +188,7 @@ interface AppContextType {
   removeNotification: (id: string) => void;
 
   // Print Preview state
-  printMode: 'none' | 'a4_attestation' | 'a4_legal_act' | 'a4_report' | 'a4_pta_2026' | 'pos_receipt' | 'staff_badge' | 'spa_diploma';
+  printMode: 'none' | 'a4_attestation' | 'a4_legal_act' | 'a4_departmental_authorization' | 'a4_recovery_notice' | 'a4_report' | 'a4_pta_2026' | 'pos_receipt' | 'staff_badge' | 'spa_diploma';
   printData: any;
   openPrintModal: (mode: AppContextType['printMode'], data: any) => void;
   closePrintModal: () => void;
@@ -315,29 +355,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Track online/offline status dynamically across network changes
+  // Track online/offline status dynamically across network changes and auto-sync on reconnect or startup
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      showNotification('info', 'Connexion Internet rétablie. Vos fiches locales seront synchronisées.');
-      // Auto-sync offline queue upon reconnection
+      showNotification('info', 'Connexion Internet rétablie. Vos fiches locales sont en cours de synchronisation vers Firebase...');
       setTimeout(() => {
         syncOfflineQueue();
-      }, 500);
+      }, 600);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      showNotification('warning', 'Mode Hors-Ligne activé. Votre session et toutes vos données restent 100% accessibles.');
+      showNotification('warning', 'Mode Hors-Ligne activé. Vos fiches et quittances restent 100% sauvegardées sur cet appareil.');
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Initial check: If already online upon launch and pending queue exists, trigger sync automatically
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      const q = localStorage.getItem('ddl_offline_queue');
+      const hasQueue = q && q !== '[]';
+      if (hasQueue) {
+        const timer = setTimeout(() => {
+          syncOfflineQueue();
+        }, 1500);
+        return () => {
+          clearTimeout(timer);
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('offline', handleOffline);
+        };
+      }
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [offlineQueue]);
+  }, []);
 
   // Persist offlineQueue to localStorage
   useEffect(() => {
@@ -405,6 +460,115 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [ptaMilestones, setPtaMilestones] = useState<PtaMilestone[]>(INITIAL_PTA_MILESTONES);
+
+  // Autorisations d'Exploitation Départementales (MOD-20)
+  const [authorizations, setAuthorizations] = useState<DepartmentalAuthorization[]>(() => {
+    try {
+      const saved = localStorage.getItem('ddl_real_authorizations_v5');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return [
+        {
+          id: 'auth-seed-001',
+          numeroAutorisation: 'AUT-2026/DDL-PN/001',
+          referenceArrete: 'Arrêté N° 042/MID-DGL/DDL-PN-2026',
+          anneeExercice: 2026,
+          dateDelivrance: '2026-02-15',
+          dateExpiration: '2027-02-14',
+          etablissementId: 'est-001',
+          codeDossier: 'DDL-PN-2026-LUM-0001',
+          nomCommercial: 'LE ROOFTOP VIP CLUB',
+          promoteurNom: 'Jean-Claude MOUKOKO',
+          promoteurTelephone: '+242 06 654 22 10',
+          arrondissement: 'Lumumba',
+          quartier: 'Centre-Ville Administratif',
+          adresseExacte: 'Avenue Moe Pratt, Immeuble Horizon 4ème étage',
+          categorie: 'Discothèque / Club de Nuit',
+          surfaceM2: 240,
+          montantRedevanceAcquittee: 250000,
+          quittanceReference: 'QUIT-2026-0042',
+          quittanceDate: '2026-02-10',
+          visaInspecteurChef: {
+            signe: true,
+            nomInspecteur: 'Gildas Ambetos',
+            dateVisa: '2026-02-12',
+            observationsConformite: 'Limiteur acoustique homologué 85 dB(A) installé, issues de secours dégagées et extincteurs valides.',
+          },
+          visaRegisseurSaf: {
+            signe: true,
+            nomRegisseur: 'Patrice Bitemo',
+            dateVisa: '2026-02-11',
+            quittanceNumero: 'QUIT-2026-0042',
+          },
+          signatureDirecteur: {
+            signe: true,
+            nomDirecteur: 'Jacques MATOKO',
+            qualite: 'Le Directeur Départemental des Loisirs de Pointe-Noire',
+            dateSignature: '2026-02-15',
+            parapheOfficiel: 'Approuvé • DDL-PN • 2026',
+          },
+          statut: 'delivre',
+          documentHash: 'c7e8a9f24b5d3e12a45c7890bfe1d45892147321e90ab4c3ef1287654321abcd',
+        },
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sauvegarde persistante des Autorisations d'Exploitation Départementales (MOD-20)
+  useEffect(() => {
+    try {
+      localStorage.setItem('ddl_real_authorizations_v5', JSON.stringify(authorizations));
+    } catch (e) {
+      console.warn('Storage save failed for authorizations:', e);
+    }
+  }, [authorizations]);
+
+  // Campagnes de Relance & Messagerie (MOD-21)
+  const [campaignBatches, setCampaignBatches] = useState<CampaignBatch[]>(() => {
+    try {
+      const saved = localStorage.getItem('ddl_campaign_batches_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return INITIAL_CAMPAIGN_BATCHES;
+    } catch {
+      return INITIAL_CAMPAIGN_BATCHES;
+    }
+  });
+
+  const [campaignMessages, setCampaignMessages] = useState<CampaignMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('ddl_campaign_messages_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return INITIAL_CAMPAIGN_MESSAGES;
+    } catch {
+      return INITIAL_CAMPAIGN_MESSAGES;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ddl_campaign_batches_v1', JSON.stringify(campaignBatches));
+    } catch (e) {
+      console.warn('Storage save failed for campaignBatches:', e);
+    }
+  }, [campaignBatches]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ddl_campaign_messages_v1', JSON.stringify(campaignMessages));
+    } catch (e) {
+      console.warn('Storage save failed for campaignMessages:', e);
+    }
+  }, [campaignMessages]);
 
   // Référentiel Officiel PTA 2026 Sovereign
   const [officialPtaData, setOfficialPtaData] = useState<OfficialPta2026Data>(() => {
@@ -974,11 +1138,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       );
 
+      const unsubAuth = onSnapshot(
+        collection(db, 'departmentalAuthorizations'),
+        (snapshot) => {
+          const list: DepartmentalAuthorization[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data();
+            if (data) {
+              list.push({ ...(data as DepartmentalAuthorization), id: data.id || d.id });
+            }
+          });
+          if (list.length > 0) {
+            setAuthorizations((prev) => {
+              const remoteIds = new Set(list.map((a) => a.id));
+              const localUnsynced = prev.filter((a) => !remoteIds.has(a.id));
+              return [...list, ...localUnsynced];
+            });
+          }
+        },
+        (err) => {
+          console.warn("Connexion Firestore departmentalAuthorizations:", err);
+        }
+      );
+
       return () => {
         unsubEst();
         unsubRec();
         unsubSch();
         unsubActs();
+        unsubAuth();
       };
     } catch (e) {
       console.warn("Écoute Firestore initialisée en mode hors-ligne:", e);
@@ -1005,6 +1193,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setGoogleUser(res.user);
         setGoogleAccessToken(res.accessToken);
         showNotification('success', `Connecté avec succès : ${res.user.displayName || res.user.email}`);
+        setTimeout(() => {
+          syncOfflineQueue();
+        }, 600);
       }
     } catch (err: any) {
       console.error('Erreur Google Auth:', err);
@@ -1147,9 +1338,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateEstablishment = async (id: string, updates: Partial<Establishment>) => {
-    setEstablishments((prev) =>
-      prev.map((est) => (est.id === id ? { ...est, ...updates } : est))
-    );
+    setEstablishments((prev) => {
+      const updated = prev.map((est) => (est.id === id ? { ...est, ...updates } : est));
+      try {
+        localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(updated));
+      } catch (err) {
+        console.warn("Erreur sauvegarde immédiate establishments localStorage:", err);
+      }
+      return updated;
+    });
 
     const cleanUpdates = cleanForFirestore(updates);
     if (typeof navigator !== 'undefined' && navigator.onLine) {
@@ -1405,6 +1602,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { receipt, nextSchedule };
   };
 
+  const rescheduleAppointment = async (params: {
+    establishmentId: string;
+    scheduleId?: string;
+    nextRdvDate: string;
+    nextRdvHeure?: string;
+    nextRdvMotif?: string;
+    reportObservations?: string;
+  }): Promise<{ schedule: InspectionSchedule; establishment: Establishment }> => {
+    let est = establishments.find((e) => e.id === params.establishmentId) ||
+              visibleEstablishments.find((e) => e.id === params.establishmentId);
+
+    if (!est && params.scheduleId) {
+      const sch = schedules.find((s) => s.id === params.scheduleId);
+      if (sch) {
+        est = establishments.find((e) => e.id === sch.etablissementId) ||
+              establishments.find((e) => e.nomCommercial.toLowerCase().trim() === sch.etablissementNom.toLowerCase().trim()) ||
+              visibleEstablishments.find((e) => e.id === sch.etablissementId);
+      }
+    }
+
+    if (!est) {
+      throw new Error(`Établissement introuvable pour ID ${params.establishmentId}`);
+    }
+
+    const defaultSAA = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
+    const activeAgent =
+      (currentAgentId !== 'all' ? staff.find((s) => s.id === currentAgentId) : null) ||
+      staff.find((s) => s.id === est.agentAssigneId) ||
+      authenticatedUser ||
+      defaultSAA;
+
+    const finalHeure = params.nextRdvHeure || est.prochainRdvHeure || '10:00';
+    const finalMotif = params.nextRdvMotif || est.prochainRdvMotif || 'Rendez-vous convenu avec le promoteur';
+
+    // 1. Update establishment in state and database
+    await updateEstablishment(est.id, {
+      prochainRdvDate: params.nextRdvDate,
+      prochainRdvHeure: finalHeure,
+      prochainRdvMotif: finalMotif,
+    });
+
+    // 2. Find or create schedule
+    let targetSchedule = params.scheduleId
+      ? schedules.find((s) => s.id === params.scheduleId)
+      : schedules.find((s) => s.etablissementId === est.id && (s.statut === 'planifie' || s.statut === 'en_cours'));
+
+    const notesComplement = params.reportObservations
+      ? ` [Reprogrammé : ${params.reportObservations}]`
+      : '';
+
+    if (targetSchedule) {
+      await updateSchedule(targetSchedule.id, {
+        dateTournee: params.nextRdvDate,
+        heure: finalHeure,
+        statut: 'planifie',
+        notes: `${finalMotif}${notesComplement}`,
+      });
+      targetSchedule = {
+        ...targetSchedule,
+        dateTournee: params.nextRdvDate,
+        heure: finalHeure,
+        statut: 'planifie',
+        notes: `${finalMotif}${notesComplement}`,
+      };
+    } else {
+      targetSchedule = await addSchedule({
+        dateTournee: params.nextRdvDate,
+        heure: finalHeure,
+        etablissementId: est.id,
+        etablissementNom: est.nomCommercial,
+        arrondissement: est.arrondissement,
+        brigadeAssignee: activeAgent?.brigadeAffectee || 'Brigade SAA',
+        inspecteurChef: activeAgent?.nomComplet || 'Inspecteur SAA',
+        agentId: activeAgent?.id || est.agentAssigneId || '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc',
+        typeMission: 'Recouvrement',
+        montantAcompteAttendu: est.soldeRestantDu || 0,
+        notes: `${finalMotif}${notesComplement}`,
+        statut: 'planifie',
+      });
+    }
+
+    // 3. Save last scheduled date in localStorage for instant calendar focus
+    try {
+      localStorage.setItem('ddl_last_scheduled_date', params.nextRdvDate);
+    } catch {
+      // ignore
+    }
+
+    // 4. Trace in Audit Log
+    await addAuditLog(
+      'REPROGRAMMATION_RDV',
+      'ETABLISSEMENT',
+      est.id,
+      `RDV reprogrammé au ${params.nextRdvDate} à ${finalHeure} pour ${est.nomCommercial} (Promoteur: ${est.promoteurNom}). Motif: ${finalMotif}${notesComplement}`
+    );
+
+    showNotification(
+      'success',
+      `Rendez-vous de ${est.nomCommercial} reprogrammé avec succès au ${params.nextRdvDate} à ${finalHeure}.`
+    );
+
+    return {
+      schedule: targetSchedule,
+      establishment: {
+        ...est,
+        prochainRdvDate: params.nextRdvDate,
+        prochainRdvHeure: finalHeure,
+        prochainRdvMotif: finalMotif,
+      },
+    };
+  };
+
   const issueLegalAct = async (
     actData: Omit<LegalAct, 'id' | 'referenceNumero' | 'documentHash'>
   ): Promise<LegalAct> => {
@@ -1502,9 +1811,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSchedule = async (id: string, updates: Partial<InspectionSchedule>) => {
-    setSchedules((prev) =>
-      prev.map((sch) => (sch.id === id ? { ...sch, ...updates } : sch))
-    );
+    setSchedules((prev) => {
+      const updated = prev.map((sch) => (sch.id === id ? { ...sch, ...updates } : sch));
+      try {
+        localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(updated));
+      } catch (e) {
+        console.warn("Erreur sauvegarde immédiate schedule localStorage:", e);
+      }
+      return updated;
+    });
 
     const cleanUpdates = cleanForFirestore(updates);
     if (typeof navigator !== 'undefined' && navigator.onLine) {
@@ -1783,9 +2098,327 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
+  // --- AUTORISATION D'EXPLOITATION DÉPARTEMENTALE (MOD-20) ---
+  const issueDepartmentalAuthorization = async (
+    authData: Omit<DepartmentalAuthorization, 'id' | 'numeroAutorisation' | 'documentHash'>
+  ): Promise<DepartmentalAuthorization> => {
+    const count = authorizations.length + 1;
+    const numeroAutorisation = `AUT-2026/DDL-PN/${String(count).padStart(3, '0')}`;
+    const hash = await computeSha256(
+      `${numeroAutorisation}_${authData.etablissementId}_${authData.dateDelivrance}_${authData.nomCommercial}_CONGO_DDL`
+    );
+
+    const newAuth: DepartmentalAuthorization = {
+      ...authData,
+      id: 'auth-' + Date.now(),
+      numeroAutorisation,
+      documentHash: hash,
+    };
+
+    setAuthorizations((prev) => [newAuth, ...prev]);
+
+    try {
+      setDoc(doc(db, 'departmentalAuthorizations', newAuth.id), cleanForFirestore(newAuth)).catch((err) => {
+        console.warn('Firestore sync departmental authorization fallback:', err);
+      });
+    } catch (e) {
+      console.warn('Firestore departmental authorization error:', e);
+    }
+
+    // Mettre à jour le statut de l'établissement
+    if (authData.etablissementId) {
+      updateEstablishment(authData.etablissementId, {
+        statut: 'en_regle',
+        numeroAttestation: numeroAutorisation,
+        dateDelivranceAttestation: authData.dateDelivrance,
+      });
+    }
+
+    await addAuditLog(
+      'DELIVRANCE_AUTORISATION_DEPARTEMENTALE',
+      'AUTORISATION',
+      newAuth.numeroAutorisation,
+      `Délivrance de l'Autorisation d'Exploitation Départementale pour ${newAuth.nomCommercial} (${newAuth.arrondissement}) sous le N° ${newAuth.numeroAutorisation}.`
+    );
+
+    showNotification(
+      'success',
+      `Autorisation d'Exploitation ${newAuth.numeroAutorisation} délivrée avec succès pour ${newAuth.nomCommercial} !`
+    );
+
+    return newAuth;
+  };
+
+  const signDepartmentalAuthorization = async (
+    authId: string,
+    nomSignataire: string,
+    typeSignature: 'directeur' | 'chef_saa_po' = 'directeur',
+    qualitePersonnalisee?: string
+  ) => {
+    const today = new Date().toISOString().substring(0, 10);
+    let targetNom = '';
+    let targetNum = '';
+
+    const isPo = typeSignature === 'chef_saa_po';
+    const qualite =
+      qualitePersonnalisee ||
+      (isPo
+        ? 'Pour le Directeur Départemental et par ordre (P.O.), Le Chef de Service Assistance et Autorisation'
+        : 'Le Directeur Départemental des Loisirs de Pointe-Noire');
+
+    const paraphe = isPo
+      ? 'Signé P.O. • Chef SAA • ' + new Date().getFullYear()
+      : 'Approuvé • DDL-PN • ' + new Date().getFullYear();
+
+    const signatureData = {
+      signe: true,
+      nomDirecteur: nomSignataire || (isPo ? 'Gildas Ambetos' : 'Jacques MATOKO'),
+      signataireNom: nomSignataire || (isPo ? 'Gildas Ambetos' : 'Jacques MATOKO'),
+      typeSignataire: typeSignature,
+      qualite,
+      dateSignature: today,
+      parapheOfficiel: paraphe,
+      mentionPo: isPo ? 'Pour le Directeur Départemental et par ordre (P.O.)' : undefined,
+    };
+
+    setAuthorizations((prev) =>
+      prev.map((a) => {
+        if (a.id === authId) {
+          targetNom = a.nomCommercial;
+          targetNum = a.numeroAutorisation;
+          return {
+            ...a,
+            statut: 'delivre',
+            signatureDirecteur: signatureData,
+          };
+        }
+        return a;
+      })
+    );
+
+    try {
+      const authRef = doc(db, 'departmentalAuthorizations', authId);
+      await setDoc(authRef, {
+        statut: 'delivre',
+        signatureDirecteur: signatureData,
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore update sign authorization error:', e);
+    }
+
+    const logDetails = isPo
+      ? `Approbation et signature par ordre (P.O.) par le Chef de Service Assistance et Autorisation (${nomSignataire || 'Gildas Ambetos'}) pour ${targetNom}.`
+      : `Approbation souveraine et signature directe par le Directeur Départemental (${nomSignataire || 'Jacques MATOKO'}) pour ${targetNom}.`;
+
+    await addAuditLog(
+      isPo ? 'SIGNATURE_PO_CHEF_SAA_AUTORISATION' : 'SIGNATURE_DIRECTEUR_AUTORISATION',
+      'AUTORISATION',
+      targetNum || authId,
+      logDetails
+    );
+
+    showNotification(
+      'success',
+      isPo
+        ? `Autorisation ${targetNum} signée par ordre (P.O.) par le Chef de Service SAA avec succès !`
+        : `Autorisation ${targetNum} signée et approuvée avec succès par le Directeur Départemental !`
+    );
+  };
+
+  const revokeDepartmentalAuthorization = async (authId: string, motif: string) => {
+    let targetNom = '';
+    let targetNum = '';
+
+    setAuthorizations((prev) =>
+      prev.map((a) => {
+        if (a.id === authId) {
+          targetNom = a.nomCommercial;
+          targetNum = a.numeroAutorisation;
+          return {
+            ...a,
+            statut: 'revoque',
+          };
+        }
+        return a;
+      })
+    );
+
+    try {
+      const authRef = doc(db, 'departmentalAuthorizations', authId);
+      await setDoc(authRef, {
+        statut: 'revoque',
+      }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore revoke authorization error:', e);
+    }
+
+    await addAuditLog(
+      'REVOCATION_AUTORISATION_DEPARTEMENTALE',
+      'AUTORISATION',
+      targetNum || authId,
+      `Révocation administrative de l'Autorisation ${targetNum} pour ${targetNom}. Motif : ${motif}`
+    );
+
+    showNotification(
+      'warning',
+      `L'Autorisation ${targetNum} a été révoquée pour non-conformité.`
+    );
+  };
+
+  // --- PLATEFORME DE RELANCE & MESSAGERIE RÉPUBLICAINE (MOD-21) ---
+  const sendCampaignMessage = async (
+    msg: Omit<CampaignMessage, 'id' | 'dateEnvoi' | 'referenceRelance'>
+  ): Promise<CampaignMessage> => {
+    const today = new Date().toISOString();
+    const count = campaignMessages.length + 1;
+    const refPrefix = msg.campaignType === 'voeux_decembre_2026' ? 'REL-2026-DEC' : 'REL-2027-JAN';
+    const referenceRelance = `${refPrefix}-${String(count).padStart(4, '0')}`;
+    const newMsg: CampaignMessage = {
+      ...msg,
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      dateEnvoi: today,
+      referenceRelance,
+    };
+
+    setCampaignMessages((prev) => [newMsg, ...prev]);
+
+    await addAuditLog(
+      'ENVOI_MESSAGE_RELANCE',
+      'CAMPAGNE',
+      newMsg.referenceRelance,
+      `Message [${newMsg.channel.toUpperCase()}] envoyé à ${newMsg.promoteurNom} (${newMsg.etablissementNom}) pour motif ${newMsg.campaignType}.`
+    );
+
+    return newMsg;
+  };
+
+  const sendBatchCampaign = async (params: {
+    titre: string;
+    campaignType: CampaignType;
+    channel: CommunicationChannel;
+    messageTemplate: string;
+    targetSegment: CampaignTargetSegment;
+    arrondissementFilter?: string;
+    periodeCible: 'decembre_2026' | 'janvier_2027' | 'courant';
+  }): Promise<{ sentCount: number; batch: CampaignBatch }> => {
+    // Filtrage des établissements ciblés
+    const targets = establishments.filter((est) => {
+      if (params.arrondissementFilter && params.arrondissementFilter !== 'all') {
+        if (est.arrondissement !== params.arrondissementFilter) return false;
+      }
+      const paid =
+        receipts.filter((r) => r.etablissementId === est.id).reduce((s, r) => s + r.montantVerse, 0) ||
+        est.montantEncaisse ||
+        0;
+      const due = est.montantRedevanceAnnuelle || 150000;
+
+      if (params.targetSegment === 'zero_entree') {
+        return paid === 0;
+      } else if (params.targetSegment === 'en_cours_acompte') {
+        return paid > 0 && paid < due;
+      } else if (params.targetSegment === 'solde_en_regle') {
+        return paid >= due;
+      }
+      return true;
+    });
+
+    const batchId = `batch-${Date.now()}`;
+    const today = new Date().toISOString();
+    const newBatch: CampaignBatch = {
+      id: batchId,
+      titre: params.titre,
+      typeCampagne: params.campaignType,
+      cibleSegment: params.targetSegment,
+      periodeCible: params.periodeCible,
+      dateCreation: today,
+      totalCibles: targets.length,
+      totalEnvoyes: targets.length,
+      canalPrincipal: params.channel,
+      statut: 'cloture',
+      auteurNom: currentAgent?.nomComplet || 'Jacques MATOKO',
+    };
+
+    const newMessages: CampaignMessage[] = targets.map((est, idx) => {
+      const paid =
+        receipts.filter((r) => r.etablissementId === est.id).reduce((s, r) => s + r.montantVerse, 0) ||
+        est.montantEncaisse ||
+        0;
+      const due = est.montantRedevanceAnnuelle || 150000;
+      const remaining = Math.max(0, due - paid);
+      const statutPaiement: 'zero_entree' | 'acompte' | 'solde' =
+        paid === 0 ? 'zero_entree' : paid < due ? 'acompte' : 'solde';
+
+      const personalized = params.messageTemplate
+        .replace(/\{NOM_PROMOTEUR\}/g, est.promoteurNom || 'Promoteur')
+        .replace(/\{NOM_ETABLISSEMENT\}/g, est.nomCommercial)
+        .replace(/\{ARRONDISSEMENT\}/g, est.arrondissement)
+        .replace(/\{CODE_DOSSIER\}/g, est.codeDossier)
+        .replace(/\{MONTANT_REDEVANCE\}/g, formatCfa(due))
+        .replace(/\{MONTANT_PAYE\}/g, formatCfa(paid))
+        .replace(/\{RESTE_A_PAYER\}/g, formatCfa(remaining))
+        .replace(
+          /\{STATUT_PAIEMENT\}/g,
+          statutPaiement === 'zero_entree'
+            ? '0 FCFA versé (Non réglé)'
+            : statutPaiement === 'acompte'
+            ? 'Acomptes partiels'
+            : 'Intégralement soldé'
+        );
+
+      const refNum = `${
+        params.periodeCible === 'decembre_2026' ? 'REL-2026-DEC' : 'REL-2027-JAN'
+      }-${String(campaignMessages.length + idx + 1).padStart(4, '0')}`;
+
+      return {
+        id: `msg-${Date.now()}-${idx}`,
+        campagneId: batchId,
+        campaignType: params.campaignType,
+        channel: params.channel,
+        establishmentId: est.id,
+        etablissementNom: est.nomCommercial,
+        promoteurNom: est.promoteurNom,
+        promoteurTelephone: est.promoteurTelephone,
+        promoteurEmail: est.promoteurEmail,
+        arrondissement: est.arrondissement,
+        categorie: est.categorie,
+        statutPaiement,
+        montantRedevance: due,
+        montantPaye: paid,
+        resteAPayer: remaining,
+        messageContent: personalized,
+        dateEnvoi: today,
+        statutEnvoi: 'delivre',
+        expediteurNom: currentAgent?.nomComplet || 'Jacques MATOKO (Directeur)',
+        referenceRelance: refNum,
+      };
+    });
+
+    setCampaignBatches((prev) => [newBatch, ...prev]);
+    setCampaignMessages((prev) => [...newMessages, ...prev]);
+
+    await addAuditLog(
+      'DIFFUSION_CAMPAGNE_MASSE',
+      'CAMPAGNE',
+      batchId,
+      `Diffusion en masse [${params.titre}] : ${targets.length} messages créés via ${params.channel.toUpperCase()}.`
+    );
+
+    showNotification(
+      'success',
+      `Campagne diffusée : ${targets.length} message(s) préparé(s)/envoyé(s) pour ${
+        params.periodeCible === 'decembre_2026' ? 'Décembre 2026' : 'Janvier 2027'
+      } !`
+    );
+
+    return { sentCount: targets.length, batch: newBatch };
+  };
+
   // Synchronise exhaustivement l'intégralité de la base locale vers Firebase Firestore
   const syncAllToFirestore = async () => {
     try {
+      // Tentative d'authentification silencieuse si disponible
+      await ensureFirebaseAuth().catch(() => null);
+
       showNotification('info', `Synchronisation vers Firebase Firestore de ${establishments.length} établissements...`);
       const allWrites: Array<{ coll: string; id: string; data: any }> = [];
 
@@ -1798,56 +2431,180 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       for (const sch of schedules) {
         allWrites.push({ coll: 'schedules', id: sch.id, data: cleanForFirestore(sch) });
       }
+      for (const auth of authorizations) {
+        allWrites.push({ coll: 'departmentalAuthorizations', id: auth.id, data: cleanForFirestore(auth) });
+      }
 
+      let writtenCount = 0;
+      let permissionDeniedOccurred = false;
       const BATCH_SIZE = 350;
       for (let i = 0; i < allWrites.length; i += BATCH_SIZE) {
         const slice = allWrites.slice(i, i + BATCH_SIZE);
-        const batch = writeBatch(db);
-        for (const w of slice) {
-          batch.set(doc(db, w.coll, w.id), w.data, { merge: true });
+        try {
+          const batch = writeBatch(db);
+          for (const w of slice) {
+            batch.set(doc(db, w.coll, w.id), w.data, { merge: true });
+          }
+          await batch.commit();
+          writtenCount += slice.length;
+        } catch (sliceErr: any) {
+          console.warn("Échec du batch slice, fallback individuel:", sliceErr);
+          if (sliceErr?.code === 'permission-denied' || sliceErr?.message?.includes('permission')) {
+            permissionDeniedOccurred = true;
+          }
+          for (const w of slice) {
+            try {
+              await setDoc(doc(db, w.coll, w.id), w.data, { merge: true });
+              writtenCount++;
+            } catch (docErr: any) {
+              console.error(`Erreur doc ${w.coll}/${w.id}:`, docErr);
+              if (docErr?.code === 'permission-denied' || docErr?.message?.includes('permission')) {
+                permissionDeniedOccurred = true;
+              }
+            }
+          }
         }
-        await batch.commit();
       }
 
-      showNotification(
-        'success',
-        `Base générale synchronisée avec succès dans Firebase Firestore (${establishments.length} établissements sauvegardés) !`
-      );
+      if (writtenCount > 0) {
+        showNotification(
+          'success',
+          `Base générale synchronisée avec succès dans Firebase Firestore (${writtenCount} fiches sauvegardées) !`
+        );
+      } else if (permissionDeniedOccurred) {
+        showNotification(
+          'error',
+          "Permissions insuffisantes dans Firebase : Dans l'onglet Règles (Rules) de votre console Firebase, remplacez les règles par 'allow read, write: if true;' et cliquez sur Publier, ou connectez-vous avec votre compte Google Jacks.matoko@gmail.com."
+        );
+      }
     } catch (err: any) {
       console.error('Erreur synchronisation Firestore:', err);
-      showNotification('error', `Erreur de synchronisation Firestore : ${err?.message}`);
+      const isPermission = err?.message?.includes('permission') || err?.code === 'permission-denied';
+      if (isPermission) {
+        showNotification(
+          'error',
+          "Permissions Firebase insuffisantes : Veuillez cliquer sur Publier dans vos Règles Firestore ou vous connecter avec Jacks.matoko@gmail.com."
+        );
+      } else {
+        showNotification('error', `Erreur de synchronisation Firestore : ${err?.message}`);
+      }
     }
   };
 
   const syncOfflineQueue = async () => {
-    if (offlineQueue.length === 0) return;
-    const queueToSync = [...offlineQueue];
     try {
-      const batch = writeBatch(db);
-      let count = 0;
+      // 1. Silent auth check sans bloquer l'agent de terrain
+      await ensureFirebaseAuth().catch(() => null);
+
+      // 2. Agrégation des éléments en file d'attente et des établissements en attente de synchro
+      const queueToSync = [...offlineQueue];
+      const pendingEsts = establishments.filter((e) => e.syncStatus === 'pending');
+
+      if (queueToSync.length === 0 && pendingEsts.length === 0) {
+        showNotification('info', 'Toutes vos fiches terrain sont déjà synchronisées avec Firebase Firestore.');
+        return;
+      }
+
+      showNotification('info', `Synchronisation en cours de vos fiches terrain vers Firebase Firestore (${queueToSync.length + pendingEsts.length} éléments)...`);
+
+      let successCount = 0;
+      let lastSingleError: any = null;
+      const batchWrites: Array<{ coll: string; id: string; data: any }> = [];
+
       for (const item of queueToSync) {
         if (item.type === 'ESTABLISHMENT_ADD' && item.data?.id) {
-          batch.set(doc(db, 'establishments', item.data.id), cleanForFirestore(item.data), { merge: true });
-          count++;
+          batchWrites.push({ coll: 'establishments', id: item.data.id, data: cleanForFirestore(item.data) });
+        } else if (item.type === 'ESTABLISHMENT_UPDATE' && item.data?.id) {
+          batchWrites.push({ coll: 'establishments', id: item.data.id, data: cleanForFirestore(item.data) });
         } else if (item.type === 'SCHEDULE_ADD' && item.data?.id) {
-          batch.set(doc(db, 'schedules', item.data.id), cleanForFirestore(item.data), { merge: true });
-          count++;
+          batchWrites.push({ coll: 'schedules', id: item.data.id, data: cleanForFirestore(item.data) });
         } else if (item.type === 'RECEIPT_ADD' && item.data?.id) {
-          batch.set(doc(db, 'receipts', item.data.id), cleanForFirestore(item.data), { merge: true });
-          count++;
+          batchWrites.push({ coll: 'receipts', id: item.data.id, data: cleanForFirestore(item.data) });
+        } else if (item.type === 'LEGAL_ACT_ADD' && item.data?.id) {
+          batchWrites.push({ coll: 'legalActs', id: item.data.id, data: cleanForFirestore(item.data) });
+        } else if (item.type === 'AUTHORIZATION_ADD' && item.data?.id) {
+          batchWrites.push({ coll: 'departmentalAuthorizations', id: item.data.id, data: cleanForFirestore(item.data) });
         }
       }
-      if (count > 0) {
-        await batch.commit();
+
+      // Add any pending establishments not already in batchWrites
+      const existingIds = new Set(batchWrites.map((w) => w.id));
+      for (const pEst of pendingEsts) {
+        if (!existingIds.has(pEst.id)) {
+          batchWrites.push({
+            coll: 'establishments',
+            id: pEst.id,
+            data: cleanForFirestore({ ...pEst, syncStatus: 'synced' }),
+          });
+        }
       }
-      setOfflineQueue([]);
-      localStorage.removeItem('ddl_offline_queue');
-      setEstablishments((prev) =>
-        prev.map((e) => (e.syncStatus === 'pending' ? { ...e, syncStatus: 'synced' } : e))
-      );
-      showNotification('success', `Synchronisation réussie : ${queueToSync.length} fiche(s) & intervention(s) transmises à Firebase Firestore.`);
+
+      // Try batch commit first
+      try {
+        const BATCH_LIMIT = 350;
+        for (let i = 0; i < batchWrites.length; i += BATCH_LIMIT) {
+          const slice = batchWrites.slice(i, i + BATCH_LIMIT);
+          const batch = writeBatch(db);
+          for (const w of slice) {
+            batch.set(doc(db, w.coll, w.id), w.data, { merge: true });
+          }
+          await batch.commit();
+          successCount += slice.length;
+        }
+      } catch (batchErr: any) {
+        lastSingleError = batchErr;
+        console.warn("Échec du batch commit global, tentative d'enregistrement individuel:", batchErr);
+        // Fallback to individual setDoc so single bad record doesn't block other valid records
+        for (const w of batchWrites) {
+          try {
+            await setDoc(doc(db, w.coll, w.id), w.data, { merge: true });
+            successCount++;
+          } catch (singleErr: any) {
+            lastSingleError = singleErr;
+            console.error(`Erreur écriture doc ${w.coll}/${w.id}:`, singleErr);
+          }
+        }
+      }
+
+      if (successCount > 0) {
+        setOfflineQueue([]);
+        localStorage.removeItem('ddl_offline_queue');
+        setEstablishments((prev) => {
+          const updated = prev.map((e) => ({ ...e, syncStatus: 'synced' as const }));
+          try {
+            localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(updated));
+          } catch (e) {
+            console.warn(e);
+          }
+          return updated;
+        });
+
+        showNotification(
+          'success',
+          `Synchronisation réussie : ${successCount} fiche(s) de terrain transmises et confirmées dans votre base Firebase Firestore !`
+        );
+      } else {
+        const errMsg = lastSingleError?.message || lastSingleError?.code || '';
+        const isPermission =
+          errMsg.includes('permission') ||
+          errMsg.includes('PERMISSION_DENIED') ||
+          lastSingleError?.code === 'permission-denied';
+
+        if (isPermission) {
+          showNotification(
+            'error',
+            "Accès refusé par Firebase (Permissions insuffisantes) : Cliquez sur « Connexion Google (Firebase) » en haut à droite avec Jacks.matoko@gmail.com pour autoriser l'enregistrement."
+          );
+        } else {
+          showNotification(
+            'warning',
+            `La synchronisation n’a pas pu aboutir : ${errMsg || 'Vérifiez que votre connexion Internet est active et stable'}.`
+          );
+        }
+      }
     } catch (err: any) {
-      console.warn("Erreur synchronisation offlineQueue:", err);
+      console.error("Erreur synchronisation offlineQueue:", err);
+      showNotification('error', `Erreur synchronisation Firebase : ${err?.message || 'Erreur réseau ou droits d’accès'}`);
     }
   };
 
@@ -1915,6 +2672,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addSchedule,
         updateSchedule,
         recordPaymentAndScheduleNext,
+        rescheduleAppointment,
         reportEstablishmentClosed,
         importFromGoogleCalendar,
         addAuditLog,
@@ -1937,6 +2695,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getQuarterPtaActivities,
         getQuarterPriorityActivities,
         updatePtaActivityProgress,
+        authorizations,
+        issueDepartmentalAuthorization,
+        signDepartmentalAuthorization,
+        revokeDepartmentalAuthorization,
+        campaignBatches,
+        campaignMessages,
+        sendCampaignMessage,
+        sendBatchCampaign,
       }}
     >
       {children}

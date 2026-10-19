@@ -61,6 +61,8 @@ const JointInspectionModule = lazyWithRetry(() => import('./components/modules/J
 const PromoterFintechPortalModule = lazyWithRetry(() => import('./components/modules/PromoterFintechPortalModule').then((m) => ({ default: m.PromoterFintechPortalModule })));
 const SupabaseDataImportModule = lazyWithRetry(() => import('./components/modules/SupabaseDataImportModule').then((m) => ({ default: m.SupabaseDataImportModule })));
 const AdministrativeDraftingCanvaModule = lazyWithRetry(() => import('./components/modules/AdministrativeDraftingCanvaModule').then((m) => ({ default: m.AdministrativeDraftingCanvaModule })));
+const DepartmentalAuthorizationModule = lazyWithRetry(() => import('./components/modules/DepartmentalAuthorizationModule').then((m) => ({ default: m.DepartmentalAuthorizationModule })));
+const CampaignAndRelanceModule = lazyWithRetry(() => import('./components/modules/CampaignAndRelanceModule').then((m) => ({ default: m.CampaignAndRelanceModule })));
 
 const ModuleLoader: React.FC = () => (
   <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center">
@@ -104,6 +106,8 @@ const MainContent: React.FC = () => {
           {activeModule === 'MOD-17' && <PromoterFintechPortalModule />}
           {activeModule === 'MOD-18' && <SupabaseDataImportModule />}
           {activeModule === 'MOD-19' && <AdministrativeDraftingCanvaModule />}
+          {activeModule === 'MOD-20' && <DepartmentalAuthorizationModule />}
+          {activeModule === 'MOD-21' && <CampaignAndRelanceModule />}
         </Suspense>
       </ErrorBoundary>
     </main>
@@ -124,14 +128,20 @@ const AppContent: React.FC = () => {
     );
   });
 
-  const isReceiptScan = typeof window !== 'undefined' && (
-    window.location.search.includes('verify=receipt') ||
-    window.location.search.includes('verify=act') ||
-    window.location.search.includes('num=') ||
-    window.location.search.includes('ref=')
-  );
+  const [showDocumentVerify, setShowDocumentVerify] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const search = window.location.search;
+    return (
+      search.includes('verify=receipt') ||
+      search.includes('verify=act') ||
+      search.includes('verify=auth') ||
+      search.includes('verify=autorisation') ||
+      search.includes('num=') ||
+      search.includes('ref=')
+    );
+  });
 
-  // Écouter les changements d'URL / hash pour naviguer vers la certification d'attestation
+  // Écouter les changements d'URL / hash pour naviguer vers la certification d'attestation ou de quittance
   React.useEffect(() => {
     const handleUrlCheck = () => {
       const search = window.location.search;
@@ -141,6 +151,15 @@ const AppContent: React.FC = () => {
         search.includes('verify-attestation') ||
         hash.includes('verify-attestation');
       setShowAttestationVerify(isVerify);
+
+      const isDocVerify =
+        search.includes('verify=receipt') ||
+        search.includes('verify=act') ||
+        search.includes('verify=auth') ||
+        search.includes('verify=autorisation') ||
+        search.includes('num=') ||
+        search.includes('ref=');
+      setShowDocumentVerify(isDocVerify);
     };
 
     window.addEventListener('popstate', handleUrlCheck);
@@ -165,11 +184,22 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Scan public de quittance ou acte : affichage direct sans invite PWA
+  // Scan public ou contrôle de quittance / acte : affichage direct
+  if (showDocumentVerify && !forceAgentLogin) {
+    return (
+      <PublicDocumentVerification
+        onGoToLogin={() => {
+          setShowDocumentVerify(false);
+          setForceAgentLogin(true);
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', window.location.pathname);
+          }
+        }}
+      />
+    );
+  }
+
   if (!isAuthenticated) {
-    if (isReceiptScan && !forceAgentLogin) {
-      return <PublicDocumentVerification onGoToLogin={() => setForceAgentLogin(true)} />;
-    }
 
     return (
       <div className={`min-h-screen ${

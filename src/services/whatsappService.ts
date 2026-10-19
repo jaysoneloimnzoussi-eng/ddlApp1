@@ -17,6 +17,20 @@ export function cleanPhoneForWhatsApp(phone: string): string {
   return clean;
 }
 
+function safeOpenExternalUrl(url: string): void {
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch {
+    window.location.href = url;
+  }
+}
+
 export function openWhatsAppReminder(params: {
   phone: string;
   etablissementNom: string;
@@ -44,7 +58,7 @@ Merci de bien vouloir préparer votre règlement (Espèces, MoMo ou Airtel Money
 _Pour la Direction Départementale des Loisirs de Pointe-Noire._`;
 
   const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+  safeOpenExternalUrl(url);
 }
 
 export function openWhatsAppNotice(params: {
@@ -71,7 +85,7 @@ Il vous est formellement enjoint de vous conformer aux prescriptions de la Loi N
 _Direction Départementale des Loisirs de Pointe-Noire._`;
 
   const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+  safeOpenExternalUrl(url);
 }
 
 export function openWhatsAppReceipt(params: {
@@ -106,6 +120,6 @@ Ce récépissé numérique fait foi auprès de toutes les patrouilles de contrô
 _Régie des Recettes DDL-PN • Pointe-Noire._`;
 
   const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+  safeOpenExternalUrl(url);
 }
 

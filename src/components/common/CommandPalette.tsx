@@ -376,6 +376,36 @@ export const CommandPalette: React.FC = () => {
       },
       isActive: activeModule === 'MOD-19',
     },
+    {
+      id: 'mod-20',
+      category: 'modules',
+      code: 'MOD-20',
+      title: "MOD-20 • Autorisation d'Exploitation Départementale",
+      subtitle: "Délivrance souveraine, Diplôme A4 officiel, Sceau DDL-PN, signature Directorale & Export Word .docx",
+      icon: Award,
+      badge: 'Titre Régalien',
+      keywords: ['autorisation', 'exploitation', 'departementale', 'diplome', 'titre', 'regalien', 'directeur', 'sceau', 'signature', 'jacques matoko', 'loi 21-2019', 'agrement', 'permis', 'mod-20'],
+      action: () => {
+        setActiveModule('MOD-20');
+        showNotification('info', "Module ouvert : MOD-20 Autorisation d'Exploitation Départementale");
+      },
+      isActive: activeModule === 'MOD-20',
+    },
+    {
+      id: 'mod-21',
+      category: 'modules',
+      code: 'MOD-21',
+      title: "MOD-21 • Relance & Vœux 2027 (Messagerie Républicaine)",
+      subtitle: "Campagnes de fin d'année 2026, rappels d'échéances et avis de recouvrement pour établissements 0 entrée en 2027",
+      icon: Send,
+      badge: 'Campagnes & Relance',
+      keywords: ['relance', 'voeux', '2026', '2027', 'recouvrement', 'avis', 'zero entree', 'impaye', 'whatsapp', 'sms', 'message', 'campagne', 'diffuseur', 'loi 21-2019', 'mod-21'],
+      action: () => {
+        setActiveModule('MOD-21');
+        showNotification('info', "Module ouvert : MOD-21 Plateforme de Relance & Messagerie Républicaine");
+      },
+      isActive: activeModule === 'MOD-21',
+    },
   ], [activeModule, setActiveModule, showNotification]);
 
   // Common quick actions

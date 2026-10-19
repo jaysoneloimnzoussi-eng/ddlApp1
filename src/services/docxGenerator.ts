@@ -11,7 +11,7 @@ import {
   WidthType,
   BorderStyle,
 } from 'docx';
-import { Establishment, LegalAct, OfficialPta2026Data } from '../types';
+import { Establishment, LegalAct, OfficialPta2026Data, DepartmentalAuthorization } from '../types';
 
 export interface QuarterlyReportData {
   trimestre: string;
@@ -1484,5 +1484,429 @@ export async function generatePta2026Docx(pta: OfficialPta2026Data): Promise<voi
 
   const blob = await Packer.toBlob(doc);
   downloadBlob(blob, `PTA_2026_DDL_PN_Officiel.docx`);
+}
+
+/**
+ * Generates official Autorisation d'Exploitation Départementale in native DOCX format
+ * Conforming strictly to DDL-PN protocol and sovereign state formatting
+ */
+export async function generateDepartmentalAuthorizationDocx(auth: DepartmentalAuthorization): Promise<void> {
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 1134, // 2.0 cm
+              bottom: 1134,
+              left: 1417, // 2.5 cm
+              right: 1417,
+            },
+          },
+        },
+        children: [
+          // Header 2 columns
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.NONE },
+              bottom: { style: BorderStyle.NONE },
+              left: { style: BorderStyle.NONE },
+              right: { style: BorderStyle.NONE },
+              insideHorizontal: { style: BorderStyle.NONE },
+              insideVertical: { style: BorderStyle.NONE },
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 55, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'MINISTÈRE DE LA CULTURE, DES ARTS,', bold: true, font: 'Garamond', size: 20 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'DU PATRIMOINE NATIONAL ET DU TOURISME', bold: true, font: 'Garamond', size: 20 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'DIRECTION GÉNÉRALE DES LOISIRS', bold: true, font: 'Garamond', size: 20 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'DIRECTION DÉPARTEMENTALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 }),
+                        ],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    width: { size: 45, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'RÉPUBLIQUE DU CONGO', bold: true, font: 'Garamond', size: 22 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'Unité - Travail - Progrès', italics: true, font: 'Garamond', size: 18 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: 'Pointe-Noire, le ', font: 'Garamond', size: 18 }),
+                          new TextRun({ text: auth.dateDelivrance, bold: true, font: 'Garamond', size: 18 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [
+                          new TextRun({ text: `Réf : ${auth.numeroAutorisation}`, bold: true, font: 'Courier New', size: 18 }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+
+          new Paragraph({ spacing: { before: 280, after: 140 } }),
+
+          // Titre Solennel
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 200, after: 120 },
+            children: [
+              new TextRun({
+                text: 'AUTORISATION D\'EXPLOITATION DÉPARTEMENTALE',
+                bold: true,
+                font: 'Garamond',
+                size: 32,
+                underline: {},
+              }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 280 },
+            children: [
+              new TextRun({
+                text: `TITRE D\'EXPLOITATION RÉGALIEN ANNUEL • EXERCICE ${auth.anneeExercice}`,
+                bold: true,
+                font: 'Garamond',
+                size: 20,
+              }),
+            ],
+          }),
+
+          // Visas
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 100 },
+            children: [
+              new TextRun({ text: 'LE DIRECTEUR DÉPARTEMENTAL DES LOISIRS DE POINTE-NOIRE,', bold: true, font: 'Garamond', size: 20 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 80 },
+            children: [
+              new TextRun({ text: 'Vu ', bold: true, italics: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: 'la Constitution de la République du Congo ;', font: 'Garamond', size: 18 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 80 },
+            children: [
+              new TextRun({ text: 'Vu ', bold: true, italics: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: 'la Loi N° 21-2019 fixant les redevances départementales applicables aux établissements récréatifs et de loisirs ;', font: 'Garamond', size: 18 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 80 },
+            children: [
+              new TextRun({ text: 'Vu ', bold: true, italics: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: 'la Note de service N° 151/MTL-CAB fixant la tarification officielle et le barème proportionnel ;', font: 'Garamond', size: 18 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 80 },
+            children: [
+              new TextRun({ text: 'Vu ', bold: true, italics: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: `le rapport d\'enquête de terrain et de conformité sonore SAA (Visa : ${auth.visaInspecteurChef.observationsConformite || 'Conforme'}) ;`, font: 'Garamond', size: 18 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 140 },
+            children: [
+              new TextRun({ text: 'Vu ', bold: true, italics: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: `la quittance officielle de régie N° ${auth.quittanceReference} constatant le versement complet des droits régaliens ;`, font: 'Garamond', size: 18 }),
+            ],
+          }),
+
+          // Décision d'octroi
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 180, after: 180 },
+            children: [
+              new TextRun({ text: 'DÉCIDE :', bold: true, font: 'Garamond', size: 24 }),
+            ],
+          }),
+
+          // Tableau récapitulatif bénéficiaire
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 6, color: '333333' },
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: '333333' },
+              left: { style: BorderStyle.SINGLE, size: 6, color: '333333' },
+              right: { style: BorderStyle.SINGLE, size: 6, color: '333333' },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
+              insideVertical: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC' },
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 35, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Établissement Bénéficiaire :', bold: true, font: 'Garamond', size: 18 })] })],
+                  }),
+                  new TableCell({
+                    width: { size: 65, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: auth.nomCommercial, bold: true, font: 'Garamond', size: 20 })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Promoteur / Exploitant :', bold: true, font: 'Garamond', size: 18 })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: `${auth.promoteurNom} (${auth.promoteurTelephone || 'Téléphone non précisé'})`, font: 'Garamond', size: 18 })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Activité & Catégorie :', bold: true, font: 'Garamond', size: 18 })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: auth.categorie, font: 'Garamond', size: 18 })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Localisation Urbaine :', bold: true, font: 'Garamond', size: 18 })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: `${auth.arrondissement} • Quartier ${auth.quartier} (${auth.adresseExacte || 'Pointe-Noire'})`, font: 'Garamond', size: 18 })] })],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Validité Temporelle :', bold: true, font: 'Garamond', size: 18 })] })],
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: `Du ${auth.dateDelivrance} au ${auth.dateExpiration} (1 an renouvelable)`, bold: true, font: 'Garamond', size: 18 })] })],
+                  }),
+                ],
+              }),
+            ],
+          }),
+
+          new Paragraph({ spacing: { before: 200, after: 120 } }),
+
+          // Articles
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 80 },
+            children: [
+              new TextRun({ text: 'Article 1er : ', bold: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: `Il est accordé à l'établissement « ${auth.nomCommercial} » la présente Autorisation d'Exploitation Départementale pour l'exercice ${auth.anneeExercice}.`, font: 'Garamond', size: 18 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 80 },
+            children: [
+              new TextRun({ text: 'Article 2 : ', bold: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: 'Le présent titre est strictement personnel, incessible et doit être affiché de façon permanente et visible à l\'entrée de l\'établissement.', font: 'Garamond', size: 18 }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.BOTH,
+            spacing: { line: 260, after: 180 },
+            children: [
+              new TextRun({ text: 'Article 3 : ', bold: true, font: 'Garamond', size: 18 }),
+              new TextRun({ text: 'Les inspecteurs assermentés de la Brigade SAA et les forces de l\'ordre sont chargés de l\'exécution de la présente décision.', font: 'Garamond', size: 18 }),
+            ],
+          }),
+
+          // Signatures protocolaires
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders: {
+              top: { style: BorderStyle.NONE },
+              bottom: { style: BorderStyle.NONE },
+              left: { style: BorderStyle.NONE },
+              right: { style: BorderStyle.NONE },
+              insideHorizontal: { style: BorderStyle.NONE },
+              insideVertical: { style: BorderStyle.NONE },
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: 'Pour le Contrôle & Conformité SAA :', italics: true, font: 'Garamond', size: 16 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        spacing: { before: 60 },
+                        children: [
+                          new TextRun({ text: `Visa Inspecteur Chef : ${auth.visaInspecteurChef.nomInspecteur}`, bold: true, font: 'Garamond', size: 16 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: `Date visa : ${auth.visaInspecteurChef.dateVisa}`, font: 'Garamond', size: 16 }),
+                        ],
+                      }),
+                    ],
+                  }),
+                  new TableCell({
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        children: [
+                          new TextRun({ text: 'Fait à Pointe-Noire, le ', font: 'Garamond', size: 18 }),
+                          new TextRun({ text: auth.signatureDirecteur.dateSignature || auth.dateDelivrance, bold: true, font: 'Garamond', size: 18 }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 80 },
+                        children: [
+                          new TextRun({
+                            text: auth.signatureDirecteur.typeSignataire === 'chef_saa_po'
+                              ? 'Pour le Directeur Départemental et par ordre (P.O.),'
+                              : 'LE DIRECTEUR DÉPARTEMENTAL DES LOISIRS,',
+                            bold: true,
+                            font: 'Garamond',
+                            size: 18,
+                          }),
+                        ],
+                      }),
+                      ...(auth.signatureDirecteur.typeSignataire === 'chef_saa_po'
+                        ? [
+                            new Paragraph({
+                              alignment: AlignmentType.RIGHT,
+                              children: [
+                                new TextRun({
+                                  text: 'Le Chef de Service Assistance et Autorisation',
+                                  font: 'Garamond',
+                                  italics: true,
+                                  size: 16,
+                                }),
+                              ],
+                            }),
+                          ]
+                        : []),
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 240 },
+                        children: [
+                          new TextRun({
+                            text: auth.signatureDirecteur.signataireNom || auth.signatureDirecteur.nomDirecteur,
+                            bold: true,
+                            underline: {},
+                            font: 'Garamond',
+                            size: 20,
+                          }),
+                        ],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        children: [
+                          new TextRun({
+                            text: auth.signatureDirecteur.parapheOfficiel || '[Sceau Officiel DDL-PN]',
+                            italics: true,
+                            font: 'Garamond',
+                            size: 16,
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+
+          // Empreinte SHA-256 en bas de page
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 280 },
+            children: [
+              new TextRun({
+                text: `Certificat numérique d'authenticité DDL-PN • Empreinte SHA-256 : ${auth.documentHash}`,
+                font: 'Courier New',
+                size: 14,
+                color: '666666',
+              }),
+            ],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `Autorisation_${auth.numeroAutorisation.replace(/[\/\\?%*:|"<>]/g, '_')}.docx`);
 }
 

@@ -214,6 +214,33 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=${activeFirebaseConfig.messagingSenderId}`;
                     <span>{copiedDomain ? 'Copié !' : 'Copier'}</span>
                   </button>
                 </div>
+
+                {/* Additional wildcard domains */}
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
+                  <span className="text-[11px] text-slate-500">Domaines génériques recommandés :</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('run.app');
+                      setCopiedDomain(true);
+                      setTimeout(() => setCopiedDomain(false), 2000);
+                    }}
+                    className="px-2 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-mono text-[11px] font-bold cursor-pointer"
+                    title="Copier run.app (couvre tous les conteneurs Cloud Run)"
+                  >
+                    + Copier run.app
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('aistudio.google.com');
+                      setCopiedDomain(true);
+                      setTimeout(() => setCopiedDomain(false), 2000);
+                    }}
+                    className="px-2 py-0.5 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-mono text-[11px] font-bold cursor-pointer"
+                    title="Copier aistudio.google.com"
+                  >
+                    + Copier aistudio.google.com
+                  </button>
+                </div>
               </div>
 
               {/* Step by step */}
@@ -223,16 +250,13 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=${activeFirebaseConfig.messagingSenderId}`;
                 </h3>
                 <ol className="text-[11px] text-slate-600 dark:text-slate-400 space-y-1.5 list-decimal list-inside leading-relaxed">
                   <li>
-                    Ouvrez la console Firebase via le bouton ci-dessous (onglet <strong>Authentication &gt; Paramètres</strong>).
-                  </li>
-                  <li>
-                    Descendez jusqu'à la section <strong>Domaines autorisés (Authorized domains)</strong>.
+                    Ouvrez la console Firebase via le bouton ci-dessous (onglet <strong>Authentication &gt; Paramètres &gt; Domaines autorisés</strong>).
                   </li>
                   <li>
                     Cliquez sur <strong>Ajouter un domaine (Add domain)</strong>.
                   </li>
                   <li>
-                    Collez votre domaine : <code className="text-blue-500 font-mono text-[10px] bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">{currentHostname}</code> et validez avec <strong>Enregistrer</strong>.
+                    Collez votre domaine : <code className="text-blue-500 font-mono text-[10px] bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">{currentHostname}</code> (ou <code className="text-blue-500 font-mono text-[10px] bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">run.app</code>) et validez avec <strong>Enregistrer</strong>.
                   </li>
                 </ol>
 

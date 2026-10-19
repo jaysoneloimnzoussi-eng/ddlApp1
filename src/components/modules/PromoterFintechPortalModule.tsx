@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   Lock,
   X,
+  CalendarClock,
+  Clock,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { generateAttestationDocx } from '../../services/docxGenerator';
@@ -22,6 +24,7 @@ export const PromoterFintechPortalModule: React.FC = () => {
     establishments,
     addReceipt,
     updateEstablishment,
+    rescheduleAppointment,
     openPrintModal,
     showNotification,
   } = useApp();
@@ -38,6 +41,13 @@ export const PromoterFintechPortalModule: React.FC = () => {
   // Certificat upload simulation
   const [limiteurFileName, setLimiteurFileName] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  // Modal Report RDV Tenancier
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [promoterNewDate, setPromoterNewDate] = useState('');
+  const [promoterNewHeure, setPromoterNewHeure] = useState('10:00');
+  const [promoterReason, setPromoterReason] = useState('Demande de délai pour trésorerie / acompte');
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
 
   const est = establishments.find((x) => x.id === selectedEstId) || establishments[0];
 
@@ -106,6 +116,39 @@ export const PromoterFintechPortalModule: React.FC = () => {
     }
   };
 
+  const handleOpenPromoterReschedule = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 2);
+    setPromoterNewDate(est.prochainRdvDate || tomorrow.toISOString().substring(0, 10));
+    setPromoterNewHeure(est.prochainRdvHeure || '10:00');
+    setPromoterReason('Demande de délai pour trésorerie / versement acompte');
+    setShowRescheduleModal(true);
+  };
+
+  const handleConfirmPromoterReschedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!est) return;
+    if (!promoterNewDate) {
+      showNotification('error', 'Veuillez sélectionner une date valide.');
+      return;
+    }
+    setIsSubmittingReschedule(true);
+    try {
+      await rescheduleAppointment({
+        establishmentId: est.id,
+        nextRdvDate: promoterNewDate,
+        nextRdvHeure: promoterNewHeure,
+        nextRdvMotif: `Demande de report promoteur: ${promoterReason}`,
+      });
+      showNotification('success', `Rendez-vous reprogrammé au ${promoterNewDate} à ${promoterNewHeure}. Votre inspecteur en est notifié.`);
+      setShowRescheduleModal(false);
+    } catch (err: any) {
+      showNotification('error', `Erreur: ${err.message || 'Impossible de reprogrammer'}`);
+    } finally {
+      setIsSubmittingReschedule(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Title */}
@@ -157,6 +200,33 @@ export const PromoterFintechPortalModule: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Bannière de Rendez-vous / Convocations */}
+      {est.prochainRdvDate && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-purple-950/60 to-slate-900 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 flex items-center justify-center shrink-0">
+              <CalendarClock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-100 text-sm">
+                Rendez-vous convenu avec l'Inspecteur DDL-PN
+              </p>
+              <p className="text-purple-300 text-xs mt-0.5">
+                Passage prévu le <strong>{est.prochainRdvDate}</strong> à <strong>{est.prochainRdvHeure || '10:00'}</strong> — Motif : {est.prochainRdvMotif || 'Contrôle et versement d\'acompte'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenPromoterReschedule}
+            className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <CalendarClock className="w-4 h-4" />
+            <span>Reprogrammer ce RDV</span>
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Colonne Gauche : Télépaiement MoMo / Airtel (6 colonnes) */}
@@ -395,6 +465,93 @@ export const PromoterFintechPortalModule: React.FC = () => {
                 Confirmer le débit
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL REPORT / REPROGRAMMATION DU TENANCIER */}
+      {showRescheduleModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in fade-in">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                <CalendarClock className="w-5 h-5 text-purple-400" />
+                <span>Demande de Report / Reprogrammation</span>
+              </h3>
+              <button
+                onClick={() => setShowRescheduleModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-xs">
+              <p className="font-bold text-slate-200">{est.nomCommercial}</p>
+              <p className="text-slate-400">Promoteur : {est.promoteurNom} • {est.arrondissement}</p>
+              {est.prochainRdvDate && (
+                <p className="text-purple-300 text-[11px] pt-1 border-t border-slate-800">
+                  Rendez-vous actuel : {est.prochainRdvDate} à {est.prochainRdvHeure || '10:00'}
+                </p>
+              )}
+            </div>
+
+            <form onSubmit={handleConfirmPromoterReschedule} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-slate-300 font-semibold">Nouvelle date souhaitée *</label>
+                  <input
+                    type="date"
+                    required
+                    value={promoterNewDate}
+                    onChange={(e) => setPromoterNewDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-300 font-semibold">Heure souhaitée *</label>
+                  <input
+                    type="time"
+                    required
+                    value={promoterNewHeure}
+                    onChange={(e) => setPromoterNewHeure(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-300 font-semibold">Motif du report / Proposition</label>
+                <select
+                  value={promoterReason}
+                  onChange={(e) => setPromoterReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100"
+                >
+                  <option value="Demande de délai pour trésorerie / acompte">Demande de délai pour trésorerie / versement acompte</option>
+                  <option value="Promoteur en déplacement / Absence temporaire">Promoteur en déplacement / Absence temporaire</option>
+                  <option value="Attente de pièces administratives du dossier">Attente de pièces administratives du dossier</option>
+                  <option value="Travaux d'insonorisation et limiteur en cours">Travaux d'insonorisation et limiteur en cours</option>
+                  <option value="Autre arrangement avec l'agent de brigade">Autre arrangement avec l'agent de brigade</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowRescheduleModal(false)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-800"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReschedule}
+                  className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow flex items-center gap-1.5"
+                >
+                  {isSubmittingReschedule ? 'Enregistrement...' : 'Valider la Reprogrammation'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

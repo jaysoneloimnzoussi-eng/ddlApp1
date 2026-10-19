@@ -24,6 +24,7 @@ import {
   Sparkles,
   Scale,
   Ban,
+  CalendarClock,
 } from 'lucide-react';
 import { Establishment, CashReceipt } from '../../types';
 import { formatCfa } from '../../services/crypto';
@@ -37,6 +38,7 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
     currentAgent,
     authenticatedUser,
     recordPaymentAndScheduleNext,
+    rescheduleAppointment,
     reportEstablishmentClosed,
     setActiveModule,
     theme,
@@ -66,6 +68,16 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
   const [closedMotif, setClosedMotif] = useState<string>('Cessation d\'activité définitive / Rideau baissé');
   const [closedObservations, setClosedObservations] = useState<string>('');
   const [isSubmittingClose, setIsSubmittingClose] = useState<boolean>(false);
+
+  // Dedicated Modal for Rescheduling Tenancier Appointment
+  const [reschedulingEst, setReschedulingEst] = useState<Establishment | null>(null);
+  const [rescheduleScheduleId, setRescheduleScheduleId] = useState<string | undefined>(undefined);
+  const [rescheduleDate, setRescheduleDate] = useState<string>('');
+  const [rescheduleHeure, setRescheduleHeure] = useState<string>('10:00');
+  const [rescheduleMotif, setRescheduleMotif] = useState<string>('Report convenu avec le promoteur');
+  const [rescheduleCustomMotif, setRescheduleCustomMotif] = useState<string>('');
+  const [rescheduleObservations, setRescheduleObservations] = useState<string>('');
+  const [isRescheduling, setIsRescheduling] = useState<boolean>(false);
 
   // Upcoming RDV count
   const upcomingAgentRdvCount = useMemo(() => {
@@ -108,20 +120,55 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
 
   // 4. PROCHAINS RENDEZ-VOUS CONVENUS
   const prochainsRdvList = useMemo(() => {
-    // Gather all establishments with an upcoming appointment date
-    const withDates = visibleEstablishments
-      .filter((e) => Boolean(e.prochainRdvDate))
-      .map((e) => ({
-        etablissement: e,
-        date: e.prochainRdvDate!,
-        heure: e.prochainRdvHeure || '10:00',
-        motif: e.prochainRdvMotif || 'Visite de conformité et recouvrement',
-        isPast: new Date(`${e.prochainRdvDate}T${e.prochainRdvHeure || '10:00'}`) < new Date(),
-      }));
+    const list: Array<{
+      etablissement: Establishment;
+      date: string;
+      heure: string;
+      motif: string;
+      isPast: boolean;
+      scheduleId?: string;
+    }> = [];
 
-    // Sort chronologically (closest first)
-    return withDates.sort((a, b) => new Date(`${a.date}T${a.heure}`).getTime() - new Date(`${b.date}T${b.heure}`).getTime());
-  }, [visibleEstablishments]);
+    const seenEstIds = new Set<string>();
+
+    visibleEstablishments.forEach((e) => {
+      const activeSch = schedules.find((s) => s.etablissementId === e.id && s.statut === 'planifie');
+      const rdvDate = e.prochainRdvDate || activeSch?.dateTournee;
+      const rdvHeure = e.prochainRdvHeure || activeSch?.heure || '10:00';
+      const rdvMotif = e.prochainRdvMotif || activeSch?.notes || 'Visite de conformité et recouvrement';
+
+      if (rdvDate) {
+        seenEstIds.add(e.id);
+        list.push({
+          etablissement: e,
+          date: rdvDate,
+          heure: rdvHeure,
+          motif: rdvMotif,
+          isPast: new Date(`${rdvDate}T${rdvHeure}`) < new Date(),
+          scheduleId: activeSch?.id,
+        });
+      }
+    });
+
+    schedules.forEach((s) => {
+      if (s.statut === 'planifie' && !seenEstIds.has(s.etablissementId)) {
+        const est = visibleEstablishments.find((e) => e.id === s.etablissementId);
+        if (est) {
+          seenEstIds.add(est.id);
+          list.push({
+            etablissement: est,
+            date: s.dateTournee,
+            heure: s.heure || '10:00',
+            motif: s.notes || s.typeMission || 'Mission de contrôle',
+            isPast: new Date(`${s.dateTournee}T${s.heure || '10:00'}`) < new Date(),
+            scheduleId: s.id,
+          });
+        }
+      }
+    });
+
+    return list.sort((a, b) => new Date(`${a.date}T${a.heure}`).getTime() - new Date(`${b.date}T${b.heure}`).getTime());
+  }, [visibleEstablishments, schedules]);
 
   // Total finances exclusively for this agent
   const totalRecouvreAgent = useMemo(() => {
@@ -189,6 +236,59 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
       showNotification('error', `Erreur lors de l'enregistrement : ${err.message || 'Erreur inconnue'}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Open Reschedule Modal for Tenancier
+  const handleOpenRescheduleModal = (
+    est: Establishment,
+    defaultDate?: string,
+    defaultHeure?: string,
+    scheduleId?: string
+  ) => {
+    setReschedulingEst(est);
+    setRescheduleScheduleId(scheduleId);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().substring(0, 10);
+
+    setRescheduleDate(defaultDate || est.prochainRdvDate || tomorrowStr);
+    setRescheduleHeure(defaultHeure || est.prochainRdvHeure || '10:00');
+    setRescheduleMotif(est.prochainRdvMotif || 'Report convenu avec le promoteur');
+    setRescheduleCustomMotif('');
+    setRescheduleObservations('');
+  };
+
+  // Confirm Reschedule Action
+  const handleConfirmReschedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reschedulingEst) return;
+    if (!rescheduleDate) {
+      showNotification('error', 'Veuillez sélectionner une date de rendez-vous valide.');
+      return;
+    }
+
+    setIsRescheduling(true);
+    try {
+      const finalMotif = rescheduleMotif === 'Autre motif convenu...'
+        ? (rescheduleCustomMotif.trim() || 'Report convenu avec le promoteur')
+        : rescheduleMotif;
+
+      await rescheduleAppointment({
+        establishmentId: reschedulingEst.id,
+        scheduleId: rescheduleScheduleId,
+        nextRdvDate: rescheduleDate,
+        nextRdvHeure: rescheduleHeure,
+        nextRdvMotif: finalMotif,
+        reportObservations: rescheduleObservations.trim() || undefined,
+      });
+
+      setReschedulingEst(null);
+      setRescheduleScheduleId(undefined);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de la reprogrammation : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setIsRescheduling(false);
     }
   };
 
@@ -610,6 +710,14 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                         <span>Signaler Fermé</span>
                       </button>
                       <button
+                        onClick={() => handleOpenRescheduleModal(est)}
+                        className="px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-700 dark:text-purple-300 font-bold text-xs border border-purple-200 dark:border-purple-800 transition flex items-center gap-1.5 cursor-pointer"
+                        title="Fixer ou reprogrammer le rendez-vous d'audition du tenancier"
+                      >
+                        <CalendarClock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>Reprogrammer RDV</span>
+                      </button>
+                      <button
                         onClick={() => handleOpenPaymentModal(est)}
                         className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
                       >
@@ -820,6 +928,14 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                           <span>Signaler Fermé</span>
                         </button>
                         <button
+                          onClick={() => handleOpenRescheduleModal(est)}
+                          className="px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-700 dark:text-purple-300 font-bold text-xs border border-purple-200 dark:border-purple-800 transition flex items-center gap-1 cursor-pointer"
+                          title="Reporter ou reprogrammer le prochain rendez-vous d'acompte"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                          <span>Reprogrammer RDV</span>
+                        </button>
+                        <button
                           onClick={() => handleOpenPaymentModal(est)}
                           className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
                         >
@@ -855,9 +971,9 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {prochainsRdvList.map(({ etablissement: est, date, heure, motif, isPast }, idx) => (
+                {prochainsRdvList.map(({ etablissement: est, date, heure, motif, isPast, scheduleId }, idx) => (
                   <div
-                    key={`${est.id}-${idx}`}
+                    key={`${est.id}-${scheduleId || idx}`}
                     className={`p-4 rounded-xl border transition flex flex-col md:flex-row md:items-center justify-between gap-3 ${
                       isPast
                         ? isLight
@@ -916,6 +1032,14 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                       >
                         <Ban className="w-3.5 h-3.5" />
                         <span>Signaler Fermé</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenRescheduleModal(est, date, heure, scheduleId)}
+                        className="px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
+                        title="Reprogrammer la date et l'heure convenue avec ce tenancier"
+                      >
+                        <CalendarClock className="w-3.5 h-3.5" />
+                        <span>Reprogrammer RDV</span>
                       </button>
                       <button
                         onClick={() => handleOpenPaymentModal(est)}
@@ -1011,6 +1135,14 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                       >
                         <Ban className="w-3.5 h-3.5" />
                         <span>Signaler Fermé</span>
+                      </button>
+                      <button
+                        onClick={() => handleOpenRescheduleModal(est)}
+                        className="px-2.5 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-700 dark:text-purple-300 font-bold text-xs border border-purple-200 dark:border-purple-800 transition flex items-center gap-1 cursor-pointer"
+                        title="Fixer ou reprogrammer un rendez-vous"
+                      >
+                        <CalendarClock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>RDV</span>
                       </button>
                       <button
                         onClick={() => handleOpenPaymentModal(est)}
@@ -1292,6 +1424,183 @@ export const FieldAgentExclusiveDashboard: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL: REPROGRAMMATION DU RENDEZ-VOUS DU TENANCIER */}
+      {reschedulingEst && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+          <div
+            className={`w-full max-w-lg rounded-2xl border p-6 shadow-2xl relative space-y-4 ${
+              isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  <CalendarClock className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                    Gestion de l'Agenda Promoteur
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Reprogrammer le Rendez-vous du Tenancier
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setReschedulingEst(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Récapitulatif Tenancier & Situation */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between flex-wrap gap-1">
+                <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                  {reschedulingEst.nomCommercial}
+                </span>
+                <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold">
+                  {reschedulingEst.codeDossier}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600 dark:text-slate-400 text-[11px]">
+                <div>
+                  Promoteur : <strong className="text-slate-800 dark:text-slate-200">{reschedulingEst.promoteurNom}</strong>
+                </div>
+                <div>
+                  Tél : <a href={`tel:${reschedulingEst.promoteurTelephone}`} className="font-mono text-purple-600 hover:underline">{reschedulingEst.promoteurTelephone}</a>
+                </div>
+                <div>
+                  Localisation : {reschedulingEst.arrondissement} ({reschedulingEst.quartier || 'Centre'})
+                </div>
+                <div>
+                  Solde dû : <strong className="font-mono text-emerald-600">{formatCfa(reschedulingEst.soldeRestantDu)}</strong>
+                </div>
+              </div>
+              {reschedulingEst.prochainRdvDate && (
+                <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-1.5 text-slate-500 text-[11px]">
+                  <Clock className="w-3.5 h-3.5 text-purple-500" />
+                  <span>RDV actuel : <strong>{reschedulingEst.prochainRdvDate}</strong> à <strong>{reschedulingEst.prochainRdvHeure || '10:00'}</strong> ({reschedulingEst.prochainRdvMotif || 'Non spécifié'})</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleConfirmReschedule} className="space-y-4 text-xs">
+              {/* Date & Heure du Nouveau Rendez-vous */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                    Nouvelle Date de Passage *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                    Heure Convenue *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={rescheduleHeure}
+                    onChange={(e) => setRescheduleHeure(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Motif de la Reprogrammation */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                  Motif de la Reprogrammation *
+                </label>
+                <select
+                  value={rescheduleMotif}
+                  onChange={(e) => setRescheduleMotif(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                  }`}
+                >
+                  <option value="Report convenu avec le promoteur">Report convenu à la demande du promoteur</option>
+                  <option value="Délai de grâce sollicité pour paiement solde">Délai de grâce accordé pour solde de redevance</option>
+                  <option value="Promoteur en déplacement / indisponible au premier passage">Promoteur en déplacement / indisponible au premier passage</option>
+                  <option value="Séance de conciliation sonométrique Loi 21-2019">Séance de conciliation sonométrique (Loi 21-2019)</option>
+                  <option value="Contrôle in situ des pièces et conformité">Contrôle in situ des pièces et conformité</option>
+                  <option value="Autre motif convenu...">Autre motif convenu...</option>
+                </select>
+
+                {rescheduleMotif === 'Autre motif convenu...' && (
+                  <input
+                    type="text"
+                    required
+                    value={rescheduleCustomMotif}
+                    onChange={(e) => setRescheduleCustomMotif(e.target.value)}
+                    placeholder="Préciser le motif convenu avec le promoteur..."
+                    className={`mt-2 w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700'
+                    }`}
+                  />
+                )}
+              </div>
+
+              {/* Observations / Notes Complémentaires */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                  Observations et Engagements du Promoteur (Optionnel)
+                </label>
+                <textarea
+                  rows={2}
+                  value={rescheduleObservations}
+                  onChange={(e) => setRescheduleObservations(e.target.value)}
+                  placeholder="Ex: Le promoteur s'engage à préparer l'acompte de 50 000 FCFA lors du passage de l'inspecteur..."
+                  className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700'
+                  }`}
+                />
+              </div>
+
+              {/* Info Notification */}
+              <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900 text-[11px] text-purple-800 dark:text-purple-300 flex items-start gap-2">
+                <CalendarCheck className="w-4 h-4 shrink-0 text-purple-600 mt-0.5" />
+                <p className="leading-tight">
+                  La nouvelle date sera immédiatement synchronisée avec l'Agenda SAA de terrain (MOD-03) et enregistrée dans le journal officiel d'audit.
+                </p>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setReschedulingEst(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRescheduling}
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  <span>{isRescheduling ? 'Enregistrement...' : 'Valider la Reprogrammation'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

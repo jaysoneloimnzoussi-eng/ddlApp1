@@ -2,11 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DdlLogo } from './DdlLogo';
 import { X, Printer, Download, Shield, FileText, CheckCircle2 } from 'lucide-react';
-import { generateAttestationDocx, generateLegalActDocx, generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
+import {
+  generateAttestationDocx,
+  generateLegalActDocx,
+  generateUniversalAdministrativeDocx,
+  generateDepartmentalAuthorizationDocx,
+} from '../../services/docxGenerator';
 import { printHtmlElement } from '../../services/printService';
 import { OfficialDocumentHeader } from './OfficialDocumentHeader';
 import { formatCfa } from '../../services/crypto';
-import { generateReceiptQrCode, generateLegalActQrCode, generateAttestationQrCode } from '../../services/qrService';
+import {
+  generateReceiptQrCode,
+  generateLegalActQrCode,
+  generateAttestationQrCode,
+  generateAuthorizationQrCode,
+} from '../../services/qrService';
 
 export const PrintModal: React.FC = () => {
   const { printMode, printData, closePrintModal } = useApp();
@@ -38,13 +48,30 @@ export const PrintModal: React.FC = () => {
             printData.etablissementNom || '',
             printData.documentHash || ''
           );
+        } else if (printMode === 'a4_departmental_authorization') {
+          const isPo = printData.signatureDirecteur?.typeSignataire === 'chef_saa_po';
+          const signNom = printData.signatureDirecteur?.signataireNom;
+          url = await generateAuthorizationQrCode(
+            printData.numeroAutorisation || 'AUT-2026/DDL-PN/001',
+            printData.nomCommercial || 'LE ROOFTOP VIP CLUB',
+            printData.promoteurNom || 'Promoteur Enregistré',
+            printData.dateDelivrance || new Date().toISOString().substring(0, 10),
+            printData.documentHash || 'DDL-SHA256',
+            isPo,
+            signNom
+          );
+        } else if (printMode === 'a4_recovery_notice') {
+          url = await generateLegalActQrCode(
+            printData.referenceRelance || 'REL-2027-JAN',
+            printData.etablissementNom || printData.nomCommercial || 'Établissement',
+            printData.documentHash || 'DDL-RECOVERY-SHA256'
+          );
         }
         if (isMounted) setQrCodeUrl(url);
       } catch (err) {
         console.warn('QR Code load error:', err);
       }
     };
-
 
     loadQr();
     return () => {
@@ -61,6 +88,8 @@ export const PrintModal: React.FC = () => {
     else if (printMode === 'pos_receipt') docTitle = `Quittance_${printData.numeroQuittance || 'DDL_PN'}`;
     else if (printMode === 'staff_badge') docTitle = `Badge_${printData.matricule || 'Agent'}`;
     else if (printMode === 'spa_diploma') docTitle = `Diplome_${printData.nomCommercial || 'DDL_PN'}`;
+    else if (printMode === 'a4_departmental_authorization') docTitle = `Autorisation_${printData.numeroAutorisation || 'DDL_PN'}`;
+    else if (printMode === 'a4_recovery_notice') docTitle = `Avis_Recouvrement_${printData.codeDossier || printData.referenceRelance || '2027'}`;
 
     printHtmlElement('printable-modal-doc', docTitle);
   };
@@ -70,6 +99,24 @@ export const PrintModal: React.FC = () => {
       await generateAttestationDocx(printData);
     } else if (printMode === 'a4_legal_act') {
       await generateLegalActDocx(printData);
+    } else if (printMode === 'a4_departmental_authorization') {
+      await generateDepartmentalAuthorizationDocx(printData);
+    } else if (printMode === 'a4_recovery_notice') {
+      await generateUniversalAdministrativeDocx({
+        titreActe: "AVIS OFFICIEL DE RECOUVREMENT & SOMMATION RÉPUBLICAINE",
+        numeroActe: printData.referenceRelance || `AVIS-2027-${printData.codeDossier || 'SAF'}`,
+        dateLieu: 'Pointe-Noire, le 02 janvier 2027',
+        destinataireTitre: `À l'attention de M./Mme ${printData.promoteurNom || 'l’Exploitant'} — « ${printData.nomCommercial || printData.etablissementNom} »`,
+        destinataireVille: printData.arrondissement || 'Pointe-Noire',
+        sections: [
+          {
+            titre: 'OBJET : SOMMATION DE RÉGULARISATION FISCALE SOUS HUITAINE (EXERCICE 2027)',
+            contenu: `En exécution de la Loi N° 21-2019 et de la Note de service N° 151/MTL-CAB, les états financiers de la Régie SAF constatent que votre établissement accuse un solde restant dû exigible de ${formatCfa(printData.resteAPayer || printData.soldeRestantDu || printData.montantRedevanceAnnuelle || 150000)} au titre des redevances départementales. Vous êtes formellement sommé de vous présenter sous 8 jours ouvrés à la Régie des Recettes pour régularisation, sous peine de fermeture administrative immédiate.`,
+          },
+        ],
+        signataireNom: 'Jacques MATOKO',
+        signataireTitre: 'Le Directeur Départemental des Loisirs de Pointe-Noire',
+      });
     } else if (printMode === 'spa_diploma') {
       await generateUniversalAdministrativeDocx({
         titreActe: "DIPLÔME D'HONNEUR DU CIVISME ACOUSTIQUE",
@@ -93,7 +140,12 @@ export const PrintModal: React.FC = () => {
     }
   };
 
-  const canDownloadDocx = printMode === 'a4_attestation' || printMode === 'a4_legal_act' || printMode === 'spa_diploma';
+  const canDownloadDocx =
+    printMode === 'a4_attestation' ||
+    printMode === 'a4_legal_act' ||
+    printMode === 'spa_diploma' ||
+    printMode === 'a4_departmental_authorization' ||
+    printMode === 'a4_recovery_notice';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
@@ -108,6 +160,8 @@ export const PrintModal: React.FC = () => {
               {printMode === 'a4_legal_act' && `Acte de Police Administrative (${printData.referenceNumero})`}
               {printMode === 'staff_badge' && "Carte Professionnelle & Badge d'Inspecteur SAA"}
               {printMode === 'spa_diploma' && "Diplôme d'Honneur Départemental (Loisirs Sains)"}
+              {printMode === 'a4_departmental_authorization' && "Autorisation d'Exploitation Départementale (Diplôme A4)"}
+              {printMode === 'a4_recovery_notice' && "Avis de Recouvrement Républicain & Sommation 2027 (A4)"}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -485,6 +539,397 @@ export const PrintModal: React.FC = () => {
 
               <div className="text-center mt-3 pt-2 border-t border-slate-800 text-[9px] text-slate-400">
                 Ministère de l'Industrie Touristique et des Loisirs • MCAPNIT
+              </div>
+            </div>
+          )}
+
+          {/* 5. AUTORISATION D'EXPLOITATION DÉPARTEMENTALE (DIPLÔME SOLEMNEL A4 - MOD-20) */}
+          {printMode === 'a4_departmental_authorization' && (
+            <div className="bg-[#fcfbf7] text-slate-900 p-8 md:p-10 rounded-2xl shadow-2xl border-8 border-double border-amber-700/60 w-full max-w-[210mm] mx-auto font-garamond relative print:m-0 print:border-4 print:shadow-none print:w-full">
+              {/* Liseré Républicain Tricolore Supérieur */}
+              <div className="h-2 w-full rounded-full flex overflow-hidden mb-6 shadow-sm">
+                <div className="flex-1 bg-[#009543]" />
+                <div className="flex-1 bg-[#fbde4a]" />
+                <div className="flex-1 bg-[#dc241f]" />
+              </div>
+
+              {/* En-tête Institutionnel Solennel */}
+              <div className="flex justify-between items-start border-b border-amber-800/30 pb-4 mb-4">
+                <div className="text-left max-w-xs space-y-0.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-800">
+                    RÉPUBLIQUE DU CONGO
+                  </p>
+                  <p className="text-[9px] italic text-slate-600 font-serif">Unité • Travail • Progrès</p>
+                  <div className="w-12 h-0.5 bg-amber-600 my-1" />
+                  <p className="text-[9px] font-semibold text-slate-700 uppercase leading-tight">
+                    MINISTÈRE DE L'INDUSTRIE CULTURELLE, TOURISTIQUE, ARTISTIQUE ET DES LOISIRS
+                  </p>
+                  <p className="text-[8.5px] text-slate-600 uppercase">
+                    DIRECTION GÉNÉRALE DES LOISIRS
+                  </p>
+                  <p className="text-[9px] font-bold text-amber-950 uppercase pt-0.5">
+                    DIRECTION DÉPARTEMENTALE DES LOISIRS DE POINTE-NOIRE
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <DdlLogo size="sm" rounded="full" bordered={true} className="w-14 h-14 shadow-md mb-1" />
+                  <span className="text-[8px] font-mono text-slate-600">SCEAU D'ÉTAT</span>
+                </div>
+
+                <div className="text-right max-w-xs space-y-0.5 font-mono text-[9px] text-slate-700">
+                  <p className="font-bold text-emerald-800 text-[10px]">TITRE RÉGALIEN DDL-PN</p>
+                  <p>Réf : <span className="font-bold">{printData.numeroAutorisation || 'AUT-2026/DDL-PN/001'}</span></p>
+                  <p>{printData.referenceArrete || 'Arrêté N° 042/MID-DGL/DDL-PN-2026'}</p>
+                  <p className="text-slate-500">Exercice Budgétaire : {printData.anneeExercice || 2026}</p>
+                </div>
+              </div>
+
+              {/* Grand Titre Impérial Cinzel */}
+              <div className="text-center my-4 py-2 border-y-2 border-amber-800/40 bg-gradient-to-r from-amber-500/5 via-amber-600/15 to-amber-500/5">
+                <h2 className="font-cinzel text-xl md:text-2xl font-black text-amber-950 uppercase tracking-widest leading-tight">
+                  AUTORISATION D'EXPLOITATION DÉPARTEMENTALE
+                </h2>
+                <p className="text-[11px] font-semibold tracking-wider text-amber-900 uppercase mt-0.5">
+                  Titre Définitif d'Exercice des Activités de Loisirs • Département de Pointe-Noire
+                </p>
+              </div>
+
+              {/* Visas Régaliens EB Garamond */}
+              <div className="text-[10px] md:text-[10.5px] leading-relaxed text-slate-700 text-justify space-y-1 mb-4 italic">
+                <p>
+                  <strong className="font-semibold not-italic">LE DIRECTEUR DÉPARTEMENTAL DES LOISIRS DE POINTE-NOIRE,</strong>
+                </p>
+                <p>
+                  <strong>VU</strong> la Constitution de la République du Congo ;
+                </p>
+                <p>
+                  <strong>VU</strong> la Loi N° 21-2019 du 13 juin 2019 fixant les règles relatives à la protection de l'environnement sonore et à l'exercice des activités de loisirs ;
+                </p>
+                <p>
+                  <strong>VU</strong> la Note de Service Ministérielle N° 151/MTL-CAB du Ministre en charge des Loisirs ;
+                </p>
+                <p>
+                  <strong>VU</strong> le procès-verbal d'inspection technique de la Brigade Mobile SAA attestant de la conformité acoustique (<span className="font-semibold not-italic">85 dB(A) max avec limiteur scellé</span>) et sécuritaire ;
+                </p>
+                <p>
+                  <strong>VU</strong> la quittance officielle N° <span className="font-mono font-bold not-italic">{printData.quittanceReference || 'QUIT-2026-0042'}</span> du Régisseur SAF constatant le règlement libératoire de la redevance départementale ;
+                </p>
+              </div>
+
+              {/* Cadre Majestueux des Données de l'Établissement */}
+              <div className="bg-amber-50/60 border-2 border-amber-700/50 rounded-xl p-4 my-3 text-[11px] space-y-2 shadow-xs">
+                <div className="text-center pb-2 border-b border-amber-700/30">
+                  <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">Établissement Récipiendaire & Exploitant</span>
+                  <h3 className="font-cinzel text-lg md:text-xl font-bold text-slate-950 uppercase tracking-wide">
+                    {printData.nomCommercial}
+                  </h3>
+                  <p className="text-xs text-amber-950 font-medium">
+                    Exploitant titulaire : <span className="font-bold">{printData.promoteurNom}</span>
+                    {printData.promoteurTelephone ? ` (${printData.promoteurTelephone})` : ''}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-1 text-[10px]">
+                  <div>
+                    <span className="text-slate-500 block">Activité & Catégorie :</span>
+                    <strong className="text-slate-900">{printData.categorie}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Localisation :</span>
+                    <strong className="text-slate-900">{printData.arrondissement} • {printData.quartier}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Surface Utile :</span>
+                    <strong className="text-slate-900">{printData.surfaceM2 || 120} m²</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Redevance Annuelle :</span>
+                    <strong className="text-emerald-700 font-mono font-bold">{formatCfa(printData.montantRedevanceAcquittee || 150000)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Quittance Régie :</span>
+                    <strong className="text-slate-800 font-mono">{printData.quittanceReference || 'RÉGLÉE'} ({printData.quittanceDate || printData.dateDelivrance})</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Validité Souveraine :</span>
+                    <strong className="text-emerald-800 font-semibold">Du {printData.dateDelivrance} au {printData.dateExpiration}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dispositions Régaliennes (Articles) */}
+              <div className="text-[9.5px] leading-relaxed text-slate-700 space-y-1 mb-4">
+                <p>
+                  <strong className="text-slate-900">Article 1er :</strong> L'établissement désigné ci-dessus est formellement autorisé à exploiter ses activités dans les limites du Département de Pointe-Noire pour l'exercice 2026.
+                </p>
+                <p>
+                  <strong className="text-slate-900">Article 2 :</strong> La présente autorisation est strictement personnelle et incessible. L'exploitant s'oblige au maintien en état de fonctionnement du limiteur sonore homologué et à l'affichage visible du présent diplôme.
+                </p>
+                <p>
+                  <strong className="text-slate-900">Article 3 :</strong> Tout manquement réitéré aux normes de salubrité sonore ou non-présentation du titre lors des tournées de contrôle entraînera la suspension immédiate ou la fermeture administrative.
+                </p>
+              </div>
+
+              {/* Bloc Tripartite des Visas & Signature Directorale */}
+              <div className="grid grid-cols-3 gap-3 pt-3 border-t-2 border-amber-800/40 text-center items-end mb-4">
+                {/* 1. Visa SAA */}
+                <div className="border border-slate-300 rounded-lg p-2 bg-white/70">
+                  <p className="text-[8.5px] uppercase font-bold text-slate-700 mb-1">
+                    Visa Technique SAA
+                  </p>
+                  <p className="text-[8px] text-emerald-700 font-semibold">Conformité Acoustique Validée</p>
+                  <div className="h-8 flex items-center justify-center italic text-[9px] text-slate-600 font-serif">
+                    {printData.visaInspecteurChef?.nomInspecteur || 'Gildas Ambetos'}
+                  </div>
+                  <p className="text-[7.5px] text-slate-500 font-mono">Date : {printData.visaInspecteurChef?.dateVisa || printData.dateDelivrance}</p>
+                </div>
+
+                {/* 2. Visa SAF */}
+                <div className="border border-slate-300 rounded-lg p-2 bg-white/70">
+                  <p className="text-[8.5px] uppercase font-bold text-slate-700 mb-1">
+                    Visa Comptable SAF
+                  </p>
+                  <p className="text-[8px] text-emerald-700 font-semibold">Redevance Régularisée</p>
+                  <div className="h-8 flex items-center justify-center italic text-[9px] text-slate-600 font-serif">
+                    {printData.visaRegisseurSaf?.nomRegisseur || 'Patrice Bitemo'}
+                  </div>
+                  <p className="text-[7.5px] text-slate-500 font-mono">{printData.quittanceReference || 'QUIT-2026'}</p>
+                </div>
+
+                {/* 3. Signature & Sceau Directeur ou Chef SAA P.O. */}
+                <div className="border-2 border-amber-600 rounded-lg p-2 bg-amber-50/50 relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
+                    <div className="w-20 h-20 rounded-full border-2 border-dashed border-red-700 flex items-center justify-center rotate-12">
+                      <span className="text-[7px] font-bold text-red-700 uppercase text-center leading-tight">
+                        DDL-PN<br/>DIRECTION<br/>LOISIRS
+                      </span>
+                    </div>
+                  </div>
+                  {printData.signatureDirecteur?.typeSignataire === 'chef_saa_po' ? (
+                    <>
+                      <p className="text-[7.5px] uppercase font-bold text-amber-950 leading-tight">
+                        Pour le Directeur Départemental et P.O.
+                      </p>
+                      <p className="text-[7.5px] italic text-slate-700 font-semibold">
+                        Le Chef de Service Assistance & Autorisation
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[8.5px] uppercase font-bold text-amber-950 leading-tight">
+                        Le Directeur Départemental
+                      </p>
+                      <p className="text-[7.5px] italic text-slate-600">des Loisirs de Pointe-Noire</p>
+                    </>
+                  )}
+                  <div className="h-8 flex items-center justify-center">
+                    <span className="font-serif italic font-bold text-xs text-slate-900">
+                      {printData.signatureDirecteur?.signataireNom || printData.signatureDirecteur?.nomDirecteur || 'Jacques MATOKO'}
+                    </span>
+                  </div>
+                  <p className="text-[7.5px] font-mono text-emerald-800 font-bold">
+                    {printData.signatureDirecteur?.parapheOfficiel || 'Approuvé • DDL-PN • 2026'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Sceau Cryptographique, QR Code et Empreinte SHA-256 */}
+              <div className="p-3 bg-slate-100/90 border border-slate-300 rounded-xl font-mono text-[8px] text-slate-600 flex justify-between items-center">
+                <div className="space-y-0.5">
+                  <p><strong className="text-slate-800">Scellement Numérique :</strong> Certificat d'authenticité DDL-PN / Loi 21-2019</p>
+                  <p className="break-all"><strong className="text-slate-800">Empreinte SHA-256 :</strong> {printData.documentHash || 'c7e8a9f24b5d3e12a45c7890bfe1d45892147321e90ab4c3ef1287654321abcd'}</p>
+                  <p className="text-[7.5px] text-slate-500 font-sans italic">Document officiel infalsifiable • Vérification instantanée par scan du QR Code ci-contre.</p>
+                </div>
+                {qrCodeUrl && (
+                  <div className="flex flex-col items-center ml-3 shrink-0">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code Officiel"
+                      className="w-16 h-16 object-contain p-1 border border-slate-300 rounded-lg bg-white shadow-xs"
+                    />
+                    <span className="text-[6.5px] text-slate-500 mt-0.5 font-sans font-medium">Contrôle QR DDL-PN</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 6. AVIS DE RECOUVREMENT RÉGALIEN & SOMMATION D'ÉTAT 2027 */}
+          {printMode === 'a4_recovery_notice' && (
+            <div className="bg-[#fffefb] text-slate-900 p-8 md:p-10 rounded-xl shadow-2xl border-4 border-double border-red-700/60 max-w-[210mm] mx-auto font-garamond space-y-4">
+              {/* Congolese National Ribbon */}
+              <div className="h-2 w-full rounded-full flex overflow-hidden shadow-xs">
+                <div className="flex-1 bg-[#009543]" />
+                <div className="flex-1 bg-[#fbde4a]" />
+                <div className="flex-1 bg-[#dc241f]" />
+              </div>
+
+              {/* En-tête Institutionnel */}
+              <div className="flex justify-between items-start border-b-2 border-red-800/30 pb-3">
+                <div className="space-y-0.5">
+                  <p className="font-bold text-[9pt] uppercase tracking-wider text-slate-800">
+                    RÉPUBLIQUE DU CONGO
+                  </p>
+                  <p className="text-[8pt] italic font-serif text-slate-600">Unité • Travail • Progrès</p>
+                  <div className="pt-1 space-y-0.5">
+                    <p className="text-[8pt] font-bold text-slate-700 uppercase">
+                      Ministère des Industries Culturelles, Touristiques, Artistiques et des Loisirs
+                    </p>
+                    <p className="text-[8.5pt] font-black text-red-950 uppercase">
+                      Direction Départementale des Loisirs de Pointe-Noire
+                    </p>
+                    <p className="text-[7.5pt] font-semibold text-slate-600 uppercase">
+                      Service Assistance & Autorisation (SAA) • Régie des Recettes (SAF)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <DdlLogo size="sm" rounded="full" bordered={true} className="w-14 h-14 shadow-md" />
+                  <span className="text-[7pt] font-mono text-red-800 font-bold mt-0.5">SOUVERAINETÉ</span>
+                </div>
+
+                <div className="text-right space-y-0.5 font-mono text-[8pt]">
+                  <p className="font-bold text-red-800">{printData.referenceRelance || 'REL-2027-JAN-0001'}</p>
+                  <p className="text-slate-600 font-sans text-[7.5pt]">Dossier : <strong>{printData.codeDossier || 'DDL-PN-2026-VALIDE'}</strong></p>
+                  <p className="text-slate-500 text-[7.5pt]">Pointe-Noire, le {printData.dateEnvoi ? new Date(printData.dateEnvoi).toLocaleDateString('fr-FR') : '02 Janvier 2027'}</p>
+                </div>
+              </div>
+
+              {/* Titre Solennel */}
+              <div className="text-center py-2.5 border-y-2 border-red-800/40 bg-red-500/10 rounded-lg">
+                <h2 className="font-cinzel text-lg md:text-xl font-black text-red-950 tracking-wider">
+                  AVIS DE RECOUVREMENT RÉGALIEN & SOMMATION D'ÉTAT
+                </h2>
+                <p className="text-[9pt] uppercase tracking-wide text-red-900 font-semibold mt-0.5">
+                  Mise en Demeure d'Apurement des Redevances Départementales • Exercice Budgétaire 2027
+                </p>
+              </div>
+
+              {/* Destinataire Encadré */}
+              <div className="border border-slate-400 bg-slate-50/90 rounded-lg p-3 text-[9pt] space-y-1">
+                <div className="flex justify-between items-baseline border-b border-slate-300 pb-1">
+                  <span className="font-cinzel font-bold text-slate-900 text-[10pt] uppercase">
+                    {printData.etablissementNom || printData.nomCommercial}
+                  </span>
+                  <span className="font-mono text-[8pt] px-2 py-0.5 rounded bg-red-100 text-red-800 font-bold border border-red-300">
+                    CONSTAT : {printData.statutPaiement === 'zero_entree' ? 'ZÉRO ENTRÉE CONSTATÉE' : 'ACOMPTE PARTIEL INSUFFISANT'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-700 text-[8.5pt] pt-1">
+                  <div>
+                    <span>Exploitant / Promoteur : </span>
+                    <strong className="text-slate-900">{printData.promoteurNom || 'Promoteur Enregistré'}</strong>
+                  </div>
+                  <div>
+                    <span>Contact Téléphonique : </span>
+                    <strong className="font-mono text-slate-900">{printData.promoteurTelephone || '+242 06 000 0000'}</strong>
+                  </div>
+                  <div>
+                    <span>Localisation Urbaine : </span>
+                    <strong>{printData.arrondissement} ({printData.quartier || 'Centre'})</strong>
+                  </div>
+                  <div>
+                    <span>Catégorie Réglementaire : </span>
+                    <em>{printData.categorie || 'Établissement Récréatif'}</em>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visas Légaux */}
+              <div className="text-justify text-[8pt] text-slate-700 space-y-0.5 leading-relaxed border-l-2 border-red-700/60 pl-2.5 italic">
+                <p><strong>Vu</strong> la Constitution de la République du Congo ;</p>
+                <p><strong>Vu</strong> la Loi N° 21-2019 fixant le régime financier des débits de boissons et complexes de loisirs ;</p>
+                <p><strong>Vu</strong> la Note de service N° 151/MTL-CAB fixant la tarification officielle des droits départementaux ;</p>
+                <p><strong>Vu</strong> les procès-verbaux de contrôle constatant l'exploitation commerciale continue sans apurement complet de la redevance régalienne.</p>
+              </div>
+
+              {/* Tableau Financier de la Dette */}
+              <div className="border border-slate-800 rounded-lg overflow-hidden text-[8.5pt]">
+                <div className="bg-slate-900 text-white font-bold grid grid-cols-4 p-1.5 text-center text-[7.5pt]">
+                  <span>REDEVANCE FIXÉE</span>
+                  <span>ACOMPTES VERSÉS</span>
+                  <span>RESTE À RECOUVRER</span>
+                  <span>ÉCHÉANCE IMPÉRIEUSE</span>
+                </div>
+                <div className="grid grid-cols-4 p-2.5 text-center items-center bg-white font-mono text-[9pt]">
+                  <span className="text-slate-700">{formatCfa(printData.montantRedevance || printData.montantRedevanceAnnuelle || 150000)}</span>
+                  <span className="text-slate-500">{formatCfa(printData.montantPaye || printData.montantEncaisse || 0)}</span>
+                  <span className="text-red-700 font-bold text-[10pt] bg-red-50 py-1 rounded">
+                    {formatCfa(printData.resteAPayer || printData.soldeRestantDu || printData.montantRedevanceAnnuelle || 150000)}
+                  </span>
+                  <span className="text-red-800 font-sans font-bold text-[7.5pt]">SOUS HUITAINE (8 JOURS)</span>
+                </div>
+              </div>
+
+              {/* Injonction & Conséquences Juridiques */}
+              <div className="bg-red-50/80 border border-red-300 rounded-lg p-3 text-[8.5pt] leading-relaxed text-red-950 space-y-1">
+                <p className="font-bold uppercase tracking-wide text-red-900 text-[9pt]">
+                  INJONCTION DE MISE EN RÈGLE RÉGALIENNE :
+                </p>
+                <p>
+                  L'exploitant est formellement sommé de se présenter sous un délai impérieux de <strong>HUIT (08) JOURS OUVRÉS</strong> auprès du Guichet de la Régie SAF (Hôtel de Ville de Pointe-Noire) ou d'effectuer le télépaiement officiel sécurisé (MTN MoMo / Airtel Money).
+                </p>
+                <p className="text-[7.5pt] text-red-900 italic">
+                  À défaut de versement ou d'accord d'échelonnement validé, il sera fait application immédiate des mesures de police administrative prévues par les lois de la République : <strong>fermeture administrative des locaux avec apposition des scellés de police et poursuites judiciaires.</strong>
+                </p>
+              </div>
+
+              {/* Signatures & Sceau Républicain */}
+              <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-slate-300 text-center text-[8pt]">
+                <div className="border border-slate-300 rounded-lg p-1.5 bg-white/70">
+                  <p className="text-[7.5pt] uppercase font-bold text-slate-700">Pour la Brigade SAA</p>
+                  <p className="text-[7pt] text-slate-500 italic">Constat & Contrôle</p>
+                  <div className="h-7 flex items-center justify-center font-serif italic text-slate-800 text-[8.5pt]">
+                    Gildas Ambetos
+                  </div>
+                  <p className="text-[7pt] font-mono text-slate-500">Inspecteur Chef SAA</p>
+                </div>
+
+                <div className="border border-slate-300 rounded-lg p-1.5 bg-white/70">
+                  <p className="text-[7.5pt] uppercase font-bold text-slate-700">Pour la Régie SAF</p>
+                  <p className="text-[7pt] text-slate-500 italic">Comptabilité des Titres</p>
+                  <div className="h-7 flex items-center justify-center font-serif italic text-slate-800 text-[8.5pt]">
+                    Patrice Bitemo
+                  </div>
+                  <p className="text-[7pt] font-mono text-slate-500">Régisseur des Recettes</p>
+                </div>
+
+                <div className="border-2 border-red-600 rounded-lg p-1.5 bg-red-50/50 relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
+                    <div className="w-14 h-14 rounded-full border-2 border-dashed border-red-700 flex items-center justify-center rotate-12">
+                      <span className="text-[5.5pt] font-bold text-red-700 uppercase text-center leading-tight">
+                        DDL-PN<br/>COMMANDEMENT<br/>ÉTAT
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[7.5pt] uppercase font-bold text-red-950">Le Directeur Départemental</p>
+                  <p className="text-[7pt] italic text-slate-600">des Loisirs de Pointe-Noire</p>
+                  <div className="h-7 flex items-center justify-center font-serif italic font-bold text-[9pt] text-slate-900">
+                    Jacques MATOKO
+                  </div>
+                  <p className="text-[7pt] font-mono text-red-800 font-bold">Signé & Scellé • 2027</p>
+                </div>
+              </div>
+
+              {/* Pied de Page & QR Code de Contrôle */}
+              <div className="p-2.5 bg-slate-100 border border-slate-300 rounded-xl font-mono text-[7.5pt] text-slate-600 flex justify-between items-center">
+                <div className="space-y-0.5">
+                  <p><strong className="text-slate-800">Numéro d'Avis :</strong> {printData.referenceRelance || 'REL-2027-JAN-0001'}</p>
+                  <p className="break-all"><strong className="text-slate-800">Empreinte de Sécurité :</strong> {printData.documentHash || 'e89a3f2b4c10d7a5b678901234567890abcdef1234567890abcdef1234567890'}</p>
+                  <p className="text-[7pt] text-slate-500 font-sans italic">Acte officiel notifié avec valeur de sommation préalable à exécution forcée.</p>
+                </div>
+                {qrCodeUrl && (
+                  <div className="flex flex-col items-center ml-2 shrink-0">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code Contrôle"
+                      className="w-14 h-14 object-contain p-0.5 border border-slate-300 rounded bg-white shadow-xs"
+                    />
+                    <span className="text-[6pt] text-slate-500 mt-0.5 font-sans font-medium">Contrôle Légal</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

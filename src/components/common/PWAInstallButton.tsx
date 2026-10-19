@@ -85,9 +85,23 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
     }
   };
 
+  const safeOpenLink = (url: string) => {
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.location.href = url;
+    }
+  };
+
   const handleOpenStandaloneTab = () => {
     if (typeof window !== 'undefined') {
-      window.open(currentAppUrl, '_blank', 'noopener,noreferrer');
+      safeOpenLink(currentAppUrl);
     }
   };
 
@@ -105,7 +119,7 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
     const text = `Application Officielle DDL-PN Sovereign v3.0 (Direction Départementale des Loisirs de Pointe-Noire). Cliquez pour ouvrir et installer sur votre téléphone : ${currentAppUrl}`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
+      safeOpenLink(url);
     }
   };
 

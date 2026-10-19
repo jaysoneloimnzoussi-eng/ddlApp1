@@ -52,6 +52,9 @@ export const Sidebar: React.FC = () => {
     theme,
     isMobileMenuOpen,
     setIsMobileMenuOpen,
+    authorizations,
+    establishments,
+    receipts,
   } = useApp();
 
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = React.useState(false);
@@ -127,6 +130,17 @@ export const Sidebar: React.FC = () => {
 
     // 3. Finances, Titres & Régie SAF
     {
+      code: 'MOD-20',
+      nomCourt: 'Autorisation Départementale',
+      nomComplet: 'Diplômes A4, Sceau DDL & Direction',
+      icon: Award,
+      badge:
+        authorizations.filter((a) => !a.signatureDirecteur.signe).length > 0
+          ? `${authorizations.filter((a) => !a.signatureDirecteur.signe).length} DIR`
+          : undefined,
+      section: 'Régie Financière & Titres',
+    },
+    {
       code: 'MOD-11',
       nomCourt: 'Titres & Quittances',
       nomComplet: 'Attestations A4 & Reçus POS 58mm',
@@ -145,6 +159,23 @@ export const Sidebar: React.FC = () => {
       nomCourt: 'Portail Télépaiement',
       nomComplet: 'Espace Promoteur & MoMo/Airtel',
       icon: Smartphone,
+      section: 'Régie Financière & Titres',
+    },
+    {
+      code: 'MOD-21',
+      nomCourt: 'Relance & Vœux 2027',
+      nomComplet: 'Vœux 2026, Échéances & Recouvrement 2027',
+      icon: Send,
+      badge:
+        establishments.filter((e) => {
+          const paid = receipts.filter((r) => r.etablissementId === e.id).reduce((s, r) => s + r.montantVerse, 0) || e.montantEncaisse || 0;
+          return paid === 0;
+        }).length > 0
+          ? `${establishments.filter((e) => {
+              const paid = receipts.filter((r) => r.etablissementId === e.id).reduce((s, r) => s + r.montantVerse, 0) || e.montantEncaisse || 0;
+              return paid === 0;
+            }).length} ZERO`
+          : undefined,
       section: 'Régie Financière & Titres',
     },
 

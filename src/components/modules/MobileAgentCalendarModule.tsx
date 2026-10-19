@@ -45,6 +45,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  CalendarClock,
 } from 'lucide-react';
 import { InspectionSchedule, Establishment, CashReceipt, Arrondissement, QUARTIERS_PAR_ARRONDISSEMENT, EstablishmentCategory } from '../../types';
 import {
@@ -72,6 +73,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
     staff,
     authenticatedUser,
     recordPaymentAndScheduleNext,
+    rescheduleAppointment,
     reportEstablishmentClosed,
     importFromGoogleCalendar,
     googleUser,
@@ -182,6 +184,15 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [closedMotif, setClosedMotif] = useState<string>('Cessation d\'activité définitive / Rideau baissé');
   const [closedObservations, setClosedObservations] = useState<string>('');
   const [isSubmittingClose, setIsSubmittingClose] = useState<boolean>(false);
+
+  // Dedicated Modal for Rescheduling Schedule
+  const [reschedulingSchedule, setReschedulingSchedule] = useState<InspectionSchedule | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<string>('');
+  const [rescheduleHeure, setRescheduleHeure] = useState<string>('10:00');
+  const [rescheduleMotif, setRescheduleMotif] = useState<string>('Report convenu avec le promoteur');
+  const [rescheduleCustomMotif, setRescheduleCustomMotif] = useState<string>('');
+  const [rescheduleObservations, setRescheduleObservations] = useState<string>('');
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState<boolean>(false);
 
   // Mini calendar helpers
   const monthNames = [
@@ -306,6 +317,54 @@ export const MobileAgentCalendarModule: React.FC = () => {
       showNotification('error', `Erreur lors de l'encaissement : ${err.message}`);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Open Reschedule Modal for existing schedule
+  const handleOpenRescheduleModalFromSchedule = (sch: InspectionSchedule) => {
+    setReschedulingSchedule(sch);
+    setRescheduleDate(sch.dateTournee);
+    setRescheduleHeure(sch.heure || '10:00');
+    setRescheduleMotif(sch.notes || 'Report convenu avec le promoteur');
+    setRescheduleCustomMotif('');
+    setRescheduleObservations('');
+  };
+
+  // Confirm Reschedule action for schedule
+  const handleConfirmRescheduleSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reschedulingSchedule) return;
+    if (!rescheduleDate) {
+      showNotification('error', 'Veuillez sélectionner une date de rendez-vous valide.');
+      return;
+    }
+
+    setIsSubmittingReschedule(true);
+    try {
+      const finalMotif = rescheduleMotif === 'Autre motif convenu...'
+        ? (rescheduleCustomMotif.trim() || 'Report convenu avec le promoteur')
+        : rescheduleMotif;
+
+      await rescheduleAppointment({
+        establishmentId: reschedulingSchedule.etablissementId,
+        scheduleId: reschedulingSchedule.id,
+        nextRdvDate: rescheduleDate,
+        nextRdvHeure: rescheduleHeure,
+        nextRdvMotif: finalMotif,
+        reportObservations: rescheduleObservations.trim() || undefined,
+      });
+
+      // Jump calendar view directly to the new date
+      const parts = rescheduleDate.split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        setCurrentDate(new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0));
+      }
+
+      setReschedulingSchedule(null);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de la reprogrammation : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setIsSubmittingReschedule(false);
     }
   };
 
@@ -1305,16 +1364,24 @@ export const MobileAgentCalendarModule: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
                       {sch.statut !== 'effectue' && (
                         <button
                           onClick={() => handleOpenPaymentFromSchedule(sch)}
                           className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow transition flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <CreditCard className="w-3 h-3" />
-                          <span>Encaisser & Reprogrammer</span>
+                          <span>Encaisser</span>
                         </button>
                       )}
+                      <button
+                        onClick={() => handleOpenRescheduleModalFromSchedule(sch)}
+                        className="py-1.5 px-2 rounded-lg border border-purple-500/40 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer"
+                        title="Reprogrammer la date et l'heure de ce rendez-vous"
+                      >
+                        <CalendarClock className="w-3 h-3" />
+                        <span>Reprogrammer</span>
+                      </button>
                       <button
                         onClick={() => setSelectedSchedule(sch)}
                         className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] cursor-pointer"
@@ -1587,15 +1654,23 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         {sch.statut !== 'effectue' && (
                           <button
                             onClick={() => handleOpenPaymentFromSchedule(sch)}
-                            className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5"
+                            className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
                           >
                             <CreditCard className="w-4 h-4" />
-                            <span>Encaisser & Reprogrammer</span>
+                            <span>Encaisser</span>
                           </button>
                         )}
                         <button
+                          onClick={() => handleOpenRescheduleModalFromSchedule(sch)}
+                          className="px-3 py-2 rounded-lg border border-purple-500/40 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                          title="Reprogrammer la date et l'heure"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          <span>Reprogrammer</span>
+                        </button>
+                        <button
                           onClick={() => handleSyncSingleEventToGoogle(sch)}
-                          className="p-2 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                          className="p-2 rounded-lg border hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer"
                           title="Pousser dans Google Agenda"
                         >
                           <Cloud className="w-4 h-4" />
@@ -1754,15 +1829,23 @@ export const MobileAgentCalendarModule: React.FC = () => {
                       {sch.statut !== 'effectue' && (
                         <button
                           onClick={() => handleOpenPaymentFromSchedule(sch)}
-                          className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5"
+                          className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
                         >
                           <CreditCard className="w-4 h-4" />
                           <span>Encaisser</span>
                         </button>
                       )}
                       <button
+                        onClick={() => handleOpenRescheduleModalFromSchedule(sch)}
+                        className="px-3 py-2 rounded-lg border border-purple-500/40 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                        title="Reprogrammer cette mission"
+                      >
+                        <CalendarClock className="w-3.5 h-3.5" />
+                        <span>Reprogrammer</span>
+                      </button>
+                      <button
                         onClick={() => setSelectedSchedule(sch)}
-                        className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                       >
                         Détails
                       </button>
@@ -1923,12 +2006,12 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
                   <button
                     onClick={() => {
-                      handleOpenCreateModal(selectedSchedule.dateTournee, selectedSchedule.heure, selectedSchedule.etablissementId);
+                      handleOpenRescheduleModalFromSchedule(selectedSchedule);
                       setSelectedSchedule(null);
                     }}
-                    className="px-3 py-2 rounded-lg border border-blue-500/50 hover:bg-blue-50 dark:hover:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-3 py-2 rounded-lg border border-purple-500/50 hover:bg-purple-50 dark:hover:bg-purple-950/60 text-purple-600 dark:text-purple-400 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Calendar className="w-3.5 h-3.5" />
+                    <CalendarClock className="w-3.5 h-3.5" />
                     <span>Reprogrammer</span>
                   </button>
 
@@ -2874,6 +2957,150 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. MODAL: REPROGRAMMER RENDEZ-VOUS / DESCENTE DE TERRAIN */}
+      {reschedulingSchedule && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+              isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+            }`}
+          >
+            <div className="bg-purple-600 p-4 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-white/20">
+                  <CalendarClock className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Reprogrammer le Rendez-vous / Descente</h3>
+                  <p className="text-xs text-purple-100 truncate">{reschedulingSchedule.etablissementNom}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReschedulingSchedule(null)}
+                className="p-1 rounded-full hover:bg-purple-700 text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmRescheduleSchedule} className="p-5 space-y-4 text-xs">
+              {/* Infos Récapitulatives */}
+              <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-900/60 space-y-1.5">
+                <div className="flex justify-between items-center text-[11px] font-bold text-purple-800 dark:text-purple-300">
+                  <span>Mission : {reschedulingSchedule.typeMission}</span>
+                  <span className="font-mono text-purple-600">{reschedulingSchedule.arrondissement}</span>
+                </div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Date actuelle : <strong className="font-mono">{reschedulingSchedule.dateTournee}</strong> à <strong className="font-mono">{reschedulingSchedule.heure}</strong> • Inspecteur : {reschedulingSchedule.inspecteurChef}
+                </div>
+              </div>
+
+              {/* Date & Heure */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                    Nouvelle Date de Tournée *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                    Nouvelle Heure *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={rescheduleHeure}
+                    onChange={(e) => setRescheduleHeure(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Motif de la Reprogrammation */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                  Motif du Report / Reprogrammation *
+                </label>
+                <select
+                  value={rescheduleMotif}
+                  onChange={(e) => setRescheduleMotif(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                  }`}
+                >
+                  <option value="Report convenu avec le promoteur">Report convenu à la demande du promoteur</option>
+                  <option value="Délai de grâce sollicité pour paiement solde">Délai de grâce accordé pour paiement du solde</option>
+                  <option value="Promoteur en déplacement / indisponible au premier passage">Promoteur en déplacement / indisponible au premier passage</option>
+                  <option value="Séance de conciliation sonométrique Loi 21-2019">Séance de conciliation sonométrique (Loi 21-2019)</option>
+                  <option value="Contrôle in situ des pièces et conformité">Contrôle in situ des pièces et conformité</option>
+                  <option value="Autre motif convenu...">Autre motif convenu...</option>
+                </select>
+
+                {rescheduleMotif === 'Autre motif convenu...' && (
+                  <input
+                    type="text"
+                    required
+                    value={rescheduleCustomMotif}
+                    onChange={(e) => setRescheduleCustomMotif(e.target.value)}
+                    placeholder="Préciser le motif convenu..."
+                    className={`mt-2 w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700'
+                    }`}
+                  />
+                )}
+              </div>
+
+              {/* Observations */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 text-slate-700 dark:text-slate-300">
+                  Observations et Engagements (Optionnel)
+                </label>
+                <textarea
+                  rows={2}
+                  value={rescheduleObservations}
+                  onChange={(e) => setRescheduleObservations(e.target.value)}
+                  placeholder="Ex: Le promoteur s'engage à être présent et à honorer son acompte..."
+                  className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                    isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700'
+                  }`}
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setReschedulingSchedule(null)}
+                  className="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReschedule}
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                  <span>{isSubmittingReschedule ? 'Enregistrement...' : 'Valider la Reprogrammation'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

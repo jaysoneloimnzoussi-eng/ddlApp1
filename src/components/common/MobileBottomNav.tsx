@@ -9,6 +9,7 @@ import {
   Coins,
   FileCheck2,
   FileSpreadsheet,
+  Award,
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -21,6 +22,7 @@ export const MobileBottomNav: React.FC = () => {
     offlineQueueCount,
     isOnline,
     currentUserRole,
+    authorizations,
   } = useApp();
 
   const isLight = theme === 'light';
@@ -133,11 +135,15 @@ export const MobileBottomNav: React.FC = () => {
         isActive: activeModule === 'MOD-03' && !isMobileMenuOpen,
       },
       {
-        id: 'MOD-06',
-        label: 'Bilans DGL',
-        icon: FileSpreadsheet,
-        action: () => setActiveModule('MOD-06'),
-        isActive: activeModule === 'MOD-06' && !isMobileMenuOpen,
+        id: 'MOD-20',
+        label: 'Autorisation',
+        icon: Award,
+        badge:
+          authorizations.filter((a) => !a.signatureDirecteur.signe).length > 0
+            ? `${authorizations.filter((a) => !a.signatureDirecteur.signe).length}`
+            : undefined,
+        action: () => setActiveModule('MOD-20'),
+        isActive: activeModule === 'MOD-20' && !isMobileMenuOpen,
       },
       {
         id: 'MENU',
@@ -147,7 +153,7 @@ export const MobileBottomNav: React.FC = () => {
         isActive: isMobileMenuOpen,
       },
     ];
-  }, [currentUserRole, activeModule, isMobileMenuOpen, isOnline, offlineQueueCount, setActiveModule, toggleMobileMenu]);
+  }, [currentUserRole, activeModule, isMobileMenuOpen, isOnline, offlineQueueCount, setActiveModule, toggleMobileMenu, authorizations]);
 
   return (
     <nav

@@ -63,6 +63,9 @@ export const Header: React.FC = () => {
     promoteur: { title: 'Portail Promoteur', color: 'bg-teal-500/20 text-teal-400 border-teal-500/30' },
   };
 
+  const pendingSyncTotal =
+    offlineQueueCount + establishments.filter((e) => e.syncStatus === 'pending').length;
+
   return (
     <header className={`app-header h-14 md:h-18 border-b px-2.5 sm:px-4 md:px-6 flex items-center justify-between sticky top-0 z-30 shadow-sm transition-colors max-w-full ${
       theme === 'light' ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
@@ -189,14 +192,15 @@ export const Header: React.FC = () => {
         {/* In-app PWA install button */}
         <PWAInstallButton variant="header" />
 
-        {/* Offline Queue Badge */}
-        {offlineQueueCount > 0 && isOnline && (
+        {/* Offline Queue / Pending Items Badge */}
+        {pendingSyncTotal > 0 && isOnline && (
           <button
             onClick={syncOfflineQueue}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow transition cursor-pointer"
+            title={`Synchroniser ${pendingSyncTotal} fiche(s) en attente vers Firebase Firestore`}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md transition cursor-pointer animate-pulse"
           >
-            <RefreshCw className="w-3 h-3 animate-spin" />
-            Sync ({offlineQueueCount})
+            <RefreshCw className="w-3 h-3" />
+            <span>Sync ({pendingSyncTotal})</span>
           </button>
         )}
 
@@ -213,6 +217,17 @@ export const Header: React.FC = () => {
 
       {/* Right Controls: Command Palette (Ctrl+K) + Theme Switcher + Google Workspace */}
       <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
+        {/* Mobile Sync Button when offline items are queued */}
+        {pendingSyncTotal > 0 && isOnline && (
+          <button
+            onClick={syncOfflineQueue}
+            title={`Synchroniser ${pendingSyncTotal} fiche(s) terrain vers Firebase`}
+            className="flex lg:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Sync ({pendingSyncTotal})</span>
+          </button>
+        )}
         {/* Command Palette (Ctrl+K) Trigger */}
         <button
           onClick={toggleCommandPalette}
@@ -303,8 +318,12 @@ export const Header: React.FC = () => {
           <button
             onClick={handleGoogleSignIn}
             disabled={isSigningIn}
-            className="flex items-center gap-1.5 min-h-[44px] md:min-h-0 px-2 sm:px-3 py-1.5 rounded-xl md:rounded-lg bg-white dark:bg-slate-800 hover:shadow border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold shadow-xs transition cursor-pointer"
-            title="Lier Google Agenda"
+            className={`flex items-center gap-1.5 min-h-[44px] md:min-h-0 px-2 sm:px-3 py-1.5 rounded-xl md:rounded-lg border text-xs font-semibold shadow-xs transition cursor-pointer ${
+              offlineQueueCount > 0
+                ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/30'
+                : 'bg-white dark:bg-slate-800 hover:shadow border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+            }`}
+            title="Connexion Google pour autoriser l'accès et la synchronisation avec Firebase Firestore"
           >
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path
@@ -324,8 +343,8 @@ export const Header: React.FC = () => {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span className="hidden md:inline">
-              {isSigningIn ? 'Liaison...' : 'Lier Google'}
+            <span className="hidden md:inline font-bold">
+              {isSigningIn ? 'Connexion...' : 'Connexion Google (Firebase)'}
             </span>
           </button>
         )}

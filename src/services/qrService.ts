@@ -139,3 +139,29 @@ export async function generateLegalActQrCode(referenceNumero: string, etablissem
   return generateQrCodeDataUrl(verificationUrl, 160);
 }
 
+/**
+ * Génère le QR Code officiel de certification d'une Autorisation d'Exploitation Départementale
+ */
+export async function generateAuthorizationQrCode(
+  authNumero: string,
+  etablissementNom: string,
+  promoteurNom: string,
+  dateDelivrance: string,
+  hash: string,
+  isPo = false,
+  signataireNom?: string
+): Promise<string> {
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://ddlpn.loisirs.gouv.cg';
+
+  let verificationUrl = `${origin}/?verify=auth&num=${encodeURIComponent(authNumero)}&etab=${encodeURIComponent(etablissementNom)}&prom=${encodeURIComponent(promoteurNom)}&date=${encodeURIComponent(dateDelivrance)}&hash=${encodeURIComponent(hash)}`;
+  if (isPo) {
+    verificationUrl += `&po=true`;
+  }
+  if (signataireNom) {
+    verificationUrl += `&sign=${encodeURIComponent(signataireNom)}`;
+  }
+  return generateQrCodeDataUrl(verificationUrl, 180);
+}
+

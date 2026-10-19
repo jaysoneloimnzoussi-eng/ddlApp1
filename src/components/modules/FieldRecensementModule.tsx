@@ -20,6 +20,8 @@ import {
   UserCheck,
   Shield,
   CalendarCheck,
+  CalendarClock,
+  Clock,
   Building,
   Edit3,
   X,
@@ -56,6 +58,7 @@ export const FieldRecensementModule: React.FC = () => {
     addEstablishment,
     addSchedule,
     updateEstablishment,
+    rescheduleAppointment,
     showNotification,
     isOnline,
     offlineQueueCount,
@@ -204,6 +207,56 @@ export const FieldRecensementModule: React.FC = () => {
       showNotification('error', `Erreur lors de la mise à jour: ${err.message}`);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Modal Reprogrammation RDV Tenancier
+  const [reschedulingEst, setReschedulingEst] = useState<Establishment | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState<string>('');
+  const [rescheduleHeure, setRescheduleHeure] = useState<string>('10:00');
+  const [rescheduleMotif, setRescheduleMotif] = useState<string>('Report convenu avec le promoteur');
+  const [rescheduleCustomMotif, setRescheduleCustomMotif] = useState<string>('');
+  const [rescheduleObservations, setRescheduleObservations] = useState<string>('');
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState<boolean>(false);
+
+  const handleOpenReschedule = (est: Establishment) => {
+    setReschedulingEst(est);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().substring(0, 10);
+    setRescheduleDate(est.prochainRdvDate || tomorrowStr);
+    setRescheduleHeure(est.prochainRdvHeure || '10:00');
+    setRescheduleMotif(est.prochainRdvMotif || 'Report convenu avec le promoteur');
+    setRescheduleCustomMotif('');
+    setRescheduleObservations('');
+  };
+
+  const handleConfirmReschedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reschedulingEst) return;
+    if (!rescheduleDate) {
+      showNotification('error', 'Veuillez sélectionner une date de rendez-vous valide.');
+      return;
+    }
+    setIsSubmittingReschedule(true);
+    try {
+      const finalMotif = rescheduleMotif === 'Autre motif convenu...'
+        ? (rescheduleCustomMotif.trim() || 'Report convenu avec le promoteur')
+        : rescheduleMotif;
+
+      await rescheduleAppointment({
+        establishmentId: reschedulingEst.id,
+        nextRdvDate: rescheduleDate,
+        nextRdvHeure: rescheduleHeure,
+        nextRdvMotif: finalMotif,
+        reportObservations: rescheduleObservations.trim() || undefined,
+      });
+
+      setReschedulingEst(null);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de la reprogrammation : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setIsSubmittingReschedule(false);
     }
   };
 
@@ -406,17 +459,32 @@ export const FieldRecensementModule: React.FC = () => {
           ) : (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold animate-pulse">
               <WifiOff className="w-3.5 h-3.5" />
-              <span>Mode Terrain Hors-Ligne ({offlineQueueCount} fiches en file)</span>
+              <span>
+                Mode Terrain Hors-Ligne (
+                {Math.max(offlineQueueCount, establishments.filter((e) => e.syncStatus === 'pending').length)} fiches en file)
+              </span>
             </div>
           )}
 
-          {offlineQueueCount > 0 && isOnline && (
+          {isOnline && (
             <button
               onClick={syncOfflineQueue}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
+                Math.max(offlineQueueCount, establishments.filter((e) => e.syncStatus === 'pending').length) > 0
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md animate-pulse'
+                  : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+              }`}
+              title="Synchroniser vos recensements locaux avec Firebase Firestore"
             >
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              Synchroniser ({offlineQueueCount})
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>
+                {Math.max(offlineQueueCount, establishments.filter((e) => e.syncStatus === 'pending').length) > 0
+                  ? `Synchroniser (${Math.max(
+                      offlineQueueCount,
+                      establishments.filter((e) => e.syncStatus === 'pending').length
+                    )})`
+                  : 'Sync Firestore'}
+              </span>
             </button>
           )}
         </div>
@@ -1238,6 +1306,31 @@ export const FieldRecensementModule: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* Rendez-vous fixé ou convenu */}
+                    {est.prochainRdvDate && (
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-[11px] text-purple-800 dark:text-purple-300">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                          <span>
+                            Rendez-vous fixé : <strong>{est.prochainRdvDate}</strong> à <strong>{est.prochainRdvHeure || '10:00'}</strong>
+                          </span>
+                          {est.prochainRdvMotif && (
+                            <span className="text-purple-600 dark:text-purple-400 italic">
+                              ({est.prochainRdvMotif})
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReschedule(est)}
+                          className="px-2 py-0.5 rounded bg-purple-600 hover:bg-purple-500 text-white font-bold text-[10px] transition cursor-pointer shrink-0"
+                          title="Modifier la date ou l'heure de ce rendez-vous"
+                        >
+                          Changer date
+                        </button>
+                      </div>
+                    )}
+
                     <div className="flex justify-end items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/60 flex-wrap">
                       {/* Rappel WhatsApp */}
                       {est.promoteurTelephone && (
@@ -1266,6 +1359,17 @@ export const FieldRecensementModule: React.FC = () => {
                       >
                         <Edit3 className="w-3 h-3 text-slate-600 dark:text-slate-400" />
                         <span>Éditer Fiche</span>
+                      </button>
+
+                      {/* Reprogrammer RDV Tenancier */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReschedule(est)}
+                        className="px-2.5 py-1 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950 dark:hover:bg-purple-900 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                        title="Reprogrammer ou fixer un rendez-vous avec ce tenancier"
+                      >
+                        <CalendarClock className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                        <span>{est.prochainRdvDate ? 'Reprogrammer RDV' : 'Fixer RDV'}</span>
                       </button>
 
                       <button
@@ -1504,6 +1608,176 @@ export const FieldRecensementModule: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL REPROGRAMMATION DU RENDEZ-VOUS DU TENANCIER */}
+      {reschedulingEst && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+              isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+            }`}
+          >
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-800 p-4 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-sm flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4" />
+                  <span>Reprogrammer le Rendez-vous Tenancier</span>
+                </h3>
+                <p className="text-xs text-purple-100 font-mono">
+                  {reschedulingEst.codeDossier || 'Dossier DDL-PN'} • {reschedulingEst.nomCommercial}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReschedulingEst(null)}
+                className="p-1 rounded-lg hover:bg-white/20 text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              {/* Récapitulatif établissement */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {reschedulingEst.nomCommercial}
+                  </span>
+                  <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">
+                    {reschedulingEst.arrondissement} ({reschedulingEst.quartier || 'Centre'})
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-500 text-[11px]">
+                  <div>Promoteur : <strong className="text-slate-700 dark:text-slate-300">{reschedulingEst.promoteurNom}</strong></div>
+                  <div>Tél : <span className="font-mono text-purple-600">{reschedulingEst.promoteurTelephone}</span></div>
+                  <div>Reste à payer : <strong className="font-mono text-emerald-600">{formatCfa(reschedulingEst.soldeRestantDu)}</strong></div>
+                  <div>Agent assigné : <strong>{reschedulingEst.agentAssigneNom || 'Agent SAA'}</strong></div>
+                </div>
+                {reschedulingEst.prochainRdvDate && (
+                  <div className="pt-1.5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-1.5 text-slate-500 text-[11px]">
+                    <Clock className="w-3.5 h-3.5 text-purple-500" />
+                    <span>RDV précédent : <strong>{reschedulingEst.prochainRdvDate}</strong> à <strong>{reschedulingEst.prochainRdvHeure || '10:00'}</strong> ({reschedulingEst.prochainRdvMotif || 'Non spécifié'})</span>
+                  </div>
+                )}
+              </div>
+
+              <form onSubmit={handleConfirmReschedule} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold">
+                      Nouvelle Date Convenue *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={rescheduleDate}
+                      onChange={(e) => setRescheduleDate(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold ${
+                        isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                      }`}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold">
+                      Heure de Passage / Audition *
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={rescheduleHeure}
+                      onChange={(e) => setRescheduleHeure(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold ${
+                        isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold">
+                    Motif de la reprogrammation *
+                  </label>
+                  <select
+                    value={rescheduleMotif}
+                    onChange={(e) => setRescheduleMotif(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  >
+                    <option value="Report convenu avec le promoteur">Report convenu avec le promoteur</option>
+                    <option value="Promoteur en déplacement / Absence momentanée">Promoteur en déplacement / Absence momentanée</option>
+                    <option value="Délai supplémentaire accordé pour versement acompte">Délai supplémentaire accordé pour versement acompte</option>
+                    <option value="Visite technique acoustique & limiteur de son">Visite technique acoustique & limiteur de son</option>
+                    <option value="Audition contradictoire au bureau de la Brigade">Audition contradictoire au bureau de la Brigade</option>
+                    <option value="Dossier en cours de constitution / Dépôt physique">Dossier en cours de constitution / Dépôt physique</option>
+                    <option value="Autre motif convenu...">Autre motif convenu...</option>
+                  </select>
+                </div>
+
+                {rescheduleMotif === 'Autre motif convenu...' && (
+                  <div className="space-y-1">
+                    <label className="text-slate-700 dark:text-slate-300 font-bold">
+                      Préciser le motif personnalisé *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Attente signature bail commercial..."
+                      value={rescheduleCustomMotif}
+                      onChange={(e) => setRescheduleCustomMotif(e.target.value)}
+                      className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                        isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                      }`}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-slate-700 dark:text-slate-300 font-bold">
+                    Observations de terrain ou engagements du tenancier
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={rescheduleObservations}
+                    onChange={(e) => setRescheduleObservations(e.target.value)}
+                    placeholder="Ex: Le promoteur a promis d'apporter l'acompte de 50 000 FCFA lors de ce passage."
+                    className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                      isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setReschedulingEst(null)}
+                    className="px-4 py-2 rounded-xl border font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReschedule}
+                    className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmittingReschedule ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Enregistrement...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CalendarClock className="w-4 h-4" />
+                        <span>Confirmer la Reprogrammation</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

@@ -331,6 +331,104 @@ export interface SoitTransmisDgl {
   observations?: string;
 }
 
+export interface DepartmentalAuthorization {
+  id: string;
+  numeroAutorisation: string; // Ex: AUT-2026/DDL-PN/001
+  referenceArrete: string;    // Ex: Arrêté N° 042/MID-DGL/DDL-PN-2026
+  anneeExercice: number;      // 2026
+  dateDelivrance: string;     // YYYY-MM-DD
+  dateExpiration: string;     // YYYY-MM-DD (1 an renouvelable)
+  etablissementId: string;
+  codeDossier: string;
+  nomCommercial: string;
+  promoteurNom: string;
+  promoteurNationalite?: string;
+  promoteurTelephone?: string;
+  arrondissement: Arrondissement;
+  quartier: string;
+  adresseExacte: string;
+  categorie: EstablishmentCategory;
+  surfaceM2: number;
+  montantRedevanceAcquittee: number;
+  quittanceReference: string;
+  quittanceDate: string;
+  
+  // Visas & Signatures protocolaires
+  visaInspecteurChef: {
+    signe: boolean;
+    nomInspecteur: string;
+    dateVisa: string;
+    observationsConformite: string;
+  };
+  visaRegisseurSaf: {
+    signe: boolean;
+    nomRegisseur: string;
+    dateVisa: string;
+    quittanceNumero: string;
+  };
+  signatureDirecteur: {
+    signe: boolean;
+    nomDirecteur: string;
+    qualite: string; // "Le Directeur Départemental des Loisirs de Pointe-Noire" ou "Pour le Directeur Départemental et P.O., Le Chef de Service Assistance et Autorisation"
+    dateSignature: string;
+    parapheOfficiel: string;
+    typeSignataire?: 'directeur' | 'chef_saa_po'; // 'directeur' (direct) ou 'chef_saa_po' (par ordre du Directeur)
+    signataireNom?: string; // Nom de la personne ayant signé
+    mentionPo?: string; // "Pour le Directeur Départemental et par ordre (P.O.)"
+  };
+
+  statut: 'en_instruction' | 'vise_inspecteur' | 'vise_regisseur' | 'approuve_directeur' | 'delivre' | 'suspendu' | 'revoque';
+  documentHash: string; // Empreinte SHA-256
+  qrCodeUrl?: string;
+}
+
+export type CampaignTargetSegment = 'all' | 'zero_entree' | 'en_cours_acompte' | 'solde_en_regle';
+
+export type CampaignType =
+  | 'voeux_decembre_2026'
+  | 'recouvrement_janvier_2027_zero'
+  | 'rappel_echeance_janvier_2027_solde'
+  | 'personnalise';
+
+export type CommunicationChannel = 'whatsapp' | 'sms' | 'email' | 'courrier_a4';
+
+export interface CampaignMessage {
+  id: string;
+  campagneId?: string;
+  campaignType: CampaignType;
+  channel: CommunicationChannel;
+  establishmentId: string;
+  etablissementNom: string;
+  promoteurNom: string;
+  promoteurTelephone: string;
+  promoteurEmail?: string;
+  arrondissement: Arrondissement;
+  categorie: EstablishmentCategory;
+  statutPaiement: 'zero_entree' | 'acompte' | 'solde';
+  montantRedevance: number;
+  montantPaye: number;
+  resteAPayer: number;
+  messageContent: string;
+  dateEnvoi: string;
+  statutEnvoi: 'en_attente' | 'envoye' | 'delivre' | 'repondu' | 'echec';
+  expediteurNom: string;
+  referenceRelance: string;
+}
+
+export interface CampaignBatch {
+  id: string;
+  titre: string;
+  typeCampagne: CampaignType;
+  cibleSegment: CampaignTargetSegment;
+  periodeCible: 'decembre_2026' | 'janvier_2027' | 'courant';
+  dateCreation: string;
+  totalCibles: number;
+  totalEnvoyes: number;
+  canalPrincipal: CommunicationChannel;
+  statut: 'brouillon' | 'en_cours' | 'cloture';
+  auteurNom: string;
+}
+
 export type {
   OfficialPta2026Data,
   PtaTableSection,
