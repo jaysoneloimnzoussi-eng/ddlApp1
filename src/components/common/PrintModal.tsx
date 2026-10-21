@@ -16,6 +16,7 @@ import {
   generateLegalActQrCode,
   generateAttestationQrCode,
   generateAuthorizationQrCode,
+  generateConvocationQrCode,
 } from '../../services/qrService';
 
 export const PrintModal: React.FC = () => {
@@ -66,6 +67,14 @@ export const PrintModal: React.FC = () => {
             printData.etablissementNom || printData.nomCommercial || 'Établissement',
             printData.documentHash || 'DDL-RECOVERY-SHA256'
           );
+        } else if (printMode === 'a4_convocation') {
+          url = await generateConvocationQrCode(
+            printData.referenceConvocation || 'CONV-2026-PN-001',
+            printData.nomCommercial || 'Établissement',
+            printData.promoteurNom || 'Promoteur',
+            printData.montantForfaitNotifie || 50000,
+            printData.dateComparution || '15 jours'
+          );
         }
         if (isMounted) setQrCodeUrl(url);
       } catch (err) {
@@ -90,6 +99,7 @@ export const PrintModal: React.FC = () => {
     else if (printMode === 'spa_diploma') docTitle = `Diplome_${printData.nomCommercial || 'DDL_PN'}`;
     else if (printMode === 'a4_departmental_authorization') docTitle = `Autorisation_${printData.numeroAutorisation || 'DDL_PN'}`;
     else if (printMode === 'a4_recovery_notice') docTitle = `Avis_Recouvrement_${printData.codeDossier || printData.referenceRelance || '2027'}`;
+    else if (printMode === 'a4_convocation') docTitle = `Convocation_${printData.nomCommercial || 'DDL_PN'}`;
 
     printHtmlElement('printable-modal-doc', docTitle);
   };
@@ -114,7 +124,35 @@ export const PrintModal: React.FC = () => {
             contenu: `En exécution de la Loi N° 21-2019 et de la Note de service N° 151/MTL-CAB, les états financiers de la Régie SAF constatent que votre établissement accuse un solde restant dû exigible de ${formatCfa(printData.resteAPayer || printData.soldeRestantDu || printData.montantRedevanceAnnuelle || 150000)} au titre des redevances départementales. Vous êtes formellement sommé de vous présenter sous 8 jours ouvrés à la Régie des Recettes pour régularisation, sous peine de fermeture administrative immédiate.`,
           },
         ],
-        signataireNom: 'Jacques MATOKO',
+        signataireNom: 'NTSEKE NGOUAKA Jean Richard',
+        signataireTitre: 'Le Directeur Départemental des Loisirs de Pointe-Noire',
+      });
+    } else if (printMode === 'a4_convocation') {
+      await generateUniversalAdministrativeDocx({
+        titreActe: "CONVOCATION OFFICIELLE POUR RÉGULARISATION ADMINISTRATIVE ET FISCALE",
+        numeroActe: printData.referenceConvocation || `CONV-2026-PN-${printData.codeDossier || '001'}`,
+        dateLieu: `Pointe-Noire, le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}`,
+        destinataireTitre: `À l'attention de M./Mme ${printData.promoteurNom || 'le Promoteur'} — « ${printData.nomCommercial} »`,
+        destinataireVille: `${printData.arrondissement || 'Pointe-Noire'} (${printData.quartier || 'Zone Urbaine'})`,
+        sections: [
+          {
+            titre: "OBJET : CONVOCATION À SE PRÉSENTER À LA DIRECTION DÉPARTEMENTALE DES LOISIRS",
+            contenu: `Dans le cadre des opérations de contrôle et de recensement de la Brigade Mobile SAA, il a été constaté l'exercice de votre établissement de loisirs « ${printData.nomCommercial} » sans titre d'exploitation régulier. En exécution de la Loi N° 21-2019, vous êtes formellement convoqué à vous présenter à la Direction Départementale des Loisirs (Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée, Tél: +242 06 186 4275, Email: ddloisirs_pnr@loisirs.cg) le ${printData.dateComparution || 'sous huitaine'} à ${printData.heureComparution || '09h00'}.`,
+          },
+          {
+            titre: "CONDITIONS FINANCIÈRES & FORFAIT INFORMEL INITIAL (50 000 FCFA)",
+            contenu: `Le montant forfaitaire réglementaire d'imposition d'office pour les établissements informels repérés sur le terrain est fixé à ${formatCfa(printData.montantForfaitNotifie || 50000)}. Il vous appartient de vous présenter muni des pièces requises pour faire valoir vos observations, négocier le cas échéant le montant forfaitaire à la baisse selon le standing réel de votre débit, et convenir des modalités de versement (acompte ou solde libératoire).`,
+          },
+          {
+            titre: "PIÈCES OBLIGATOIRES À PRODUIRE",
+            contenu: `1. Pièce d'identité officielle du promoteur / gérant (CNI ou Passeport)\n2. Contrat de bail commercial ou titre d'occupation des lieux\n3. Registre du commerce (RCCM) ou déclaration d'activité (si existant)\n4. Quittances antérieures de versement ou preuve de paiement éventuelle`,
+          },
+          {
+            titre: "AVERTISSEMENT LÉGAL ET SANCTIONS EN CAS DE DÉFAUT",
+            contenu: `À défaut de comparution à la date fixée, il sera fait application immédiate des mesures de police administrative prévues par la réglementation en vigueur : majoration de retard, mise en demeure avec astreinte journalière et fermeture conservatoire immédiate de l'établissement par la force publique.`,
+          },
+        ],
+        signataireNom: 'NTSEKE NGOUAKA Jean Richard',
         signataireTitre: 'Le Directeur Départemental des Loisirs de Pointe-Noire',
       });
     } else if (printMode === 'spa_diploma') {
@@ -130,7 +168,7 @@ export const PrintModal: React.FC = () => {
             contenu: `En reconnaissance de son civisme exemplaire, de sa conformité acoustique stricte à la Loi N° 21-2019 (< 65 dB(A)) et de sa contribution active à la tranquillité publique et à la salubrité environnementale du Département de Pointe-Noire.`,
           },
         ],
-        signataireNom: 'Jean Richard NTSEKE NGOUAKA',
+        signataireNom: 'NTSEKE NGOUAKA Jean Richard',
         signataireTitre: 'Le Directeur Départemental des Loisirs',
         margeGaucheCm: 2.5,
         margeDroiteCm: 2.0,
@@ -145,7 +183,8 @@ export const PrintModal: React.FC = () => {
     printMode === 'a4_legal_act' ||
     printMode === 'spa_diploma' ||
     printMode === 'a4_departmental_authorization' ||
-    printMode === 'a4_recovery_notice';
+    printMode === 'a4_recovery_notice' ||
+    printMode === 'a4_convocation';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
@@ -162,6 +201,7 @@ export const PrintModal: React.FC = () => {
               {printMode === 'spa_diploma' && "Diplôme d'Honneur Départemental (Loisirs Sains)"}
               {printMode === 'a4_departmental_authorization' && "Autorisation d'Exploitation Départementale (Diplôme A4)"}
               {printMode === 'a4_recovery_notice' && "Avis de Recouvrement Républicain & Sommation 2027 (A4)"}
+              {printMode === 'a4_convocation' && "Convocation de Régularisation Républicaine (50 000 FCFA)"}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -725,7 +765,7 @@ export const PrintModal: React.FC = () => {
                   )}
                   <div className="h-8 flex items-center justify-center">
                     <span className="font-serif italic font-bold text-xs text-slate-900">
-                      {printData.signatureDirecteur?.signataireNom || printData.signatureDirecteur?.nomDirecteur || 'Jacques MATOKO'}
+                      {printData.signatureDirecteur?.signataireNom || printData.signatureDirecteur?.nomDirecteur || 'NTSEKE NGOUAKA Jean Richard'}
                     </span>
                   </div>
                   <p className="text-[7.5px] font-mono text-emerald-800 font-bold">
@@ -869,7 +909,7 @@ export const PrintModal: React.FC = () => {
                   INJONCTION DE MISE EN RÈGLE RÉGALIENNE :
                 </p>
                 <p>
-                  L'exploitant est formellement sommé de se présenter sous un délai impérieux de <strong>HUIT (08) JOURS OUVRÉS</strong> auprès du Guichet de la Régie SAF (Hôtel de Ville de Pointe-Noire) ou d'effectuer le télépaiement officiel sécurisé (MTN MoMo / Airtel Money).
+                  L'exploitant est formellement sommé de se présenter sous un délai impérieux de <strong>HUIT (08) JOURS OUVRÉS</strong> auprès du Guichet de la Régie SAF (Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée) ou d'effectuer le télépaiement officiel sécurisé (MTN MoMo / Airtel Money).
                 </p>
                 <p className="text-[7.5pt] text-red-900 italic">
                   À défaut de versement ou d'accord d'échelonnement validé, il sera fait application immédiate des mesures de police administrative prévues par les lois de la République : <strong>fermeture administrative des locaux avec apposition des scellés de police et poursuites judiciaires.</strong>
@@ -907,7 +947,7 @@ export const PrintModal: React.FC = () => {
                   <p className="text-[7.5pt] uppercase font-bold text-red-950">Le Directeur Départemental</p>
                   <p className="text-[7pt] italic text-slate-600">des Loisirs de Pointe-Noire</p>
                   <div className="h-7 flex items-center justify-center font-serif italic font-bold text-[9pt] text-slate-900">
-                    Jacques MATOKO
+                    NTSEKE NGOUAKA Jean Richard
                   </div>
                   <p className="text-[7pt] font-mono text-red-800 font-bold">Signé & Scellé • 2027</p>
                 </div>
@@ -928,6 +968,174 @@ export const PrintModal: React.FC = () => {
                       className="w-14 h-14 object-contain p-0.5 border border-slate-300 rounded bg-white shadow-xs"
                     />
                     <span className="text-[6pt] text-slate-500 mt-0.5 font-sans font-medium">Contrôle Légal</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 7. CONVOCATION ADMINISTRATIVE OFFICIELLE (FORFAIT 50 000 FCFA) */}
+          {printMode === 'a4_convocation' && (
+            <div className="bg-[#fffefb] text-slate-900 p-8 md:p-10 rounded-xl shadow-2xl border-4 border-double border-amber-700/60 max-w-[210mm] mx-auto font-garamond space-y-4">
+              {/* Congolese National Ribbon */}
+              <div className="h-2 w-full rounded-full flex overflow-hidden shadow-xs">
+                <div className="flex-1 bg-[#009543]" />
+                <div className="flex-1 bg-[#fbde4a]" />
+                <div className="flex-1 bg-[#dc241f]" />
+              </div>
+
+              {/* En-tête Institutionnel Solennel */}
+              <div className="flex justify-between items-start border-b-2 border-amber-800/30 pb-3">
+                <div className="space-y-0.5">
+                  <p className="font-bold text-[9pt] uppercase tracking-wider text-slate-800">
+                    RÉPUBLIQUE DU CONGO
+                  </p>
+                  <p className="text-[8pt] italic font-serif text-slate-600">Unité • Travail • Progrès</p>
+                  <div className="pt-1 space-y-0.5">
+                    <p className="text-[8pt] font-bold text-slate-700 uppercase">
+                      Ministère des Industries Culturelles, Touristiques, Artistiques et des Loisirs
+                    </p>
+                    <p className="text-[8.5pt] font-black text-amber-950 uppercase">
+                      Direction Départementale des Loisirs de Pointe-Noire
+                    </p>
+                    <p className="text-[7.5pt] font-semibold text-slate-600 uppercase">
+                      Service Assistance & Autorisation (SAA) • Brigade Mobile de Contrôle
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <DdlLogo size="sm" rounded="full" bordered={true} className="w-14 h-14 shadow-md" />
+                  <span className="text-[7pt] font-mono text-amber-800 font-bold mt-0.5">CONVOCATION</span>
+                </div>
+
+                <div className="text-right space-y-0.5 font-mono text-[8pt]">
+                  <p className="font-bold text-amber-900">{printData.referenceConvocation || 'CONV-2026-PN-0042'}</p>
+                  <p className="text-slate-600 font-sans text-[7.5pt]">Dossier : <strong>{printData.codeDossier || 'DDL-PN-2026-INFORMEL'}</strong></p>
+                  <p className="text-slate-500 text-[7.5pt]">Pointe-Noire, le {printData.dateEmission ? new Date(printData.dateEmission).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}</p>
+                </div>
+              </div>
+
+              {/* Grand Titre Officiel */}
+              <div className="text-center py-2.5 border-y-2 border-amber-800/40 bg-amber-500/10 rounded-lg">
+                <h2 className="font-cinzel text-lg md:text-xl font-black text-amber-950 tracking-wider">
+                  CONVOCATION OFFICIELLE POUR RÉGULARISATION ADMINISTRATIVE ET FISCALE
+                </h2>
+                <p className="text-[9pt] uppercase tracking-wide text-amber-900 font-semibold mt-0.5">
+                  Procédure d'Intégration & Régularisation des Établissements de Loisirs • Loi N° 21-2019
+                </p>
+              </div>
+
+              {/* Destinataire & Établissement Repéré */}
+              <div className="border border-slate-400 bg-slate-50/90 rounded-lg p-3 text-[9pt] space-y-1">
+                <div className="flex justify-between items-baseline border-b border-slate-300 pb-1">
+                  <span className="font-cinzel font-bold text-slate-900 text-[10pt] uppercase">
+                    Établissement Repéré : {printData.nomCommercial}
+                  </span>
+                  <span className="font-mono text-[8pt] px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold border border-amber-300">
+                    FORFAIT INFORMEL STANDARD : {formatCfa(printData.montantForfaitNotifie || printData.montantRedevanceAnnuelle || 50000)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-700 text-[8.5pt] pt-1">
+                  <div>
+                    <span>Promoteur / Gérant : </span>
+                    <strong className="text-slate-900">{printData.promoteurNom || 'Promoteur Non Immatriculé'}</strong>
+                  </div>
+                  <div>
+                    <span>Contact Téléphonique : </span>
+                    <strong className="font-mono text-slate-900">{printData.promoteurTelephone || 'Non renseigné'}</strong>
+                  </div>
+                  <div>
+                    <span>Localisation Urbaine : </span>
+                    <strong>{printData.arrondissement} ({printData.quartier || 'Zone Urbaine'})</strong>
+                  </div>
+                  <div>
+                    <span>Activité Constatée : </span>
+                    <em>{printData.categorie || 'Débit de Boisson / Établissement Récréatif'}</em>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notification des Modalités & Droit de Concertation */}
+              <div className="bg-amber-50/50 border border-amber-300 rounded-lg p-3 text-[8.5pt] text-slate-800 space-y-1.5 leading-relaxed">
+                <p className="font-bold text-amber-950 text-[9pt]">
+                  OBJET : CONVOCATION À SE PRÉSENTER À LA DIRECTION DÉPARTEMENTALE DES LOISIRS
+                </p>
+                <p className="text-justify">
+                  Dans le cadre du recensement et de l'assainissement du secteur des loisirs, la Brigade Mobile SAA a constaté l'exploitation de votre établissement sans titre administratif d'exploitation valide.
+                </p>
+                <p className="text-justify">
+                  En exécution de la réglementation départementale, vous êtes formellement convoqué à vous présenter à la <strong>{printData.lieuComparution || 'Direction Départementale des Loisirs (Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée)'}</strong> le <strong>{printData.dateComparution ? new Date(printData.dateComparution).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'dans un délai impératif de 8 jours ouvrés'}</strong> à <strong>{printData.heureComparution || '09h00'}</strong>.
+                </p>
+                <p className="text-justify font-semibold text-emerald-900 bg-emerald-50/60 p-2 rounded border border-emerald-300/60">
+                  ℹ️ <strong>Rappel du Processus Régalien de Régularisation :</strong> Le montant forfaitaire fixé au départ est de <strong>50 000 FCFA</strong>. Il vous appartient de vous présenter muni de vos documents pour :
+                  <br />• Justifier de votre situation réelle et, le cas échéant, <strong>négocier le montant de la redevance à la baisse</strong> selon la capacité de votre débit ;
+                  <br />• <strong>Verser un acompte</strong> libératoire au bureau de la Régie SAF ou convenir d'un règlement sur le terrain ;
+                  <br />• Convenir d'un <strong>rendez-vous d'échéancier</strong> avec la Brigade Mobile.
+                </p>
+              </div>
+
+              {/* Pièces Obligatoires à Apporter */}
+              <div className="border border-slate-300 rounded-lg p-3 bg-white text-[8pt] text-slate-700 space-y-1">
+                <p className="font-bold text-slate-900 uppercase tracking-wide text-[8.5pt]">
+                  PIÈCES ET DOCUMENTS ADMINISTRATIFS EXIGIBLES À LA PRÉSENTATION :
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 pl-1">
+                  <li>Original ou copie de la pièce d'identité du promoteur (CNI, Passeport ou Permis de conduire)</li>
+                  <li>Contrat de bail commercial ou titre d'occupation du local d'exploitation</li>
+                  <li>Registre du Commerce et du Crédit Mobilier (RCCM) ou déclaration d'activité (si existant)</li>
+                  <li>Anciennes quittances ou reçus de versements antérieurs éventuels</li>
+                </ul>
+              </div>
+
+              {/* Avertissement Juridique */}
+              <div className="text-[7.5pt] text-red-950 bg-red-50/80 border border-red-300 rounded-lg p-2.5 text-justify italic leading-snug">
+                <strong>AVERTISSEMENT LÉGAL :</strong> Le défaut de présentation à la date fixée expose l'exploitant défaillant aux mesures coercitives de police administrative prévues par la Loi N° 21-2019, notamment la notification immédiate d'une mise en demeure avec astreinte journalière et la fermeture conservatoire de l'établissement par la force publique.
+              </div>
+
+              {/* Bloc Signatures & Sceau */}
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div className="border border-slate-300 rounded-lg p-2 bg-white/70">
+                  <p className="text-[7.5pt] uppercase font-bold text-slate-700">L'Inspecteur / Brigade Mobile</p>
+                  <p className="text-[7pt] text-slate-500 italic">Constat in situ & Notification</p>
+                  <div className="h-7 flex items-center justify-center font-serif italic text-slate-800 text-[8.5pt]">
+                    {printData.inspecteurNom || 'Inspecteur SAA'}
+                  </div>
+                  <p className="text-[7pt] font-mono text-slate-500">{printData.inspecteurMatricule || 'Matricule SAA-PN'}</p>
+                </div>
+
+                <div className="border-2 border-amber-600 rounded-lg p-2 bg-amber-50/50 relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none">
+                    <div className="w-14 h-14 rounded-full border-2 border-dashed border-amber-700 flex items-center justify-center rotate-12">
+                      <span className="text-[5.5pt] font-bold text-amber-700 uppercase text-center leading-tight">
+                        DDL-PN<br/>COMMANDEMENT<br/>LOISIRS
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[7.5pt] uppercase font-bold text-amber-950">Le Directeur Départemental</p>
+                  <p className="text-[7pt] italic text-slate-600">des Loisirs de Pointe-Noire</p>
+                  <div className="h-7 flex items-center justify-center font-serif italic font-bold text-[9pt] text-slate-900">
+                    NTSEKE NGOUAKA Jean Richard
+                  </div>
+                  <p className="text-[7pt] font-mono text-amber-800 font-bold">Signé & Scellé • DDL-PN</p>
+                </div>
+              </div>
+
+              {/* Pied de Page & QR Code de Contrôle */}
+              <div className="p-2.5 bg-slate-100 border border-slate-300 rounded-xl font-mono text-[7.5pt] text-slate-600 flex justify-between items-center">
+                <div className="space-y-0.5">
+                  <p><strong className="text-slate-800">Convocation N° :</strong> {printData.referenceConvocation || 'CONV-2026-PN-0042'}</p>
+                  <p className="break-all"><strong className="text-slate-800">Contrôle QR :</strong> Conforme au forfait informel 50 000 FCFA avec faculté de négociation républicaine.</p>
+                  <p className="text-[7pt] text-slate-500 font-sans italic">Acte régulier délivré en exécution de la mission d'assainissement du Département de Pointe-Noire.</p>
+                </div>
+                {qrCodeUrl && (
+                  <div className="flex flex-col items-center ml-2 shrink-0">
+                    <img
+                      src={qrCodeUrl}
+                      alt="QR Code Convocation"
+                      className="w-14 h-14 object-contain p-0.5 border border-slate-300 rounded bg-white shadow-xs"
+                    />
+                    <span className="text-[6pt] text-slate-500 mt-0.5 font-sans font-medium">Contrôle QR</span>
                   </div>
                 )}
               </div>

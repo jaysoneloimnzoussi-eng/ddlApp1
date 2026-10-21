@@ -38,9 +38,17 @@ import {
   X,
   FileCheck,
   Sliders,
+  TrendingDown,
+  ArrowRight,
+  Scale,
+  Clock,
+  Building,
+  Crown,
 } from 'lucide-react';
 import { StaffPersonnel, UserRole } from '../../types';
 import { printHtmlElement } from '../../services/printService';
+import { formatCfa } from '../../services/crypto';
+import { generateUniversalAdministrativeDocx } from '../../services/docxGenerator';
 
 export const AdminPersonnelModule: React.FC = () => {
   const {
@@ -48,11 +56,12 @@ export const AdminPersonnelModule: React.FC = () => {
     updateStaffCredentials,
     openPrintModal,
     showNotification,
+    setActiveModule,
     theme,
   } = useApp();
 
   // Active main tab
-  const [activeTab, setActiveTab] = useState<'vault' | 'tutorial' | 'badges' | 'rbac'>('vault');
+  const [activeTab, setActiveTab] = useState<'vault' | 'tenancier_cycle' | 'tutorial' | 'badges' | 'rbac'>('vault');
 
   // Search & Filters for Vault
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,6 +170,61 @@ Vos Accès Confidentiels à la Plateforme Souveraine (Loi N° 21-2019) :
     return `${cleanBase}#${randomDigits}`;
   };
 
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
+
+  const handleExportProcedureDocx = async () => {
+    try {
+      setIsExportingDocx(true);
+      showNotification('info', 'Génération du document Word officiel de la démarche en cours...');
+      await generateUniversalAdministrativeDocx({
+        titreActe: "PROTOCOLE ET DÉMARCHE OPÉRATIONNELLE DE RÉGULARISATION DU TENANCIER D'ÉTABLISSEMENT DE LOISIRS",
+        numeroActe: 'DDL-PN/DIR/REG-2026/PROT-01',
+        dateLieu: 'Pointe-Noire, République du Congo',
+        emetteurTitre: 'LE DIRECTEUR DÉPARTEMENTAL DES LOISIRS',
+        reference: 'Loi N° 21-2019 • Note de Service N° 151/MTL-CAB',
+        objet: "Directives administratives fixant la chaîne complète : repérage terrain, convocation forfaitaire (50 000 FCFA), négociation motivée, encaissement fractionné et délivrance des titres",
+        sections: [
+          {
+            titre: "Article 1 : Principe du Repérage In Situ et Notification de la Convocation Forfaitaire",
+            contenu: "Tout établissement informel identifié sur le territoire des six arrondissements de Pointe-Noire (Lumumba, Mvou-Mvou, Tié-Tié, Loandjili, Mongo-Mpoukou, Ngoyo) fait l'objet d'un recensement immédiat avec coordonnées GPS par la Brigade Mobile SAA. L'agent notifie sur-le-champ au tenancier une Convocation Administrative Officielle A4 munie d'un QR Code de sécurité infalsifiable. Le montant réglementaire initial de référence est fixé au forfait de 50 000 FCFA conformément à la Note de service N° 151/MTL-CAB. Un délai de comparution de huit (08) jours est accordé.",
+          },
+          {
+            titre: "Article 2 : Comparution Obligatoire à la Direction Départementale",
+            contenu: "Le promoteur ou tenancier est tenu de déférer à la convocation en se présentant au siège de la Direction Départementale des Loisirs (Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée, Tél: +242 06 186 4275, Email: ddloisirs_pnr@loisirs.cg) muni de sa convocation, de sa pièce d'identité (CNI ou Passeport), du bail commercial ou titre d'occupation du domaine, et de son numéro RCCM ou récépissé s'il en dispose.",
+          },
+          {
+            titre: "Article 3 : Faculté de Négociation Motivée et Révision à la Baisse de la Redevance",
+            contenu: "Au cours de l'audience de régularisation, compte tenu des réalités économiques, de la superficie modeste ou du caractère saisonnier de l'activité, la Direction Départementale et le tenancier peuvent convenir d'une minoration du montant forfaitaire (pouvant être ramené à 30 000 FCFA ou 35 000 FCFA). Toute minoration arrêtée doit être formellement motivée et fait l'objet d'une inscription cryptographique horodatée dans le Journal d'Audit SHA-256 de la Régie.",
+          },
+          {
+            titre: "Article 4 : Modalités de Règlement (Comptant, Acompte ou Rendez-vous Ferme)",
+            contenu: "Le tenancier peut s'acquitter de ses droits soit au guichet de la Régie SAF (espèces ou virement Trésor Public), soit directement sur le terrain auprès de la Brigade Mobile SAA (espèces ou Mobile Money). En cas de versement d'un acompte partiel, l'agent ou le régisseur fixe obligatoirement et immédiatement la date et l'heure de la prochaine échéance dans le calendrier officiel de l'application.",
+          },
+          {
+            titre: "Article 5 : Clôture Définitive à Solde Zéro et Délivrance des Actes Républicains",
+            contenu: "Dès constatation du solde intégral (reste à payer égal à 0 FCFA), l'établissement acquiert le statut définitif 'En Règle'. Le Directeur Départemental délivre l'Attestation Provisoire de Dépôt ou l'Autorisation Départementale d'Exploitation avec visa légal et QR Code de contrôle de validité.",
+          },
+        ],
+        signataireNom: 'NTSEKE NGOUAKA Jean Richard',
+        signataireTitre: 'Directeur Départemental des Loisirs de Pointe-Noire',
+        ampliations: [
+          "Cabinet du Ministre de l'Industrie Touristique et des Loisirs (Pour information)",
+          'Direction Générale des Loisirs (DGL)',
+          'Préfecture du Département de Pointe-Noire',
+          'Brigades Mobiles de Contrôle SAA',
+          'Régie des Recettes SAF',
+          'Archives et Dossiers Promoteurs',
+        ],
+      });
+      showNotification('success', 'Protocole officiel téléchargé au format Word (.docx) avec succès !');
+    } catch (err) {
+      console.error(err);
+      showNotification('error', 'Erreur lors de la génération du document Word.');
+    } finally {
+      setIsExportingDocx(false);
+    }
+  };
+
   // Filtered staff list
   const filteredStaff = useMemo(() => {
     return staff.filter((s) => {
@@ -212,7 +276,18 @@ Vos Accès Confidentiels à la Plateforme Souveraine (Loi N° 21-2019) :
         </div>
 
         {/* Global Action / Quick Summary */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => {
+              setActiveTab('tenancier_cycle');
+              showNotification('info', "Affichage de la démarche officielle de régularisation du tenancier.");
+            }}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Démarche Tenancier (50 000 FCFA & Solde)</span>
+          </button>
+
           <button
             onClick={() => {
               setActiveTab('tutorial');
@@ -226,54 +301,110 @@ Vos Accès Confidentiels à la Plateforme Souveraine (Loi N° 21-2019) :
         </div>
       </div>
 
+      {/* Direction Départementale Official Institutional Identity Card */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white border border-emerald-800/80 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white shadow-lg shrink-0 border border-amber-400/40">
+            <Crown className="w-6 h-6 text-amber-100" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold uppercase border border-emerald-500/30">
+                Direction Départementale des Loisirs de Pointe-Noire
+              </span>
+              <span className="text-[10px] font-mono text-amber-300 font-bold">
+                MCAPNIT • DGL
+              </span>
+            </div>
+            <h2 className="text-sm sm:text-base font-bold font-cinzel text-slate-100 mt-0.5">
+              Directeur Départemental : Monsieur NTSEKE NGOUAKA Jean Richard
+            </h2>
+            <p className="text-xs text-slate-300 flex items-center gap-1.5 mt-0.5">
+              <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 shrink-0">
+          <a
+            href="tel:+242061864275"
+            className="flex items-center gap-1.5 hover:text-emerald-400 transition"
+          >
+            <Phone className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-mono font-bold text-white">+242 06 186 4275</span>
+          </a>
+          <div className="hidden sm:block w-[1px] h-4 bg-slate-700" />
+          <a
+            href="mailto:ddloisirs_pnr@loisirs.cg"
+            className="flex items-center gap-1.5 hover:text-emerald-400 transition"
+          >
+            <Mail className="w-3.5 h-3.5 text-blue-400" />
+            <span className="font-mono text-slate-200">ddloisirs_pnr@loisirs.cg</span>
+          </a>
+        </div>
+      </div>
+
       {/* Main Tabs Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60 rounded-xl p-1 gap-1">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/60 rounded-xl p-1 gap-1 flex-wrap">
         <button
           onClick={() => setActiveTab('vault')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer min-w-[140px] ${
             activeTab === 'vault'
               ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200 dark:border-slate-700'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
           <Lock className="w-4 h-4 text-emerald-500" />
-          <span>Coffre-Fort des Identifiants & Passwords ({staff.length})</span>
+          <span>Coffre-Fort ({staff.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('tenancier_cycle')}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer min-w-[170px] ${
+            activeTab === 'tenancier_cycle'
+              ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 shadow-sm border border-amber-500/40 font-black'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+          }`}
+        >
+          <FileText className="w-4 h-4 text-amber-500" />
+          <span>Démarche Tenancier (Cycle Complet)</span>
         </button>
 
         <button
           onClick={() => setActiveTab('tutorial')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer min-w-[140px] ${
             activeTab === 'tutorial'
               ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200 dark:border-slate-700'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
           <BookOpen className="w-4 h-4 text-amber-500" />
-          <span>Tutoriel Complet de Manipulation (18 Modules)</span>
+          <span>Manuel des 18 Modules</span>
         </button>
 
         <button
           onClick={() => setActiveTab('badges')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer min-w-[140px] ${
             activeTab === 'badges'
               ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200 dark:border-slate-700'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
           <CreditCard className="w-4 h-4 text-blue-500" />
-          <span>Badges & Cartes Professionnelles</span>
+          <span>Badges & Cartes</span>
         </button>
 
         <button
           onClick={() => setActiveTab('rbac')}
-          className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer min-w-[140px] ${
             activeTab === 'rbac'
               ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200 dark:border-slate-700'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
           <ShieldCheck className="w-4 h-4 text-purple-500" />
-          <span>Habilitations & Modèle RBAC</span>
+          <span>Habilitations RBAC</span>
         </button>
       </div>
 
@@ -577,6 +708,415 @@ Vos Accès Confidentiels à la Plateforme Souveraine (Loi N° 21-2019) :
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 1.5: DÉMARCHE & PROTOCOLE DE RÉGULARISATION DU TENANCIER               */}
+      {/* ========================================================================= */}
+      {activeTab === 'tenancier_cycle' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header Banner Solennel */}
+          <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-r from-amber-950 via-amber-900 to-slate-900 text-white border border-amber-800/80 shadow-2xl space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold uppercase border border-amber-500/30">
+                  RÉFÉRENTIEL OPÉRATIONNEL DDL-PN
+                </span>
+                <span className="text-[10px] font-mono text-amber-200">
+                  Loi N° 21-2019 • Note N° 151/MTL-CAB
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportProcedureDocx}
+                  disabled={isExportingDocx}
+                  className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isExportingDocx ? 'Génération Word...' : 'Exporter Protocole (.DOCX)'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimer la Démarche</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold font-cinzel text-amber-100">
+                Protocole Officiel de Régularisation du Tenancier d'Établissement de Loisirs
+              </h2>
+              <p className="text-xs text-amber-200/90 max-w-4xl leading-relaxed mt-1">
+                Guide méthodologique transverse destiné à la Direction Départementale, aux inspecteurs de brigade SAA et aux régisseurs SAF. 
+                Ce protocole détaille la chaîne complète depuis le repérage de l'établissement informel jusqu'au solde définitif et à la délivrance des titres d'exploitation.
+              </p>
+            </div>
+
+            {/* Ruban Républicain Congolais */}
+            <div className="h-1.5 w-full rounded-full flex overflow-hidden shadow-xs">
+              <div className="flex-1 bg-[#009543]" />
+              <div className="flex-1 bg-[#fbde4a]" />
+              <div className="flex-1 bg-[#dc241f]" />
+            </div>
+          </div>
+
+          {/* Synthèse du Processus en 5 Points Clés */}
+          <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-950/20 space-y-2">
+            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-bold text-xs uppercase font-mono">
+              <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Résumé Opérationnel du Parcours Tenancier</span>
+            </div>
+            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+              <strong>1. Repérage in situ :</strong> L'agent SAA repère l'établissement informel et lui délivre sur le champ une <strong>convocation officielle au forfait informel fixé à 50 000 FCFA</strong> avec QR Code et date de comparution.<br />
+              <strong>2. Comparution à la Direction :</strong> Le tenancier se présente à la Direction muni de ses pièces administratives (CNI, bail commercial, RCCM éventuel).<br />
+              <strong>3. Négociation motivée :</strong> La Direction et le promoteur peuvent <strong>négocier le prix à la baisse</strong> (ex: de 50 000 à 35 000 FCFA) avec justification obligatoire archivée au Journal d'Audit SHA-256.<br />
+              <strong>4. Paiement au bureau ou sur place :</strong> Le tenancier verse soit un <strong>acompte</strong> (au bureau SAF ou sur le terrain à la brigade mobile), soit donne un <strong>rendez-vous ferme</strong> pour le paiement.<br />
+              <strong>5. Solde intégral :</strong> Dès que le reste à payer atteint 0 FCFA, l'établissement est classé <strong>En règle</strong> et reçoit son Attestation Provisoire ou son Autorisation Départementale.
+            </p>
+          </div>
+
+          {/* Schéma Interactif des 5 Étapes du Cycle */}
+          <div className="space-y-4">
+            <h3 className="text-base font-bold font-cinzel text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Scale className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Les 5 Étapes Chronologiques de la Régularisation</span>
+            </h3>
+
+            {/* ÉTAPE 1 */}
+            <div className="rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="p-4 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/40 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-amber-600 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
+                    1
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>Repérage In Situ & Forfait Informel Standard</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30">
+                        50 000 FCFA
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">Brigade Mobile de Contrôle SAA • Sur le terrain</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveModule('MOD-02')}
+                  className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                >
+                  <span>Aller au Recensement (MOD-02)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="p-4 text-xs space-y-3 text-slate-600 dark:text-slate-300">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Opérateur Responsable</span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">Inspecteur Chef de Brigade SAA</p>
+                    <p className="text-[11px] text-slate-500">Tournée nocturne ou diurne dans l'arrondissement.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Acte Administratif Émis</span>
+                    <p className="font-semibold text-amber-600 dark:text-amber-400">Convocation Officielle A4</p>
+                    <p className="text-[11px] text-slate-500">Générée instantanément avec QR Code et référence CONV-2026-PN.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Statut Système Attribué</span>
+                    <p className="font-semibold font-mono text-amber-700 dark:text-amber-300">convocation_delivree</p>
+                    <p className="text-[11px] text-slate-500">Délai de comparution fixé à 8 jours par défaut.</p>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-[11px] space-y-1">
+                  <p className="font-bold text-slate-800 dark:text-slate-200">
+                    📋 Contenu légal notifié dans la convocation :
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-300">
+                    <li>Montant forfaitaire réglementaire notifié : <strong>50 000 FCFA</strong> (base informelle Note 151/MTL-CAB).</li>
+                    <li>Date, heure et lieu de comparution (Direction Départementale des Loisirs, Bâtiment de la Préfecture, Centre-Ville, en face du Trésor Public, au rez-de-chaussée).</li>
+                    <li>Liste des documents à fournir : CNI/Passeport du gérant, titre d'occupation/bail, RCCM si disponible.</li>
+                    <li>Avertissement légal : Sanction de fermeture conservatoire sous 48h selon la Loi 21-2019 en cas de défaut de présentation.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* ÉTAPE 2 */}
+            <div className="rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="p-4 bg-blue-50/80 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800/40 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-blue-600 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
+                    2
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                      Comparution du Tenancier & Dépôt des Documents
+                    </h4>
+                    <p className="text-[11px] text-slate-500">Direction Départementale des Loisirs (Bâtiment de la Préfecture, RDC) • Guichet SAA</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-300 font-bold border border-blue-500/20">
+                  Délai : 8 à 15 jours
+                </span>
+              </div>
+              <div className="p-4 text-xs space-y-3 text-slate-600 dark:text-slate-300">
+                <p>
+                  Le tenancier se présente à la Direction Départementale des Loisirs avec sa convocation officielle. 
+                  L'inspecteur de permanence ou l'agent d'accueil examine les pièces présentées et procède à la vérification d'identité et de localisation.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">📄 Pièces administratives réceptionnées :</span>
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-slate-500">
+                      <li>Copie CNI ou Passeport du promoteur / gérant</li>
+                      <li>Contrat de bail ou titre d'occupation du site</li>
+                      <li>RCCM ou déclaration d'activité (si existant)</li>
+                    </ul>
+                  </div>
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">⚙️ Enregistrement au système :</span>
+                    <p className="text-[11px] text-slate-500">
+                      L'agent recherche le dossier dans le système par son nom ou son QR Code, actualise les coordonnées téléphoniques et valide les pièces fournies dans la checklist.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ÉTAPE 3 */}
+            <div className="rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="p-4 bg-purple-50/80 dark:bg-purple-950/30 border-b border-purple-200 dark:border-purple-800/40 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-purple-600 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
+                    3
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>Négociation Motivée & Révision du Forfait à la Baisse</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-800 dark:text-purple-300 font-bold border border-purple-500/30">
+                        Arbitrage Souverain
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">Direction Départementale • Audience de régularisation</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-bold">
+                  Bouton « Négocier Forfait »
+                </span>
+              </div>
+              <div className="p-4 text-xs space-y-3 text-slate-600 dark:text-slate-300">
+                <p>
+                  Conformément à la réalité socio-économique du terrain, le promoteur peut justifier de sa faible capacité d'accueil ou de son chiffre d'affaires modeste pour <strong>négocier le forfait à la baisse</strong>.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 block">Tarif Négocié Type</span>
+                    <p className="font-bold text-base font-mono text-purple-700 dark:text-purple-300">30 000 à 45 000 FCFA</p>
+                    <p className="text-[10px] text-purple-600 dark:text-purple-400">Minoration de 10% à 40% sur le forfait initial.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 block">Motif Obligatoire</span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">Justification économique</p>
+                    <p className="text-[10px] text-slate-500">Ex: Petite terrasse de quartier, début d'exploitation, accord de conciliation.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-purple-700 dark:text-purple-300 block">Traçabilité & Audit</span>
+                    <p className="font-semibold text-emerald-600 dark:text-emerald-400">Journal SHA-256</p>
+                    <p className="text-[10px] text-slate-500">Archivage nominatif avec identifiant de l'agent validateur.</p>
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-lg border border-purple-500/30 bg-purple-500/5 text-[11px] text-purple-800 dark:text-purple-300">
+                  💡 <strong>Impact dans l'application :</strong> L'ouverture du modal <code>NegotiationModal</code> recalcule automatiquement le nouveau solde restant dû et met à jour le statut en <code>negociation_en_cours</code> ou <code>acompte_verse</code> selon les versements antérieurs.
+                </div>
+              </div>
+            </div>
+
+            {/* ÉTAPE 4 */}
+            <div className="rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="p-4 bg-teal-50/80 dark:bg-teal-950/30 border-b border-teal-200 dark:border-teal-800/40 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-teal-600 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
+                    4
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>Paiement Fractionné (Acompte) ou Prise de Rendez-vous</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-800 dark:text-teal-300 font-bold border border-teal-500/30">
+                        Bureau SAF ou Sur le Terrain
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">Régie Financière SAF • Caisse Trésor ou Brigade Mobile SAA</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveModule('MOD-01')}
+                    className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <span>Agenda SAA (MOD-01)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveModule('MOD-04')}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <span>Caisse SAF (MOD-04)</span>
+                  </button>
+                </div>
+              </div>
+              <div className="p-4 text-xs space-y-3 text-slate-600 dark:text-slate-300">
+                <p>
+                  Le tenancier dispose de trois options pratiques pour commencer à honorer ses frais d'exploitation :
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                      <Building className="w-4 h-4 text-teal-500" />
+                      <span>Option A : Au Bureau (Caisse SAF)</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Paiement en espèces ou virement Trésor. Le caissier régisseur SAF émet immédiatement la quittance certifiée SHA-256.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                      <MapPin className="w-4 h-4 text-emerald-500" />
+                      <span>Option B : Sur Place / Sur le Terrain</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Paiement direct à la brigade mobile lors de sa tournée, en espèces avec reçu immédiat ou via Airtel Money / MTN MoMo.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                      <Clock className="w-4 h-4 text-purple-500" />
+                      <span>Option C : Échéancier avec Rendez-vous</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Si le promoteur donne un rendez-vous ferme, la date et l'heure sont inscrites directement dans l'agenda de la brigade.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-[11px] space-y-1 text-teal-900 dark:text-teal-200">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    Règle d'or de l'échéancier dans l'application :
+                  </p>
+                  <p>
+                    Dès qu'un acompte est saisi (ex: 20 000 FCFA) et que le solde restant est supérieur à 0, l'application <strong>oblige la fixation de la date et de l'heure du prochain rendez-vous</strong>. 
+                    L'établissement disparaît des tâches d'aujourd'hui et est reclassé automatiquement sur la date future convenue dans le calendrier de l'agent.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ÉTAPE 5 */}
+            <div className="rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <div className="p-4 bg-emerald-50/80 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-800/40 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-emerald-600 text-white font-mono font-black text-xs flex items-center justify-center shadow-xs">
+                    5
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>Solde Intégral & Délivrance des Titres Républicains</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-500/30">
+                        Reste à payer : 0 FCFA
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">Direction Départementale • Guichet des Titres (MOD-03) & Actes</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveModule('MOD-03')}
+                  className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 transition cursor-pointer"
+                >
+                  <span>Guichet des Titres (MOD-03)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="p-4 text-xs space-y-3 text-slate-600 dark:text-slate-300">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-300 block">Statut Réglementaire</span>
+                    <p className="font-bold text-sm font-mono text-emerald-600 dark:text-emerald-400">en_regle</p>
+                    <p className="text-[10px] text-slate-500">Établissement intégralement affranchi de ses redevances pour l'année 2026.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-300 block">Titres Disponibles</span>
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">Attestation & Autorisation</p>
+                    <p className="text-[10px] text-slate-500">Impression A4 haute fidélité avec sceaux officiels et export Word .docx.</p>
+                  </div>
+                  <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-300 block">Reconduction Annuelle</span>
+                    <p className="font-semibold text-blue-600 dark:text-blue-400">Exercice N+1 (2027)</p>
+                    <p className="text-[10px] text-slate-500">Programmation automatique à la date anniversaire du premier versement.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tableau Récapitulatif des Statuts et Actions Système */}
+          <div className="p-4 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 space-y-3 shadow-sm">
+            <h4 className="font-bold text-sm font-cinzel text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-emerald-500" />
+              <span>Matrice de Correspondance des Statuts dans l'Application</span>
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase text-slate-400 font-bold bg-slate-50 dark:bg-slate-950">
+                    <th className="p-2.5">Code Statut</th>
+                    <th className="p-2.5">Étape du Cycle</th>
+                    <th className="p-2.5">Montant Redevance</th>
+                    <th className="p-2.5">Document Édité</th>
+                    <th className="p-2.5">Action Immédiate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono text-[11px]">
+                  <tr>
+                    <td className="p-2.5 font-bold text-amber-600">convocation_delivree</td>
+                    <td className="p-2.5 font-sans">Étape 1 : Repérage terrain</td>
+                    <td className="p-2.5">50 000 FCFA (Forfait initial)</td>
+                    <td className="p-2.5 font-sans">Convocation Officielle A4 (QR Code)</td>
+                    <td className="p-2.5 font-sans text-slate-500">Attente comparution sous 8 jours</td>
+                  </tr>
+                  <tr>
+                    <td className="p-2.5 font-bold text-purple-600">negociation_en_cours</td>
+                    <td className="p-2.5 font-sans">Étape 3 : Négociation à la baisse</td>
+                    <td className="p-2.5">Prix convenu (ex: 35 000 FCFA)</td>
+                    <td className="p-2.5 font-sans">Avenant & Journal d'Audit SHA-256</td>
+                    <td className="p-2.5 font-sans text-slate-500">Motif de minoration validé</td>
+                  </tr>
+                  <tr>
+                    <td className="p-2.5 font-bold text-blue-600">acompte_verse</td>
+                    <td className="p-2.5 font-sans">Étape 4 : Paiement partiel</td>
+                    <td className="p-2.5">Solde &gt; 0 FCFA</td>
+                    <td className="p-2.5 font-sans">Quittance SAF Trésor + Date de RDV</td>
+                    <td className="p-2.5 font-sans text-slate-500">Programmation suite tournée</td>
+                  </tr>
+                  <tr className="bg-emerald-500/5">
+                    <td className="p-2.5 font-bold text-emerald-600">en_regle</td>
+                    <td className="p-2.5 font-sans">Étape 5 : Solde intégral</td>
+                    <td className="p-2.5 text-emerald-600 font-bold">0 FCFA restant</td>
+                    <td className="p-2.5 font-sans">Attestation & Autorisation A4 / .docx</td>
+                    <td className="p-2.5 font-sans text-emerald-600 font-bold">Titres d'exploitation délivrés</td>
+                  </tr>
                 </tbody>
               </table>
             </div>

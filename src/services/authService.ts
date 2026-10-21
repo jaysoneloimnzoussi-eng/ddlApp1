@@ -22,15 +22,15 @@ export function normalizePhone(phone: string): string {
   return phone.replace(/[^\d]/g, '').replace(/^242/, ''); // Remove +242 prefix if present
 }
 
-// Super-Admin Account
+// Super-Admin Account (Directeur Départemental Officiel)
 export const SUPER_ADMIN_ACCOUNT: AuthAccount = {
   id: 'all',
-  nomComplet: 'Directeur Départemental des Loisirs',
+  nomComplet: 'NTSEKE NGOUAKA Jean Richard',
   matricule: 'DDL-DIR-001',
-  telephone: '06 600 00 01',
-  normalizedPhone: '066000001',
-  email: 'directeur.ddlpn@loisirs.gouv.cg',
-  fonction: 'Directeur Départemental (Super-Admin)',
+  telephone: '+242 06 186 4275',
+  normalizedPhone: '061864275',
+  email: 'ddloisirs_pnr@loisirs.cg',
+  fonction: 'Directeur Départemental des Loisirs',
   service: 'Direction',
   role: 'administrateur',
   isSuperAdmin: true,
@@ -62,8 +62,17 @@ export function findAccountByIdentifier(identifier: string): AuthAccount | undef
   const cleanSimple = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const cleanPhone = normalizePhone(identifier);
 
-  // Admin keywords
-  if (clean === 'admin' || clean === 'directeur' || clean === 'dir' || clean === 'ddl-dir-001' || clean === 'direction') {
+  // Admin and Director keywords (matches M. NTSEKE NGOUAKA Jean Richard)
+  if (
+    clean === 'admin' ||
+    clean === 'directeur' ||
+    clean === 'dir' ||
+    clean === 'ddl-dir-001' ||
+    clean === 'direction' ||
+    clean.includes('ntseke') ||
+    clean.includes('ngouaka') ||
+    clean.includes('jean richard')
+  ) {
     return SUPER_ADMIN_ACCOUNT;
   }
 

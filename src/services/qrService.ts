@@ -165,3 +165,24 @@ export async function generateAuthorizationQrCode(
   return generateQrCodeDataUrl(verificationUrl, 180);
 }
 
+export async function generateConvocationQrCode(
+  referenceNumero: string,
+  etablissementNom: string,
+  promoteurNom: string,
+  forfait: number,
+  dateComparution: string
+): Promise<string> {
+  const origin =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://ddlpn.loisirs.gouv.cg';
+
+  const verificationUrl = `${origin}/?verify=convocation&ref=${encodeURIComponent(
+    referenceNumero
+  )}&etab=${encodeURIComponent(etablissementNom)}&prom=${encodeURIComponent(
+    promoteurNom
+  )}&forfait=${encodeURIComponent(forfait)}&rdv=${encodeURIComponent(dateComparution)}`;
+  return generateQrCodeDataUrl(verificationUrl, 180);
+}
+
+

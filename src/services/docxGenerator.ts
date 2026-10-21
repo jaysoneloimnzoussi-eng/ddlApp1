@@ -593,7 +593,7 @@ export async function generateTransmissionLetterDocx(data: TransmissionLetterDat
   const emetteurTitre = data.emetteurTitre || 'Le Directeur Départemental des Loisirs de Pointe-Noire';
   const objet = data.objet || "Transmission du Rapport d'Activités du 3ème Trimestre 2026.";
   const reference = data.reference || 'N°033/MCAPNIT/DGL/DPN/DDL-PN du 23 septembre 2026.';
-  const signataireNom = data.signataireNom || 'Jean Richard NTSEKE NGOUAKA';
+  const signataireNom = data.signataireNom || 'NTSEKE NGOUAKA Jean Richard';
   const pieceJointe = data.pieceJointe || "Rapport d'Activités du 3ème Trimestre 2026.";
 
   const paragraphs = data.corpsTexte && data.corpsTexte.length > 0 ? data.corpsTexte : [
@@ -882,7 +882,7 @@ export async function generateBordereauSoitTransmisDocx(data: BordereauSoitTrans
           new Paragraph({
             alignment: AlignmentType.RIGHT,
             children: [
-              new TextRun({ text: 'Jean Richard NTSEKE NGOUAKA', bold: true, font: 'Garamond', size: 26 }),
+              new TextRun({ text: 'NTSEKE NGOUAKA Jean Richard', bold: true, font: 'Garamond', size: 26 }),
             ],
           }),
         ],
@@ -969,6 +969,8 @@ export async function generateUniversalAdministrativeDocx(data: UniversalAdminis
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DIRECTION DÉPARTEMENTALE DES LOISIRS', bold: true, font: 'Garamond', size: 22 })] }),
                       new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'DE POINTE-NOIRE', bold: true, font: 'Garamond', size: 22 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public (RDC)', italics: true, font: 'Garamond', size: 16 })] }),
+                      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Tél : +242 06 186 4275 • Email : ddloisirs_pnr@loisirs.cg', italics: true, font: 'Garamond', size: 16 })] }),
                       ...(data.numeroActe ? [
                         new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '———', font: 'Garamond', size: 18 })] }),
                         new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: data.numeroActe, bold: true, font: 'Garamond', size: 24 })] }),
@@ -1077,7 +1079,7 @@ export async function generateUniversalAdministrativeDocx(data: UniversalAdminis
           new Paragraph({
             alignment: AlignmentType.RIGHT,
             children: [
-              new TextRun({ text: data.signataireNom || 'Jean Richard NTSEKE NGOUAKA', bold: true, font: 'Garamond', size: 26 }),
+              new TextRun({ text: data.signataireNom || 'NTSEKE NGOUAKA Jean Richard', bold: true, font: 'Garamond', size: 26 }),
             ],
           }),
 
@@ -1151,7 +1153,7 @@ export async function generateLegalActDocx(act: LegalAct): Promise<void> {
           : `L'établissement ${act.etablissementNom} fait l'objet d'une suspension immédiate d'activité avec pose des scellés réglementaires par la force publique jusqu'à mise en conformité intégrale.`,
       },
     ],
-    signataireNom: "Jean Richard NTSEKE NGOUAKA",
+    signataireNom: "NTSEKE NGOUAKA Jean Richard",
     signataireTitre: "Le Directeur Départemental des Loisirs de Pointe-Noire",
     ampliations: [
       "Direction Générale des Loisirs / Brazzaville",

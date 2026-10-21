@@ -56,7 +56,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
   // Modal d'approbation et signature (Directeur ou Chef de Service Assistance et Autorisation par ordre - P.O.)
   const [signingAuth, setSigningAuth] = useState<DepartmentalAuthorization | null>(null);
   const [signatureType, setSignatureType] = useState<'directeur' | 'chef_saa_po'>('directeur');
-  const [signataireNom, setSignataireNom] = useState('Jacques MATOKO');
+  const [signataireNom, setSignataireNom] = useState('NTSEKE NGOUAKA Jean Richard');
   const [directorNotes, setDirectorNotes] = useState(
     "Vu les avis favorables de la brigade SAA et de la régie SAF. Autorisation accordée pour l'exercice 2026."
   );
@@ -162,8 +162,8 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
         },
         signatureDirecteur: {
           signe: creationSignMode !== 'pending',
-          nomDirecteur: creationSignMode === 'directeur' ? 'Jacques MATOKO' : (currentAgent?.nomComplet || inspecteurNom || 'Gildas Ambetos'),
-          signataireNom: creationSignMode === 'directeur' ? 'Jacques MATOKO' : (currentAgent?.nomComplet || inspecteurNom || 'Gildas Ambetos'),
+          nomDirecteur: creationSignMode === 'directeur' ? 'NTSEKE NGOUAKA Jean Richard' : (currentAgent?.nomComplet || inspecteurNom || 'Gildas Ambetos'),
+          signataireNom: creationSignMode === 'directeur' ? 'NTSEKE NGOUAKA Jean Richard' : (currentAgent?.nomComplet || inspecteurNom || 'Gildas Ambetos'),
           typeSignataire: creationSignMode === 'chef_saa_po' ? 'chef_saa_po' : 'directeur',
           qualite: creationSignMode === 'chef_saa_po'
             ? 'Pour le Directeur Départemental et par ordre (P.O.), Le Chef de Service Assistance et Autorisation'
@@ -195,7 +195,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
       setSignataireNom(currentAgent?.nomComplet || 'Gildas Ambetos');
     } else {
       setSignatureType('directeur');
-      setSignataireNom('Jacques MATOKO');
+      setSignataireNom('NTSEKE NGOUAKA Jean Richard');
     }
   };
 
@@ -446,7 +446,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
                 </div>
                 <h3 className="font-semibold text-sm text-amber-200">Signature Directeur ou Chef SAA (P.O.)</h3>
                 <p className="text-xs text-amber-300/80 leading-relaxed">
-                  Approbation directe du Directeur Départemental (Jacques MATOKO) ou signature par ordre (P.O.) par le Chef de Service Assistance et Autorisation (SAA).
+                  Approbation directe du Directeur Départemental (M. NTSEKE NGOUAKA Jean Richard) ou signature par ordre (P.O.) par le Chef de Service Assistance et Autorisation (SAA).
                 </p>
                 <div className="pt-2 text-[11px] text-amber-400 font-bold flex items-center gap-1">
                   <Stamp className="w-3.5 h-3.5" />
@@ -792,7 +792,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
                       Signer : Directeur
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 mt-2">Jacques MATOKO (Signature directe)</span>
+                  <span className="text-[10px] text-slate-400 mt-2">NTSEKE NGOUAKA Jean Richard (Signature directe)</span>
                 </label>
 
                 <label
@@ -1019,7 +1019,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
                       <div>
                         <span className="text-slate-500 block text-[10px]">Signature Souveraine :</span>
                         <span className="text-slate-200 font-serif italic">
-                          {auth.signatureDirecteur.signataireNom || auth.signatureDirecteur.nomDirecteur || 'Jacques MATOKO'}
+                          {auth.signatureDirecteur.signataireNom || auth.signatureDirecteur.nomDirecteur || 'NTSEKE NGOUAKA Jean Richard'}
                         </span>
                         <span className="text-[10px] text-emerald-400 block font-mono">
                           {auth.signatureDirecteur.signe
@@ -1038,7 +1038,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 1: APPROBATION & SIGNATURE DIRECTORALE (JACQUES MATOKO) */}
+      {/* MODAL 1: APPROBATION & SIGNATURE DIRECTORALE (NTSEKE NGOUAKA JEAN RICHARD) */}
       {signingAuth && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
           <div className="bg-slate-900 border-2 border-amber-600/60 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden space-y-4 p-6">
@@ -1087,7 +1087,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSignatureType('directeur');
-                      setSignataireNom('Jacques MATOKO');
+                      setSignataireNom('NTSEKE NGOUAKA Jean Richard');
                       setDirectorNotes("Vu les avis favorables de la brigade SAA et de la régie SAF. Autorisation départementale accordée pour l'exercice 2026.");
                     }}
                     className={`p-3 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
@@ -1099,7 +1099,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
                     <Crown className={`w-4 h-4 shrink-0 mt-0.5 ${signatureType === 'directeur' ? 'text-amber-400' : 'text-slate-500'}`} />
                     <div>
                       <span className="text-xs font-bold block text-slate-100">Le Directeur Départemental</span>
-                      <span className="text-[10px] text-slate-400 block">Signature directe de Jacques MATOKO</span>
+                      <span className="text-[10px] text-slate-400 block">Signature directe de M. NTSEKE NGOUAKA Jean Richard</span>
                     </div>
                   </button>
 
@@ -1305,7 +1305,7 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
                         : 'Le Directeur Départemental'}
                     </p>
                     <p className="font-serif italic font-bold text-slate-900">
-                      {previewAuth.signatureDirecteur.signataireNom || previewAuth.signatureDirecteur.nomDirecteur || 'Jacques MATOKO'}
+                      {previewAuth.signatureDirecteur.signataireNom || previewAuth.signatureDirecteur.nomDirecteur || 'NTSEKE NGOUAKA Jean Richard'}
                     </p>
                     <p className="text-emerald-800 font-mono font-bold">
                       {previewAuth.signatureDirecteur.parapheOfficiel || (previewAuth.signatureDirecteur.typeSignataire === 'chef_saa_po' ? 'Signé P.O. • Chef SAA • 2026' : 'Approuvé • DDL-PN • 2026')}

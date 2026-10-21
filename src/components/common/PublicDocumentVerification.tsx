@@ -91,14 +91,14 @@ export const PublicDocumentVerification: React.FC<PublicDocumentVerificationProp
     },
     signatureDirecteur: {
       signe: true,
-      nomDirecteur: 'Jacques MATOKO',
+      nomDirecteur: 'NTSEKE NGOUAKA Jean Richard',
       qualite: searchParams.get('po') === 'true'
         ? 'Pour le Directeur Départemental et par ordre (P.O.), Le Chef de Service Assistance et Autorisation'
         : 'Le Directeur Départemental des Loisirs de Pointe-Noire',
       dateSignature: queryDate,
       parapheOfficiel: searchParams.get('po') === 'true' ? 'Signé P.O. • Chef SAA • 2026' : 'Approuvé • DDL-PN • 2026',
       typeSignataire: searchParams.get('po') === 'true' ? ('chef_saa_po' as const) : ('directeur' as const),
-      signataireNom: searchParams.get('sign') || (searchParams.get('po') === 'true' ? 'Gildas Ambetos' : 'Jacques MATOKO'),
+      signataireNom: searchParams.get('sign') || (searchParams.get('po') === 'true' ? 'Gildas Ambetos' : 'NTSEKE NGOUAKA Jean Richard'),
       mentionPo: searchParams.get('po') === 'true' ? 'Pour le Directeur Départemental et par ordre (P.O.)' : undefined,
     },
     statut: 'delivre' as const,
@@ -219,7 +219,7 @@ export const PublicDocumentVerification: React.FC<PublicDocumentVerificationProp
                         : 'Visa & Signature Souveraine'}
                     </span>
                     <p className="text-slate-200 font-serif italic text-xs mt-0.5">
-                      {effectiveAuth.signatureDirecteur?.signataireNom || effectiveAuth.signatureDirecteur?.nomDirecteur || 'Jacques MATOKO'}
+                      {effectiveAuth.signatureDirecteur?.signataireNom || effectiveAuth.signatureDirecteur?.nomDirecteur || 'NTSEKE NGOUAKA Jean Richard'}
                     </p>
                     <span className="text-[10px] text-slate-400">
                       {effectiveAuth.signatureDirecteur?.typeSignataire === 'chef_saa_po'
@@ -353,8 +353,9 @@ export const PublicDocumentVerification: React.FC<PublicDocumentVerificationProp
         </div>
       </div>
 
-      <div className="text-center text-[11px] text-slate-600 font-mono py-2">
-        DDL-PN • Système d&apos;Immatriculation et de Quittancement des Loisirs
+      <div className="text-center text-[11px] text-slate-500 font-mono py-2 space-y-0.5">
+        <p>Direction Départementale des Loisirs de Pointe-Noire • Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public (RDC)</p>
+        <p>Tél : +242 06 186 4275 • Email : ddloisirs_pnr@loisirs.cg</p>
       </div>
     </div>
   );

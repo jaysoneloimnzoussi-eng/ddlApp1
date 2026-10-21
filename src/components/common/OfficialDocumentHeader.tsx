@@ -48,6 +48,11 @@ export const OfficialDocumentHeader: React.FC<OfficialDocumentHeaderProps> = ({
             <br />
             DE POINTE-NOIRE
           </p>
+          <p className="text-[7.5pt] leading-tight text-slate-700 font-sans mt-0.5 font-normal">
+            Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public (RDC)
+            <br />
+            Tél : +242 06 186 4275 • Email : ddloisirs_pnr@loisirs.cg
+          </p>
           {numeroActe && (
             <>
               <p className="text-[10pt] font-semibold tracking-widest my-0.5 text-slate-700">———</p>

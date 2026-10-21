@@ -410,9 +410,15 @@ export const AgentLoginConsole: React.FC = () => {
             </div>
 
             {/* Bottom Security Note */}
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center mt-5">
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Portail officiel sécurisé • Ministère de la Culture, des Arts, du Tourisme et des Loisirs
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center mt-5 space-y-1">
+              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                Direction Départementale des Loisirs de Pointe-Noire
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public (RDC)
+              </p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                Tél : +242 06 186 4275 • Email : ddloisirs_pnr@loisirs.cg
               </p>
             </div>
           </div>

@@ -25,9 +25,14 @@ import {
   Building,
   Edit3,
   X,
-  CheckSquare,
   FileCheck2,
   BadgeAlert,
+  TrendingDown,
+  Printer,
+  Coins,
+  Banknote,
+  CreditCard,
+  History,
 } from 'lucide-react';
 import {
   Arrondissement,
@@ -35,6 +40,7 @@ import {
   ComplianceStatus,
   QUARTIERS_PAR_ARRONDISSEMENT,
   Establishment,
+  CashReceipt,
 } from '../../types';
 import { formatCfa } from '../../services/crypto';
 import { SonometerTool } from '../common/SonometerTool';
@@ -46,6 +52,8 @@ import {
 import { PhotoCapture } from '../common/PhotoCapture';
 import { SignaturePad } from '../common/SignaturePad';
 import { openWhatsAppReminder } from '../../services/whatsappService';
+import { IssueConvocationModal } from '../common/IssueConvocationModal';
+import { NegotiationModal } from '../common/NegotiationModal';
 
 export const FieldRecensementModule: React.FC = () => {
   const {
@@ -59,6 +67,8 @@ export const FieldRecensementModule: React.FC = () => {
     addSchedule,
     updateEstablishment,
     rescheduleAppointment,
+    issueConvocation,
+    negotiateFee,
     showNotification,
     isOnline,
     offlineQueueCount,
@@ -68,9 +78,14 @@ export const FieldRecensementModule: React.FC = () => {
     theme,
     selectedEstablishmentForRecensement,
     setSelectedEstablishmentForRecensement,
+    recordPaymentAndScheduleNext,
   } = useApp();
 
   const isLight = theme === 'light';
+
+  // Modal states for Convocation & Négociation
+  const [convocationModalEst, setConvocationModalEst] = useState<Establishment | null>(null);
+  const [negotiationModalEst, setNegotiationModalEst] = useState<Establishment | null>(null);
 
   // Form states
   const [nomCommercial, setNomCommercial] = useState('');
@@ -80,7 +95,7 @@ export const FieldRecensementModule: React.FC = () => {
   const [arrondissement, setArrondissement] = useState<Arrondissement>('Lumumba');
   const [quartier, setQuartier] = useState<string>(QUARTIERS_PAR_ARRONDISSEMENT['Lumumba'][0]);
   const [repereLocal, setRepereLocal] = useState('');
-  const [statutInitial, setStatutInitial] = useState<ComplianceStatus>('mise_en_demeure');
+  const [statutInitial, setStatutInitial] = useState<ComplianceStatus>('convocation_delivree');
   const [adresseExacte, setAdresseExacte] = useState('');
   const [categorie, setCategorie] = useState<EstablishmentCategory>('Bar Dancing / Cabaret');
   const [regimeFiscal, setRegimeFiscal] = useState<'informel_forfaitaire' | 'formel_proportionnel'>('informel_forfaitaire');
@@ -260,6 +275,75 @@ export const FieldRecensementModule: React.FC = () => {
     }
   };
 
+  // Modal Gestion des Acomptes & Encaissement Échelonné
+  const [acompteModalEst, setAcompteModalEst] = useState<Establishment | null>(null);
+  const [montantAcompte, setMontantAcompte] = useState<number>(0);
+  const [modePaiementAcompte, setModePaiementAcompte] = useState<CashReceipt['modePaiement']>('especes');
+  const [nextAcompteRdvDate, setNextAcompteRdvDate] = useState<string>('');
+  const [nextAcompteRdvHeure, setNextAcompteRdvHeure] = useState<string>('10:00');
+  const [nextAcompteRdvMotif, setNextAcompteRdvMotif] = useState<string>('');
+  const [isSubmittingAcompte, setIsSubmittingAcompte] = useState<boolean>(false);
+
+  const handleOpenAcompte = (est: Establishment) => {
+    setAcompteModalEst(est);
+    const solde = est.soldeRestantDu > 0 ? est.soldeRestantDu : (est.montantRedevanceAnnuelle || 50000);
+    // Proposition d'acompte par défaut : 50 000 FCFA ou le solde restant si inférieur
+    setMontantAcompte(Math.min(solde, 50000));
+    setModePaiementAcompte('especes');
+    
+    // Prochain RDV dans 8 jours par défaut pour le suivi de la tranche suivante
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + 8);
+    setNextAcompteRdvDate(nextDate.toISOString().substring(0, 10));
+    setNextAcompteRdvHeure('10:00');
+    setNextAcompteRdvMotif(`Versement solde / tranche suivante (${est.nomCommercial})`);
+  };
+
+  const handleSaveAcompte = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!acompteModalEst) return;
+
+    if (montantAcompte <= 0) {
+      showNotification('error', 'Le montant du versement doit être supérieur à zéro FCFA.');
+      return;
+    }
+
+    setIsSubmittingAcompte(true);
+    try {
+      const restAfter = Math.max(0, (acompteModalEst.soldeRestantDu || 0) - montantAcompte);
+      const res = await recordPaymentAndScheduleNext({
+        establishmentId: acompteModalEst.id,
+        montantVerse: Number(montantAcompte),
+        modePaiement: modePaiementAcompte,
+        nextRdvDate: restAfter > 0 ? nextAcompteRdvDate : undefined,
+        nextRdvHeure: restAfter > 0 ? nextAcompteRdvHeure : undefined,
+        nextRdvMotif: restAfter > 0 ? nextAcompteRdvMotif : undefined,
+      });
+
+      showNotification(
+        'success',
+        `Acompte de ${formatCfa(montantAcompte)} enregistré pour « ${acompteModalEst.nomCommercial} ». Quittance N° ${res.receipt.numeroQuittance} émise.`
+      );
+
+      // Ouvrir automatiquement le ticket officiel d'encaissement pour impression directe
+      openPrintModal('pos_receipt', {
+        ...acompteModalEst,
+        numeroQuittance: res.receipt.numeroQuittance,
+        montantEncaisse: Number(montantAcompte),
+        soldeRestantDu: restAfter,
+        modePaiement: modePaiementAcompte,
+        datePaiement: res.receipt.datePaiement,
+        quittanceHash: res.receipt.quittanceHash,
+      });
+
+      setAcompteModalEst(null);
+    } catch (err: any) {
+      showNotification('error', `Erreur lors de l'enregistrement de l'acompte : ${err.message || 'Erreur inconnue'}`);
+    } finally {
+      setIsSubmittingAcompte(false);
+    }
+  };
+
   // Traite la navigation directe depuis l'agenda des descentes
   useEffect(() => {
     if (selectedEstablishmentForRecensement) {
@@ -383,6 +467,45 @@ export const FieldRecensementModule: React.FC = () => {
         );
       }
 
+      // Auto-issue official convocation if statutInitial is convocation_delivree
+      if (statutInitial === 'convocation_delivree' && createdEst) {
+        const defaultComparution = (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 8);
+          const y = d.getFullYear();
+          const m = (d.getMonth() + 1).toString().padStart(2, '0');
+          const day = d.getDate().toString().padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        })();
+
+        try {
+          const conv = await issueConvocation(createdEst.id, {
+            dateComparution: planifierIntervention ? dateIntervention : defaultComparution,
+            heureComparution: planifierIntervention ? heureIntervention : '09:00',
+            lieuComparution: 'Direction Départementale des Loisirs (Bâtiment de la Préfecture, Centre-Ville, en face du Trésor Public, au rez-de-chaussée)',
+            montantForfait: redevanceCalculee || 50000,
+            observations: `Délivrée in situ lors de la tournée de repérage (${fullQuartier})`,
+          });
+
+          openPrintModal('a4_convocation', {
+            ...createdEst,
+            referenceConvocation: conv.referenceConvocation,
+            dateEmission: conv.dateEmission,
+            dateComparution: conv.dateComparution,
+            heureComparution: conv.heureComparution,
+            lieuComparution: conv.lieuComparution,
+            montantForfaitNotifie: conv.montantForfaitNotifie,
+            motifConvocation: conv.motifConvocation,
+            piecesRequises: conv.piecesRequises,
+            inspecteurNom: conv.inspecteurNom,
+            inspecteurMatricule: conv.inspecteurMatricule,
+            observations: conv.observations,
+          });
+        } catch (convErr) {
+          console.warn("Convocation issue non-blocking error:", convErr);
+        }
+      }
+
       // Reset Form
       setNomCommercial('');
       setPromoteurNom('');
@@ -390,7 +513,7 @@ export const FieldRecensementModule: React.FC = () => {
       setPromoteurEmail('');
       setRepereLocal('');
       setAdresseExacte('');
-      setStatutInitial('mise_en_demeure');
+      setStatutInitial('convocation_delivree');
       setPlanifierIntervention(false);
       setPhotoUrl('');
       setSignatureUrl('');
@@ -468,7 +591,7 @@ export const FieldRecensementModule: React.FC = () => {
 
           {isOnline && (
             <button
-              onClick={syncOfflineQueue}
+              onClick={() => syncOfflineQueue({ silent: false })}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs transition cursor-pointer ${
                 Math.max(offlineQueueCount, establishments.filter((e) => e.syncStatus === 'pending').length) > 0
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md animate-pulse'
@@ -739,20 +862,41 @@ export const FieldRecensementModule: React.FC = () => {
               </div>
 
               <div className="space-y-1.5 text-xs">
+                <label className="flex items-start gap-2 cursor-pointer p-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20">
+                  <input
+                    type="radio"
+                    name="dossierStatus"
+                    checked={statutInitial === 'convocation_delivree'}
+                    onChange={() => setStatutInitial('convocation_delivree')}
+                    className="mt-0.5 accent-amber-600"
+                  />
+                  <div>
+                    <span className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                      <span>Convocation Officielle Immédiate (Forfait 50 000 FCFA)</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-black">
+                        STANDARD INFORMEL
+                      </span>
+                    </span>
+                    <p className="text-[10px] text-amber-800 dark:text-amber-300">
+                      Procédure standard de repérage : délivrance d'une convocation à se présenter à la Direction sous 8 jours avec QR Code pour négocier, verser un acompte ou solder.
+                    </p>
+                  </div>
+                </label>
+
                 <label className="flex items-start gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-white/50 dark:hover:bg-slate-900/50">
                   <input
                     type="radio"
                     name="dossierStatus"
                     checked={statutInitial === 'mise_en_demeure'}
                     onChange={() => setStatutInitial('mise_en_demeure')}
-                    className="mt-0.5 accent-amber-600"
+                    className="mt-0.5 accent-slate-600"
                   />
                   <div>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
-                      En Instance de Régularisation (Mise en Demeure / Dossier Non Déposé)
+                      Mise en Demeure / Dossier Non Déposé
                     </span>
                     <p className="text-[10px] text-slate-500">
-                      Statut par défaut lors du recensement. Aucune attestation ne sera délivrée tant que les pièces n'ont pas été reçues.
+                      Établissement récalcitrant ou récidiviste nécessitant une sommation juridique immédiate sous 48h.
                     </p>
                   </div>
                 </label>
@@ -1332,6 +1476,47 @@ export const FieldRecensementModule: React.FC = () => {
                     )}
 
                     <div className="flex justify-end items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/60 flex-wrap">
+                      {/* Convocation Administrative Officielle A4 */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (est.derniereConvocation) {
+                            openPrintModal('a4_convocation', {
+                              ...est,
+                              referenceConvocation: est.derniereConvocation.referenceConvocation,
+                              dateEmission: est.derniereConvocation.dateEmission,
+                              dateComparution: est.derniereConvocation.dateComparution,
+                              heureComparution: est.derniereConvocation.heureComparution,
+                              lieuComparution: est.derniereConvocation.lieuComparution,
+                              montantForfaitNotifie: est.derniereConvocation.montantForfaitNotifie,
+                              motifConvocation: est.derniereConvocation.motifConvocation,
+                              piecesRequises: est.derniereConvocation.piecesRequises,
+                              inspecteurNom: est.derniereConvocation.inspecteurNom,
+                              inspecteurMatricule: est.derniereConvocation.inspecteurMatricule,
+                              observations: est.derniereConvocation.observations,
+                            });
+                          } else {
+                            setConvocationModalEst(est);
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                        title="Délivrer ou réimprimer la convocation officielle à 50 000 FCFA avec QR Code"
+                      >
+                        <Printer className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        <span>{est.derniereConvocation ? 'Convocation A4' : 'Délivrer Convocation'}</span>
+                      </button>
+
+                      {/* Négocier le Tarif à la Baisse */}
+                      <button
+                        type="button"
+                        onClick={() => setNegotiationModalEst(est)}
+                        className="px-2.5 py-1 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                        title="Négocier et minorer le montant de la redevance avec justification obligatoire"
+                      >
+                        <TrendingDown className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                        <span>Négocier Forfait</span>
+                      </button>
+
                       {/* Rappel WhatsApp */}
                       {est.promoteurTelephone && (
                         <button
@@ -1372,12 +1557,15 @@ export const FieldRecensementModule: React.FC = () => {
                         <span>{est.prochainRdvDate ? 'Reprogrammer RDV' : 'Fixer RDV'}</span>
                       </button>
 
+                      {/* Gérer les acomptes & Encaissements fractionnés */}
                       <button
-                        onClick={() => setActiveModule('MOD-01')}
-                        className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900 dark:text-blue-300 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                        type="button"
+                        onClick={() => handleOpenAcompte(est)}
+                        className="px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer shadow-xs"
+                        title="Enregistrer un acompte, consulter l'historique des versements ou solder le dossier"
                       >
-                        <CalendarCheck className="w-3 h-3 text-blue-600" />
-                        Gérer RDV & Acomptes
+                        <Coins className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        <span>Gérer les acomptes</span>
                       </button>
 
                       {/* Attestation conditionnelle : UNIQUEMENT si le dossier est déposé et validé */}
@@ -1781,6 +1969,263 @@ export const FieldRecensementModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL GESTION DES ACOMPTES & ENCAISSEMENT ÉCHELONNÉ */}
+      {acompteModalEst && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-lg rounded-2xl border p-5 sm:p-6 shadow-2xl relative space-y-4 my-auto ${
+              isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                  <Coins className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <span>Gestion des Acomptes & Trésorerie</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      Régie SAF
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                    {acompteModalEst.codeDossier || 'DDL-PN'} • <strong className="font-sans text-slate-800 dark:text-slate-200">{acompteModalEst.nomCommercial}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAcompteModalEst(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Recap financier (3 cartes) */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                <p className="text-[10px] uppercase font-bold text-slate-500">Redevance Fixée</p>
+                <p className="text-xs sm:text-sm font-mono font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                  {formatCfa(acompteModalEst.montantRedevanceAnnuelle || 50000)}
+                </p>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60">
+                <p className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400">Déjà Versé</p>
+                <p className="text-xs sm:text-sm font-mono font-bold text-emerald-600 dark:text-emerald-300 mt-0.5">
+                  {formatCfa(acompteModalEst.montantEncaisse || 0)}
+                </p>
+              </div>
+
+              <div className={`p-2.5 rounded-xl border ${
+                acompteModalEst.soldeRestantDu <= 0
+                  ? 'bg-blue-50/60 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300'
+                  : 'bg-rose-50/60 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'
+              }`}>
+                <p className="text-[10px] uppercase font-bold">Reste à Payer</p>
+                <p className="text-xs sm:text-sm font-mono font-bold mt-0.5">
+                  {formatCfa(acompteModalEst.soldeRestantDu || 0)}
+                </p>
+              </div>
+            </div>
+
+            {/* Historique des acomptes si existants */}
+            {acompteModalEst.historiquePaiements && acompteModalEst.historiquePaiements.length > 0 && (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Versements Antérieurs ({acompteModalEst.historiquePaiements.length})</span>
+                  </span>
+                  <span className="text-slate-500 font-mono text-[10px]">Trésorerie certifiée</span>
+                </div>
+                <div className="max-h-24 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-800 pr-1">
+                  {acompteModalEst.historiquePaiements.map((p, idx) => (
+                    <div key={idx} className="py-1 flex items-center justify-between text-[11px]">
+                      <div>
+                        <span className="font-mono text-slate-500">{new Date(p.date).toLocaleDateString('fr-FR')}</span>
+                        <span className="text-slate-400 ml-1.5">({p.modePaiement})</span>
+                      </div>
+                      <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        +{formatCfa(p.montant)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Formulaire d'encaissement d'un nouvel acompte */}
+            <form onSubmit={handleSaveAcompte} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold block mb-1 text-slate-800 dark:text-slate-200">
+                  Montant du Versement / Acompte (FCFA) :
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={1000}
+                    max={acompteModalEst.soldeRestantDu > 0 ? acompteModalEst.soldeRestantDu : undefined}
+                    step={1000}
+                    value={montantAcompte || ''}
+                    onChange={(e) => setMontantAcompte(Number(e.target.value))}
+                    required
+                    className={`w-full px-3 py-2 rounded-xl border font-mono text-sm font-bold pl-8 ${
+                      isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-slate-100'
+                    }`}
+                  />
+                  <Coins className="w-4 h-4 text-emerald-500 absolute left-2.5 top-2.5 pointer-events-none" />
+                </div>
+
+                {/* Boutons rapides pour sélectionner un montant */}
+                <div className="flex gap-1.5 mt-2 flex-wrap">
+                  {[15000, 25000, 35000, 50000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setMontantAcompte(amt)}
+                      className="px-2 py-1 rounded-lg border text-[10px] font-mono font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      {formatCfa(amt)}
+                    </button>
+                  ))}
+                  {acompteModalEst.soldeRestantDu > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMontantAcompte(acompteModalEst.soldeRestantDu)}
+                      className="px-2 py-1 rounded-lg border border-emerald-400 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/50 hover:bg-emerald-100 cursor-pointer"
+                    >
+                      Solder Tout ({formatCfa(acompteModalEst.soldeRestantDu)})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Mode de règlement */}
+              <div>
+                <label className="font-bold block mb-1 text-slate-800 dark:text-slate-200">
+                  Canal / Mode de Règlement :
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'especes', label: '💵 Espèces (SAF)' },
+                    { id: 'airtel_money', label: '📱 Airtel Money' },
+                    { id: 'momo', label: '📱 MTN MoMo' },
+                    { id: 'virement_tresor', label: '🏛️ Trésor Public' },
+                    { id: 'cheque', label: '🏦 Chèque' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setModePaiementAcompte(m.id as any)}
+                      className={`p-2 rounded-xl border text-[11px] font-semibold text-center transition cursor-pointer ${
+                        modePaiementAcompte === m.id
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold'
+                          : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calcul dynamique du solde restant après ce paiement */}
+              <div className="p-2.5 rounded-xl bg-slate-100/70 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] flex justify-between items-center">
+                <span className="text-slate-600 dark:text-slate-400">Solde restant après versement :</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                  {formatCfa(Math.max(0, (acompteModalEst.soldeRestantDu || 0) - (montantAcompte || 0)))}
+                </span>
+              </div>
+
+              {/* Si le solde n'est pas complètement soldé, fixation de la date de la prochaine tranche */}
+              {(acompteModalEst.soldeRestantDu - (montantAcompte || 0)) > 0 && (
+                <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900 space-y-2 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-300 text-[11px]">
+                    <CalendarClock className="w-4 h-4 text-purple-600" />
+                    <span>Échéance d'Apurement du Reste à Payer</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold block text-purple-950 dark:text-purple-300">
+                        Date de l'échéance :
+                      </label>
+                      <input
+                        type="date"
+                        value={nextAcompteRdvDate}
+                        onChange={(e) => setNextAcompteRdvDate(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-lg border text-xs ${
+                          isLight ? 'bg-white border-purple-200' : 'bg-slate-950 border-purple-800'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold block text-purple-950 dark:text-purple-300">
+                        Heure :
+                      </label>
+                      <input
+                        type="time"
+                        value={nextAcompteRdvHeure}
+                        onChange={(e) => setNextAcompteRdvHeure(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-lg border text-xs ${
+                          isLight ? 'bg-white border-purple-200' : 'bg-slate-950 border-purple-800'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Boutons d'action */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAcompteModalEst(null)}
+                  className="px-4 py-2 rounded-xl border text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                >
+                  Annuler
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingAcompte}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingAcompte ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Encaissement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="w-4 h-4" />
+                      <span>Encaisser l'Acompte & Émettre Quittance</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONVOCATION ADMINISTRATIVE OFFICIELLE */}
+      <IssueConvocationModal
+        establishment={convocationModalEst}
+        isOpen={Boolean(convocationModalEst)}
+        onClose={() => setConvocationModalEst(null)}
+      />
+
+      {/* MODAL NÉGOCIATION ET RÉVISION TARIFAIRE */}
+      <NegotiationModal
+        establishment={negotiationModalEst}
+        isOpen={Boolean(negotiationModalEst)}
+        onClose={() => setNegotiationModalEst(null)}
+      />
     </div>
   );
 };

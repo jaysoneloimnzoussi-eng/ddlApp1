@@ -11,6 +11,8 @@ import {
   UserRole,
   ComplianceStatus,
   DepartmentalAuthorization,
+  ConvocationAdministrative,
+  NegociationRedevance,
   CampaignBatch,
   CampaignMessage,
   CampaignTargetSegment,
@@ -181,14 +183,28 @@ interface AppContextType {
 
   // Offline status & alerts
   isOnline: boolean;
+  isSyncing: boolean;
   offlineQueueCount: number;
-  syncOfflineQueue: () => void;
+  syncOfflineQueue: (options?: { silent?: boolean }) => Promise<void>;
   notifications: NotificationItem[];
   showNotification: (type: 'success' | 'warning' | 'error' | 'info', message: string) => void;
   removeNotification: (id: string) => void;
 
+  // Cycle de Régularisation du Tenancier (Convocation à 50 000 FCFA & Négociation)
+  issueConvocation: (
+    establishmentId: string,
+    params: {
+      dateComparution: string;
+      heureComparution?: string;
+      lieuComparution?: string;
+      montantForfait?: number;
+      observations?: string;
+    }
+  ) => Promise<ConvocationAdministrative>;
+  negotiateFee: (establishmentId: string, nouveauMontant: number, motif: string) => Promise<void>;
+
   // Print Preview state
-  printMode: 'none' | 'a4_attestation' | 'a4_legal_act' | 'a4_departmental_authorization' | 'a4_recovery_notice' | 'a4_report' | 'a4_pta_2026' | 'pos_receipt' | 'staff_badge' | 'spa_diploma';
+  printMode: 'none' | 'a4_attestation' | 'a4_legal_act' | 'a4_departmental_authorization' | 'a4_recovery_notice' | 'a4_report' | 'a4_pta_2026' | 'pos_receipt' | 'staff_badge' | 'spa_diploma' | 'a4_convocation';
   printData: any;
   openPrintModal: (mode: AppContextType['printMode'], data: any) => void;
   closePrintModal: () => void;
@@ -346,6 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [offlineQueue, setOfflineQueue] = useState<any[]>(() => {
     try {
       const q = localStorage.getItem('ddl_offline_queue');
@@ -355,40 +372,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Track online/offline status dynamically across network changes and auto-sync on reconnect or startup
+  // Track online/offline status dynamically: auto-sync in background silently without intrusive popups
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      showNotification('info', 'Connexion Internet rétablie. Vos fiches locales sont en cours de synchronisation vers Firebase...');
+      // Synchronisation automatique silencieuse en arrière-plan dès la reconnexion
       setTimeout(() => {
-        syncOfflineQueue();
-      }, 600);
+        syncOfflineQueue({ silent: true });
+      }, 500);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      showNotification('warning', 'Mode Hors-Ligne activé. Vos fiches et quittances restent 100% sauvegardées sur cet appareil.');
+      // Pas de popup intempestive (évidence pour l'utilisateur, simple icône discrète)
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initial check: If already online upon launch and pending queue exists, trigger sync automatically
+    // Démarrage : si l'agent est en ligne, synchronisation automatique silencieuse
     if (typeof navigator !== 'undefined' && navigator.onLine) {
-      const q = localStorage.getItem('ddl_offline_queue');
-      const hasQueue = q && q !== '[]';
-      if (hasQueue) {
-        const timer = setTimeout(() => {
-          syncOfflineQueue();
-        }, 1500);
-        return () => {
-          clearTimeout(timer);
-          window.removeEventListener('online', handleOnline);
-          window.removeEventListener('offline', handleOffline);
-        };
-      }
+      setTimeout(() => {
+        syncOfflineQueue({ silent: true });
+      }, 1200);
     }
 
+    // Intervalle automatique de fond (toutes les 40 secondes) pour synchroniser en toute transparence
+    const intervalTimer = setInterval(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        syncOfflineQueue({ silent: true });
+      }
+    }, 40000);
+
     return () => {
+      clearInterval(intervalTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -504,7 +520,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           },
           signatureDirecteur: {
             signe: true,
-            nomDirecteur: 'Jacques MATOKO',
+            nomDirecteur: 'NTSEKE NGOUAKA Jean Richard',
             qualite: 'Le Directeur Départemental des Loisirs de Pointe-Noire',
             dateSignature: '2026-02-15',
             parapheOfficiel: 'Approuvé • DDL-PN • 2026',
@@ -1174,6 +1190,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const showNotification = (type: NotificationItem['type'], message: string) => {
+    // Supprimer tous les popups d'information superflus (mode hors-ligne, retour en ligne, synchronisation)
+    // Pour les agents de terrain, ces états sont des évidences ; une simple icône discrète suffit.
+    const lower = (message || '').toLowerCase();
+    if (
+      lower.includes('hors-ligne') ||
+      lower.includes('hors ligne') ||
+      lower.includes('connexion rétablie') ||
+      lower.includes('synchronisation') ||
+      lower.includes('synchroniser') ||
+      lower.includes('synchronisé') ||
+      lower.includes('firebase firestore')
+    ) {
+      console.log('[Info de connectivité discrète]', message);
+      return;
+    }
+
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
     setNotifications((prev) => [...prev, { id, type, message }]);
     setTimeout(() => {
@@ -1305,9 +1337,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof navigator !== 'undefined' && navigator.onLine) {
       Promise.race([
         setDoc(doc(db, 'establishments', newEst.id), cleanDoc),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Firestore')), 1500))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Firestore')), 4000))
       ]).catch((e) => {
-        console.warn("Échec ou latence Firestore, mise en file d'attente hors-ligne:", e);
+        console.warn("Échec ou latence Firestore, mise en file d'attente:", e);
         setOfflineQueue((prev) => [...prev, { type: 'ESTABLISHMENT_ADD', data: cleanDoc }]);
       });
     } else {
@@ -1316,11 +1348,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (!options?.silent) {
-      if (!isOnline) {
-        showNotification('warning', `Établissement enregistré localement en mode Hors-Ligne (Dossier ${codeDossier}).`);
-      } else {
-        showNotification('success', `Nouvel établissement recensé (Attribué à ${newEst.agentAssigneNom}) : ${newEst.nomCommercial}`);
-      }
+      showNotification('success', `Fiche enregistrée : ${newEst.nomCommercial} (${codeDossier})`);
+    }
+
+    // Auto-sync in background silently if online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setTimeout(() => syncOfflineQueue({ silent: true }), 1000);
     }
 
     try {
@@ -1356,6 +1389,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ]).catch((e) => {
         console.warn("Firestore update error/timeout:", e);
       });
+      setTimeout(() => syncOfflineQueue({ silent: true }), 800);
     }
   };
 
@@ -1449,6 +1483,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       numeroQuittance,
       `Versement de ${recData.montantVerse.toLocaleString('fr-FR')} FCFA (${recData.natureRecette}) pour ${recData.etablissementNom}`
     );
+
+    // Auto-sync in background silently if online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setTimeout(() => syncOfflineQueue({ silent: true }), 800);
+    }
 
     return newReceipt;
   };
@@ -1712,6 +1751,220 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prochainRdvMotif: finalMotif,
       },
     };
+  };
+
+  // Cycle de Régularisation du Tenancier : Délivrance de la Convocation à 50 000 FCFA
+  const issueConvocation = async (
+    establishmentId: string,
+    params: {
+      dateComparution: string;
+      heureComparution?: string;
+      lieuComparution?: string;
+      montantForfait?: number;
+      observations?: string;
+    }
+  ): Promise<ConvocationAdministrative> => {
+    let est = establishments.find((e) => e.id === establishmentId);
+    if (!est) {
+      est = visibleEstablishments.find((e) => e.id === establishmentId);
+    }
+    if (!est) {
+      throw new Error("Établissement non trouvé");
+    }
+
+    const convId = 'conv-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    const refNum = `CONV-2026-PN-${Math.floor(1000 + Math.random() * 9000)}`;
+    const montant = params.montantForfait ?? (est.montantRedevanceAnnuelle || 50000);
+    const activeAgent = currentAgent || staff.find((s) => s.id === est.agentAssigneId) || staff[0];
+
+    const convocation: ConvocationAdministrative = {
+      id: convId,
+      referenceConvocation: refNum,
+      dateEmission: new Date().toISOString().substring(0, 10),
+      dateComparution: params.dateComparution,
+      heureComparution: params.heureComparution || '09h00',
+      lieuComparution:
+        params.lieuComparution ||
+        'Direction Départementale des Loisirs (Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée)',
+      montantForfaitNotifie: montant,
+      motifConvocation:
+        "Régularisation administrative et fiscale des droits d'exploitation (Loi n° 21-2019)",
+      piecesRequises: [
+        "Pièce d'identité officielle du promoteur / gérant (CNI ou Passeport)",
+        "Contrat de bail commercial ou titre d'occupation des lieux",
+        "Registre du commerce (RCCM) ou déclaration d'activité (si existant)",
+        "Quittances antérieures de versement ou preuve de paiement éventuelle",
+      ],
+      inspecteurNom: activeAgent.nomComplet || est.agentAssigneNom || 'Jacques MATOKO',
+      inspecteurMatricule: activeAgent.matricule || 'DDL-DIR-001',
+      statut: 'delivree',
+      observations: params.observations || "Délivrée in situ lors de la tournée de repérage de la brigade mobile SAA",
+    };
+
+    const newSolde = Math.max(0, montant - (est.montantEncaisse || 0));
+    const newStatut: ComplianceStatus = (est.montantEncaisse || 0) > 0 ? 'acompte_verse' : 'convocation_delivree';
+
+    setEstablishments((prev) =>
+      prev.map((item) => {
+        if (item.id === establishmentId) {
+          return {
+            ...item,
+            montantRedevanceAnnuelle: montant,
+            soldeRestantDu: newSolde,
+            statut: newStatut,
+            derniereConvocation: convocation,
+            historiqueConvocations: [convocation, ...(item.historiqueConvocations || [])],
+            prochainRdvDate: params.dateComparution,
+            prochainRdvHeure: params.heureComparution || '09h00',
+            prochainRdvMotif: `Comparution administrative (${refNum})`,
+          };
+        }
+        return item;
+      })
+    );
+
+    // Persistence
+    try {
+      const saved = JSON.parse(localStorage.getItem('ddl_real_establishments_v5') || '[]');
+      const updatedList = saved.map((item: any) =>
+        item.id === establishmentId
+          ? {
+              ...item,
+              montantRedevanceAnnuelle: montant,
+              soldeRestantDu: newSolde,
+              statut: newStatut,
+              derniereConvocation: convocation,
+              historiqueConvocations: [convocation, ...(item.historiqueConvocations || [])],
+              prochainRdvDate: params.dateComparution,
+              prochainRdvHeure: params.heureComparution || '09h00',
+              prochainRdvMotif: `Comparution administrative (${refNum})`,
+            }
+          : item
+      );
+      localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(updatedList));
+    } catch (e) {
+      console.warn("Erreur sauvegarde convocation:", e);
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setDoc(doc(db, 'establishments', establishmentId), cleanForFirestore({
+        ...est,
+        montantRedevanceAnnuelle: montant,
+        soldeRestantDu: newSolde,
+        statut: newStatut,
+        derniereConvocation: convocation,
+        historiqueConvocations: [convocation, ...(est.historiqueConvocations || [])],
+        prochainRdvDate: params.dateComparution,
+        prochainRdvHeure: params.heureComparution || '09h00',
+        prochainRdvMotif: `Comparution administrative (${refNum})`,
+      }), { merge: true }).catch(() => null);
+    }
+
+    await addAuditLog(
+      'DELIVRANCE_CONVOCATION',
+      'ESTABLISHMENT',
+      est.codeDossier,
+      `Convocation ${refNum} au forfait de ${formatCfa(montant)} délivrée à ${est.nomCommercial}. Comparution fixée au ${params.dateComparution}.`
+    );
+
+    showNotification('success', `Convocation ${refNum} délivrée à ${est.nomCommercial} (Forfait ${formatCfa(montant)}).`);
+
+    // Synchronisation automatique silencieuse en arrière-plan dès la délivrance
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setTimeout(() => syncOfflineQueue({ silent: true }), 800);
+    }
+
+    return convocation;
+  };
+
+  // Négociation motivée de la redevance à la baisse
+  const negotiateFee = async (
+    establishmentId: string,
+    nouveauMontant: number,
+    motif: string
+  ): Promise<void> => {
+    let est = establishments.find((e) => e.id === establishmentId);
+    if (!est) {
+      est = visibleEstablishments.find((e) => e.id === establishmentId);
+    }
+    if (!est) {
+      throw new Error("Établissement non trouvé");
+    }
+
+    const montantInitial = est.montantRedevanceAnnuelle || 50000;
+    const activeAgent = currentAgent || staff.find((s) => s.id === est.agentAssigneId) || staff[0];
+    const negociation: NegociationRedevance = {
+      id: 'neg-' + Date.now(),
+      dateNegociation: new Date().toISOString().substring(0, 10),
+      montantInitial,
+      montantConvenu: nouveauMontant,
+      motifNegociation: motif,
+      validePar: activeAgent.nomComplet || 'NTSEKE NGOUAKA Jean Richard (Directeur)',
+    };
+
+    const newSolde = Math.max(0, nouveauMontant - (est.montantEncaisse || 0));
+    const newStatut: ComplianceStatus = newSolde === 0 ? 'en_regle' : ((est.montantEncaisse || 0) > 0 ? 'acompte_verse' : 'negociation_en_cours');
+
+    setEstablishments((prev) =>
+      prev.map((item) => {
+        if (item.id === establishmentId) {
+          return {
+            ...item,
+            montantRedevanceAnnuelle: nouveauMontant,
+            soldeRestantDu: newSolde,
+            statut: newStatut,
+            derniereNegociation: negociation,
+            historiqueNegociations: [negociation, ...(item.historiqueNegociations || [])],
+          };
+        }
+        return item;
+      })
+    );
+
+    // Persistence
+    try {
+      const saved = JSON.parse(localStorage.getItem('ddl_real_establishments_v5') || '[]');
+      const updatedList = saved.map((item: any) =>
+        item.id === establishmentId
+          ? {
+              ...item,
+              montantRedevanceAnnuelle: nouveauMontant,
+              soldeRestantDu: newSolde,
+              statut: newStatut,
+              derniereNegociation: negociation,
+              historiqueNegociations: [negociation, ...(item.historiqueNegociations || [])],
+            }
+          : item
+      );
+      localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(updatedList));
+    } catch (e) {
+      console.warn("Erreur sauvegarde négociation:", e);
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setDoc(doc(db, 'establishments', establishmentId), cleanForFirestore({
+        ...est,
+        montantRedevanceAnnuelle: nouveauMontant,
+        soldeRestantDu: newSolde,
+        statut: newStatut,
+        derniereNegociation: negociation,
+        historiqueNegociations: [negociation, ...(est.historiqueNegociations || [])],
+      }), { merge: true }).catch(() => null);
+    }
+
+    await addAuditLog(
+      'NEGOCIATION_REDEVANCE',
+      'ESTABLISHMENT',
+      est.codeDossier,
+      `Redevance révisée de ${formatCfa(montantInitial)} à ${formatCfa(nouveauMontant)} pour ${est.nomCommercial}. Motif : ${motif}`
+    );
+
+    showNotification('success', `Redevance révisée à ${formatCfa(nouveauMontant)} pour ${est.nomCommercial}. Nouveau solde : ${formatCfa(newSolde)}.`);
+
+    // Synchronisation automatique silencieuse en arrière-plan dès la révision
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      setTimeout(() => syncOfflineQueue({ silent: true }), 800);
+    }
   };
 
   const issueLegalAct = async (
@@ -2172,8 +2425,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const signatureData = {
       signe: true,
-      nomDirecteur: nomSignataire || (isPo ? 'Gildas Ambetos' : 'Jacques MATOKO'),
-      signataireNom: nomSignataire || (isPo ? 'Gildas Ambetos' : 'Jacques MATOKO'),
+      nomDirecteur: nomSignataire || (isPo ? 'Gildas Ambetos' : 'NTSEKE NGOUAKA Jean Richard'),
+      signataireNom: nomSignataire || (isPo ? 'Gildas Ambetos' : 'NTSEKE NGOUAKA Jean Richard'),
       typeSignataire: typeSignature,
       qualite,
       dateSignature: today,
@@ -2208,7 +2461,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const logDetails = isPo
       ? `Approbation et signature par ordre (P.O.) par le Chef de Service Assistance et Autorisation (${nomSignataire || 'Gildas Ambetos'}) pour ${targetNom}.`
-      : `Approbation souveraine et signature directe par le Directeur Départemental (${nomSignataire || 'Jacques MATOKO'}) pour ${targetNom}.`;
+      : `Approbation souveraine et signature directe par le Directeur Départemental (${nomSignataire || 'NTSEKE NGOUAKA Jean Richard'}) pour ${targetNom}.`;
 
     await addAuditLog(
       isPo ? 'SIGNATURE_PO_CHEF_SAA_AUTORISATION' : 'SIGNATURE_DIRECTEUR_AUTORISATION',
@@ -2388,7 +2641,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         messageContent: personalized,
         dateEnvoi: today,
         statutEnvoi: 'delivre',
-        expediteurNom: currentAgent?.nomComplet || 'Jacques MATOKO (Directeur)',
+        expediteurNom: currentAgent?.nomComplet || 'NTSEKE NGOUAKA Jean Richard (Directeur)',
         referenceRelance: refNum,
       };
     });
@@ -2491,7 +2744,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const syncOfflineQueue = async () => {
+  const syncOfflineQueue = async (options?: { silent?: boolean }) => {
+    const isSilent = options?.silent ?? true;
+    if (isSyncing) return;
+    setIsSyncing(true);
     try {
       // 1. Silent auth check sans bloquer l'agent de terrain
       await ensureFirebaseAuth().catch(() => null);
@@ -2501,11 +2757,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pendingEsts = establishments.filter((e) => e.syncStatus === 'pending');
 
       if (queueToSync.length === 0 && pendingEsts.length === 0) {
-        showNotification('info', 'Toutes vos fiches terrain sont déjà synchronisées avec Firebase Firestore.');
+        if (!isSilent) {
+          showNotification('info', 'Toutes vos fiches terrain sont déjà synchronisées avec Firebase.');
+        }
         return;
       }
 
-      showNotification('info', `Synchronisation en cours de vos fiches terrain vers Firebase Firestore (${queueToSync.length + pendingEsts.length} éléments)...`);
+      if (!isSilent) {
+        showNotification('info', `Synchronisation en cours de ${queueToSync.length + pendingEsts.length} éléments...`);
+      }
 
       let successCount = 0;
       let lastSingleError: any = null;
@@ -2579,10 +2839,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return updated;
         });
 
-        showNotification(
-          'success',
-          `Synchronisation réussie : ${successCount} fiche(s) de terrain transmises et confirmées dans votre base Firebase Firestore !`
-        );
+        if (!isSilent) {
+          showNotification(
+            'success',
+            `Synchronisation réussie : ${successCount} fiche(s) transmise(s) dans Firebase !`
+          );
+        }
       } else {
         const errMsg = lastSingleError?.message || lastSingleError?.code || '';
         const isPermission =
@@ -2590,21 +2852,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           errMsg.includes('PERMISSION_DENIED') ||
           lastSingleError?.code === 'permission-denied';
 
-        if (isPermission) {
+        if (isPermission && !isSilent) {
           showNotification(
             'error',
-            "Accès refusé par Firebase (Permissions insuffisantes) : Cliquez sur « Connexion Google (Firebase) » en haut à droite avec Jacks.matoko@gmail.com pour autoriser l'enregistrement."
+            "Accès refusé par Firebase (Permissions insuffisantes) : Cliquez sur Publier dans vos Règles Firestore ou connectez-vous avec Jacks.matoko@gmail.com."
           );
-        } else {
+        } else if (!isSilent) {
           showNotification(
             'warning',
-            `La synchronisation n’a pas pu aboutir : ${errMsg || 'Vérifiez que votre connexion Internet est active et stable'}.`
+            `La synchronisation n’a pas pu aboutir : ${errMsg || 'Vérifiez la connexion Internet'}.`
           );
         }
       }
     } catch (err: any) {
       console.error("Erreur synchronisation offlineQueue:", err);
-      showNotification('error', `Erreur synchronisation Firebase : ${err?.message || 'Erreur réseau ou droits d’accès'}`);
+      if (!isSilent) {
+        showNotification('error', `Erreur synchronisation Firebase : ${err?.message || 'Erreur réseau ou droits d’accès'}`);
+      }
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -2673,11 +2939,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSchedule,
         recordPaymentAndScheduleNext,
         rescheduleAppointment,
+        issueConvocation,
+        negotiateFee,
         reportEstablishmentClosed,
         importFromGoogleCalendar,
         addAuditLog,
         createSoitTransmis,
         isOnline,
+        isSyncing,
         offlineQueueCount: offlineQueue.length,
         syncOfflineQueue,
         notifications,

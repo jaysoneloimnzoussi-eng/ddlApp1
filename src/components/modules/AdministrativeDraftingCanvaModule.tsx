@@ -75,7 +75,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
   const [objet, setObjet] = useState<string>("Dépôt de dossier technique d'agrément d'établissement de loisirs");
   const [reference, setReference] = useState<string>('');
   const [formuleAppel, setFormuleAppel] = useState<string>('');
-  const [signataireNom, setSignataireNom] = useState<string>('Jean Richard NTSEKE NGOUAKA');
+  const [signataireNom, setSignataireNom] = useState<string>('NTSEKE NGOUAKA Jean Richard');
   const [signataireTitre, setSignataireTitre] = useState<string>('Le Directeur Départemental des Loisirs de Pointe-Noire');
   const [piecesJointes, setPiecesJointes] = useState<string>('Récépissé de versement SAF et Quittance de régularisation.');
   const [ampliations, setAmpliations] = useState<string>(
@@ -304,7 +304,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
       setReference(''); // Référence non obligatoire / sans lois arbitraires
       setFormuleAppel('');
       setSignataireTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
-      setSignataireNom('Jean Richard NTSEKE NGOUAKA');
+      setSignataireNom('NTSEKE NGOUAKA Jean Richard');
       setPiecesJointes('Récépissé de versement SAF et Quittance de régularisation.');
       setAmpliations(
         '- DGL / Brazzaville\n- Préfecture du Département de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Brigade de Salubrité Acoustique (SAA)\n- Archives / Chrono'
@@ -339,7 +339,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
       setReference('Note de Service N° 151/MTL-CAB du 03 août 2022 et Note de Service N° 152/MTL-CAB du 05 août 2022');
       setFormuleAppel('');
       setSignataireTitre('Le Directeur Départemental des Loisirs de Pointe-Noire');
-      setSignataireNom('Jean Richard NTSEKE NGOUAKA');
+      setSignataireNom('NTSEKE NGOUAKA Jean Richard');
       setPiecesJointes("Dossier physique relié, Quitus Sapeurs-Pompiers, Quittance SAF d'enquête terrain (30.000 FCFA)");
       setAmpliations(
         '- DGL / Brazzaville\n- Préfecture de Pointe-Noire\n- Mairie Centrale de Pointe-Noire\n- Service Administratif et Financier (SAF)\n- Archives / Chrono'

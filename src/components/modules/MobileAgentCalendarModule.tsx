@@ -46,6 +46,7 @@ import {
   ChevronDown,
   ChevronUp,
   CalendarClock,
+  TrendingDown,
 } from 'lucide-react';
 import { InspectionSchedule, Establishment, CashReceipt, Arrondissement, QUARTIERS_PAR_ARRONDISSEMENT, EstablishmentCategory } from '../../types';
 import {
@@ -57,6 +58,8 @@ import {
   ParsedGoogleCalendarEstablishment,
 } from '../../services/googleWorkspace';
 import { formatCfa } from '../../services/crypto';
+import { IssueConvocationModal } from '../common/IssueConvocationModal';
+import { NegotiationModal } from '../common/NegotiationModal';
 
 export const MobileAgentCalendarModule: React.FC = () => {
   const {
@@ -111,6 +114,11 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [nextRdvHeure, setNextRdvHeure] = useState<string>('11:00');
   const [nextRdvMotif, setNextRdvMotif] = useState<string>('Solde convenu avec le promoteur');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [lieuEncaissement, setLieuEncaissement] = useState<'terrain' | 'bureau'>('terrain');
+
+  // Convocation & Négociation Modals
+  const [convocationModalEst, setConvocationModalEst] = useState<Establishment | null>(null);
+  const [negotiationModalEst, setNegotiationModalEst] = useState<Establishment | null>(null);
 
   // Create new appointment modal
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -1650,19 +1658,67 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap justify-end">
                         {sch.statut !== 'effectue' && (
                           <button
                             onClick={() => handleOpenPaymentFromSchedule(sch)}
-                            className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition flex items-center gap-1.5 cursor-pointer"
                           >
-                            <CreditCard className="w-4 h-4" />
+                            <CreditCard className="w-3.5 h-3.5" />
                             <span>Encaisser</span>
                           </button>
                         )}
+
+                        {/* Convocation & Négociation Rapides */}
+                        {(() => {
+                          const linkedEst = establishments.find((e) => e.id === sch.etablissementId) ||
+                            visibleEstablishments.find((e) => e.id === sch.etablissementId);
+                          if (!linkedEst) return null;
+                          return (
+                            <>
+                              <button
+                                onClick={() => setNegotiationModalEst(linkedEst)}
+                                className="px-2.5 py-1.5 rounded-lg border border-purple-500/40 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-xs transition flex items-center gap-1 cursor-pointer"
+                                title="Négocier et minorer le forfait à la baisse avec le promoteur"
+                              >
+                                <TrendingDown className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Négocier</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  if (linkedEst.derniereConvocation) {
+                                    openPrintModal('a4_convocation', {
+                                      ...linkedEst,
+                                      referenceConvocation: linkedEst.derniereConvocation.referenceConvocation,
+                                      dateEmission: linkedEst.derniereConvocation.dateEmission,
+                                      dateComparution: linkedEst.derniereConvocation.dateComparution,
+                                      heureComparution: linkedEst.derniereConvocation.heureComparution,
+                                      lieuComparution: linkedEst.derniereConvocation.lieuComparution,
+                                      montantForfaitNotifie: linkedEst.derniereConvocation.montantForfaitNotifie,
+                                      motifConvocation: linkedEst.derniereConvocation.motifConvocation,
+                                      piecesRequises: linkedEst.derniereConvocation.piecesRequises,
+                                      inspecteurNom: linkedEst.derniereConvocation.inspecteurNom,
+                                      inspecteurMatricule: linkedEst.derniereConvocation.inspecteurMatricule,
+                                      observations: linkedEst.derniereConvocation.observations,
+                                    });
+                                  } else {
+                                    setConvocationModalEst(linkedEst);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg border border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold text-xs transition flex items-center gap-1 cursor-pointer"
+                                title="Délivrer ou réimprimer la convocation officielle à 50 000 FCFA avec QR Code"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Convocation</span>
+                              </button>
+                            </>
+                          );
+                        })()}
+
                         <button
                           onClick={() => handleOpenRescheduleModalFromSchedule(sch)}
-                          className="px-3 py-2 rounded-lg border border-purple-500/40 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg border border-purple-500/40 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-400 font-bold text-xs transition flex items-center gap-1 cursor-pointer"
                           title="Reprogrammer la date et l'heure"
                         >
                           <CalendarClock className="w-3.5 h-3.5" />
@@ -2054,7 +2110,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
             <form onSubmit={handleExecutePaymentWorkflow} className="p-5 space-y-4 text-xs">
               {/* Current Balances */}
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Taxe annuelle totale :</span>
                   <span className="font-mono font-bold">{formatCfa(targetEstForPayment.montantRedevanceAnnuelle)}</span>
@@ -2066,6 +2122,48 @@ export const MobileAgentCalendarModule: React.FC = () => {
                 <div className="flex justify-between text-sm font-bold pt-1 border-t border-slate-200 dark:border-slate-800">
                   <span className="text-emerald-700 dark:text-emerald-400">Solde restant dû :</span>
                   <span className="font-mono text-emerald-600">{formatCfa(targetEstForPayment.soldeRestantDu)}</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setNegotiationModalEst(targetEstForPayment)}
+                  className="w-full mt-2 py-1.5 px-3 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <TrendingDown className="w-3.5 h-3.5" />
+                  <span>Négocier / Ajuster la redevance à la baisse</span>
+                </button>
+              </div>
+
+              {/* Lieu d'encaissement */}
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  Lieu d'encaissement :
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLieuEncaissement('terrain')}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      lieuEncaissement === 'terrain'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Sur le terrain (In situ)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLieuEncaissement('bureau')}
+                    className={`py-1.5 px-2 rounded-lg border text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      lieuEncaissement === 'bureau'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <Building className="w-3.5 h-3.5" />
+                    <span>Au bureau (Direction / SAF)</span>
+                  </button>
                 </div>
               </div>
 
@@ -3104,6 +3202,27 @@ export const MobileAgentCalendarModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL CONVOCATION ADMINISTRATIVE OFFICIELLE */}
+      <IssueConvocationModal
+        establishment={convocationModalEst}
+        isOpen={Boolean(convocationModalEst)}
+        onClose={() => setConvocationModalEst(null)}
+      />
+
+      {/* MODAL NÉGOCIATION ET RÉVISION TARIFAIRE */}
+      <NegotiationModal
+        establishment={negotiationModalEst}
+        isOpen={Boolean(negotiationModalEst)}
+        onClose={() => setNegotiationModalEst(null)}
+        onSuccess={() => {
+          // Si on était dans le modal d'encaissement, mettre à jour targetEstForPayment
+          if (targetEstForPayment && negotiationModalEst?.id === targetEstForPayment.id) {
+            const updated = establishments.find((e) => e.id === targetEstForPayment.id);
+            if (updated) setTargetEstForPayment(updated);
+          }
+        }}
+      />
     </div>
   );
 };

@@ -11,10 +11,13 @@ import {
   CheckCircle2,
   FileText,
   DollarSign,
+  TrendingDown,
 } from 'lucide-react';
 import { formatCfa } from '../../services/crypto';
 import { generateAttestationDocx } from '../../services/docxGenerator';
 import { Establishment, CashReceipt } from '../../types';
+import { IssueConvocationModal } from '../common/IssueConvocationModal';
+import { NegotiationModal } from '../common/NegotiationModal';
 
 export const TitlesAndReceiptsModule: React.FC = () => {
   const {
@@ -40,6 +43,10 @@ export const TitlesAndReceiptsModule: React.FC = () => {
   const [referenceTransaction, setReferenceTransaction] = useState('');
   const [natureRecette, setNatureRecette] = useState<CashReceipt['natureRecette']>('Forfait Informel SAA');
   const [isCashingIn, setIsCashingIn] = useState(false);
+
+  // Modals Convocation & Négociation
+  const [convocationModalEst, setConvocationModalEst] = useState<Establishment | null>(null);
+  const [negotiationModalEst, setNegotiationModalEst] = useState<Establishment | null>(null);
 
   // Auto-select first establishment if none is selected
   React.useEffect(() => {
@@ -229,13 +236,48 @@ export const TitlesAndReceiptsModule: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
+                    <button
+                      onClick={() => setNegotiationModalEst(selectedEst)}
+                      className="px-2.5 py-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                      title="Négocier et minorer le forfait avec le promoteur"
+                    >
+                      <TrendingDown className="w-3.5 h-3.5" />
+                      <span>Négocier Tarif</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (selectedEst.derniereConvocation) {
+                          openPrintModal('a4_convocation', {
+                            ...selectedEst,
+                            referenceConvocation: selectedEst.derniereConvocation.referenceConvocation,
+                            dateEmission: selectedEst.derniereConvocation.dateEmission,
+                            dateComparution: selectedEst.derniereConvocation.dateComparution,
+                            heureComparution: selectedEst.derniereConvocation.heureComparution,
+                            lieuComparution: selectedEst.derniereConvocation.lieuComparution,
+                            montantForfaitNotifie: selectedEst.derniereConvocation.montantForfaitNotifie,
+                            motifConvocation: selectedEst.derniereConvocation.motifConvocation,
+                            piecesRequises: selectedEst.derniereConvocation.piecesRequises,
+                            inspecteurNom: selectedEst.derniereConvocation.inspecteurNom,
+                            inspecteurMatricule: selectedEst.derniereConvocation.inspecteurMatricule,
+                            observations: selectedEst.derniereConvocation.observations,
+                          });
+                        } else {
+                          setConvocationModalEst(selectedEst);
+                        }
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                      title="Délivrer ou réimprimer la convocation officielle à 50 000 FCFA avec QR Code"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>{selectedEst.derniereConvocation ? 'Convocation A4' : 'Délivrer Convocation'}</span>
+                    </button>
                     <button
                       onClick={() => handleDownloadDocx(selectedEst)}
                       className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      Télécharger Word (.docx)
+                      Word (.docx)
                     </button>
                     <button
                       onClick={() => openPrintModal('a4_attestation', selectedEst)}
@@ -372,6 +414,26 @@ export const TitlesAndReceiptsModule: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* MODAL CONVOCATION ADMINISTRATIVE OFFICIELLE */}
+      <IssueConvocationModal
+        establishment={convocationModalEst}
+        isOpen={Boolean(convocationModalEst)}
+        onClose={() => setConvocationModalEst(null)}
+      />
+
+      {/* MODAL NÉGOCIATION ET RÉVISION TARIFAIRE */}
+      <NegotiationModal
+        establishment={negotiationModalEst}
+        isOpen={Boolean(negotiationModalEst)}
+        onClose={() => setNegotiationModalEst(null)}
+        onSuccess={() => {
+          if (selectedEst && negotiationModalEst?.id === selectedEst.id) {
+            const updated = establishments.find((e) => e.id === selectedEst.id);
+            if (updated) setSelectedEst(updated);
+          }
+        }}
+      />
     </div>
   );
 };

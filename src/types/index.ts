@@ -95,10 +95,39 @@ export type EstablishmentCategory =
   | 'Autre établissement de loisirs';
 
 export type ComplianceStatus =
-  | 'en_regle'              // Vert
-  | 'attestation_provisoire'// Bleu
-  | 'mise_en_demeure'       // Orange
-  | 'ferme_contentieux';    // Rouge
+  | 'en_regle'              // Vert : Soldé / Autorisé
+  | 'attestation_provisoire'// Bleu : Quittance de solde avec attestation délivrée
+  | 'convocation_delivree'  // Ambre : Repéré in situ, convoqué à 50 000 FCFA
+  | 'acompte_verse'         // Jaune : Acompte partiel versé, RDV fixé pour le reste
+  | 'negociation_en_cours'  // Indigo : En négociation de la redevance à la Direction
+  | 'mise_en_demeure'       // Orange : Délai dépassé sans régularisation
+  | 'ferme_contentieux';    // Rouge : Sanction administrative
+
+export interface ConvocationAdministrative {
+  id: string;
+  referenceConvocation: string;      // Ex: CONV-2026-PN-0042
+  dateEmission: string;
+  dateComparution: string;           // Date limite de comparution
+  heureComparution?: string;         // Ex: "09h00"
+  lieuComparution: string;           // "Direction Départementale des Loisirs (Bâtiment de la Préfecture, Centre-Ville, en face du Trésor Public, au rez-de-chaussée)"
+  montantForfaitNotifie: number;     // 50 000 FCFA
+  motifConvocation: string;          // "Régularisation administrative et fiscale des droits d'exploitation"
+  piecesRequises: string[];
+  inspecteurNom: string;
+  inspecteurMatricule?: string;
+  statut: 'delivree' | 'honoree' | 'renegociee' | 'echue';
+  observations?: string;
+}
+
+export interface NegociationRedevance {
+  id: string;
+  dateNegociation: string;
+  montantInitial: number;           // Ex: 50 000 FCFA
+  montantConvenu: number;           // Ex: 35 000 FCFA
+  motifNegociation: string;         // Ex: "Débit de boisson modeste, capacité réduite constatée"
+  validePar: string;                // Nom de l'agent / Régisseur / Directeur
+  observations?: string;
+}
 
 export type UserRole =
   | 'directeur'
@@ -180,6 +209,12 @@ export interface Establishment {
   // Preuve visuelle & Signature in situ
   photoUrl?: string;
   signatureUrl?: string;
+
+  // Cycle de Régularisation & Convocations / Négociations
+  derniereConvocation?: ConvocationAdministrative;
+  historiqueConvocations?: ConvocationAdministrative[];
+  derniereNegociation?: NegociationRedevance;
+  historiqueNegociations?: NegociationRedevance[];
 }
 
 export interface CashReceipt {

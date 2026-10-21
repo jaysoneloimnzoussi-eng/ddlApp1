@@ -25,14 +25,14 @@ export const OFFICIAL_CAMPAIGN_TEMPLATES: CampaignTemplate[] = [
 
 Cher(e) Promoteur {NOM_PROMOTEUR} ({NOM_ETABLISSEMENT} - {ARRONDISSEMENT}),
 
-À l'approche des festivités de fin d'année 2026, le Directeur Départemental des Loisirs de Pointe-Noire, M. Jacques MATOKO, ainsi que l'ensemble des cadres de la Direction, vous adressent leurs vœux les plus chaleureux de santé, de prospérité et de plein succès pour votre établissement.
+À l'approche des festivités de fin d'année 2026, le Directeur Départemental des Loisirs de Pointe-Noire, M. NTSEKE NGOUAKA Jean Richard, ainsi que l'ensemble des cadres de la Direction, vous adressent leurs vœux les plus chaleureux de santé, de prospérité et de plein succès pour votre établissement.
 
 Nous saluons votre contribution au rayonnement récréatif de notre ville océane. Nous vous rappelons avec bienveillance que les formalités d'ouverture et de renouvellement de l'Autorisation d'Exploitation Départementale pour le nouvel exercice 2027 débuteront dès le 02 Janvier 2027 (Loi N° 21-2019).
 
-Nos équipes de la Brigade SAA et de la Régie SAF restent à votre entière disposition à l'Hôtel de Ville.
+Nos équipes de la Brigade SAA et de la Régie SAF restent à votre entière disposition au Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée (Tél: +242 06 186 4275 • Email: ddloisirs_pnr@loisirs.cg).
 
 Bonne et heureuse fête de fin d'année 2026 !
-— Jacques MATOKO, Directeur Départemental des Loisirs`,
+— NTSEKE NGOUAKA Jean Richard, Directeur Départemental des Loisirs de Pointe-Noire`,
     canalRecommande: 'whatsapp',
     description: 'Campagne institutionnelle bienveillante de fin d’année adressée à tous les exploitants récréatifs recensés pour fidéliser et préparer la rentrée fiscale 2027.',
   },
@@ -53,12 +53,12 @@ Monsieur / Madame l'Exploitant,
 
 Les états financiers de la Régie des Recettes SAF constatent à ce jour un solde de ZÉRO ENTRÉE (0 FCFA versé) au titre des redevances d'exploitation prévues par la Loi républicaine. Votre dette cumulée s'élève à {RESTE_A_PAYER} FCFA.
 
-En ce début d'exercice budgétaire 2027, vous êtes formellement mis en demeure de vous présenter sans délai sous huitaine (8 jours ouvrés) au Guichet Unique de la Régie SAF (Hôtel de Ville de Pointe-Noire) ou de procéder au télépaiement officiel sécurisé (Airtel Money / MTN MoMo).
+En ce début d'exercice budgétaire 2027, vous êtes formellement mis en demeure de vous présenter sans délai sous huitaine (8 jours ouvrés) au Guichet Unique de la Régie SAF (Bâtiment de la Préfecture, sis au Centre-Ville, en face du Trésor Public, au rez-de-chaussée) ou de procéder au télépaiement officiel sécurisé (Airtel Money / MTN MoMo).
 
 À défaut de paiement ou de protocole d'apurement validé, la Direction Départementale engagera les mesures de police administrative prévues par les textes (fermeture administrative immédiate, saisie conservatoire et poursuites de contentieux).
 
 Fait à Pointe-Noire pour valoir sommation d'État.
-— Pour la Régie SAF & la Brigade SAA • Direction Départementale des Loisirs`,
+— Pour la Régie SAF & la Brigade SAA • Direction Départementale des Loisirs (Tél: +242 06 186 4275)`,
     canalRecommande: 'whatsapp',
     description: 'Avis officiel impérieux sommant les établissements sans aucun versement (0 FCFA versé) de se régulariser sous 8 jours dès l’ouverture de l’exercice 2027.',
   },
@@ -106,7 +106,7 @@ export const INITIAL_CAMPAIGN_BATCHES: CampaignBatch[] = [
     totalEnvoyes: 12,
     canalPrincipal: 'whatsapp',
     statut: 'en_cours',
-    auteurNom: 'Jacques MATOKO (Directeur)',
+    auteurNom: 'NTSEKE NGOUAKA Jean Richard (Directeur)',
   },
   {
     id: 'batch-2027-jan-zero',
@@ -139,10 +139,10 @@ export const INITIAL_CAMPAIGN_MESSAGES: CampaignMessage[] = [
     montantRedevance: 50000,
     montantPaye: 35000,
     resteAPayer: 15000,
-    messageContent: 'Meilleurs vœux de fin d’année 2026 transmis par le Directeur Jacques MATOKO pour Espace Prestige Vicky.',
+    messageContent: 'Meilleurs vœux de fin d’année 2026 transmis par le Directeur Départemental M. NTSEKE NGOUAKA Jean Richard pour Espace Prestige Vicky.',
     dateEnvoi: '2026-10-17T03:32:00.000Z',
     statutEnvoi: 'delivre',
-    expediteurNom: 'Jacques MATOKO',
+    expediteurNom: 'Direction Départementale des Loisirs',
     referenceRelance: 'REL-2026-DEC-0001',
   },
   {

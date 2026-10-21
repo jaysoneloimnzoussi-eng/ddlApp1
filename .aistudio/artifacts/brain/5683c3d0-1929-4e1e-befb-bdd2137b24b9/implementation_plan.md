@@ -1,74 +1,147 @@
-# Plan d'Implémentation — Module MOD-20 : Autorisation d'Exploitation Départementale
+# Cycle Complet de Régularisation du Tenancier : Du Repérage au Solde
 
-## 1. Synthèse Exécutive & Alignement Utilisateur
-
-Conformément aux réponses fournies lors du cadrage interactif, nous créons un module autonome **MOD-20 : Autorisation d'Exploitation Départementale**.
-
-Ce module permet à la **Direction Départementale des Loisirs de Pointe-Noire (MCAPNIT / DGL)** de délivrer, gérer, archiver et authentifier le **titre régalien suprême** accordé aux établissements de loisirs de Pointe-Noire : l'**Autorisation d'Exploitation Départementale Définitive** (renouvelable annuellement conformément à la Loi N° 21-2019 et à la Note de service N° 151/MTL-CAB).
-
-### Critères & Modalités Clés Validés :
-* **Déclenchement & Validation Souveraine** : Approbation directe et signature solennelle du **Directeur Départemental des Loisirs** (workflow d'instruction, visa de conformité SAA, visa financier SAF, et validation finale Directorale avec apposition du sceau et paraphe).
-* **Restitution & Format Officiel** : 
-  1. **Diplôme A4 Solennel Imprimable** : Mise en page prestigieuse grand format avec les armes et sceaux de la République du Congo (« *Unité - Travail - Progrès* »), liséré républicain tricolore (Vert-Jaune-Rouge), typographies officielles d'apparat (**Cinzel** pour les en-têtes et titres régaliens, **EB Garamond** pour les visas juridiques et formules d'octroi, **JetBrains Mono** pour la référence souveraine et l'horodatage cryptographique).
-  2. **QR Code de Sécurité & Certification Publique** : Intégration d'un QR code infalsifiable renvoyant vers la vérification instantanée (`/?verify=autorisation&num=...`).
-  3. **Exportation Word (.docx)** : Génération automatisée du document Word officiel conforme au protocole administratif de la République du Congo pour archivage et modifications bureautiques.
-* **Intégration Applicative** : Module autonome **MOD-20** accessible dans la barre latérale (`Sidebar`), la navigation mobile (`MobileBottomNav`), la palette de commandes (`CommandPalette`) et synchronisé avec `AppContext` et Firebase Firestore.
+Plan d'architecture et de mise en œuvre pour intégrer de façon transversale le processus administratif et financier des tenanciers d'établissements de loisirs : repérage terrain, convocation officielle au forfait informel de 50 000 FCFA, négociation motivée du montant, encaissement fractionné (acomptes / solde) au bureau ou in situ, et délivrance des actes officiels.
 
 ---
 
-## 2. Charte Graphique, Typographies & Architecture Visuelle
+## Synthèse des Décisions & Choix Confirmés
 
-### A. Polices d'Écriture Officielles de la Direction
-* **En-têtes d'État & Titres Récoltés** : `Cinzel` (Romain impérial, majuscules ciselées, espacement majestueux `tracking-widest`).
-* **Corps de Texte Régalien & Formules Protocolaires** : `EB Garamond` (Élégance institutionnelle des actes administratifs d'État, italique de chancellerie pour les considérants et arrêtés).
-* **Références, Numérotations & Sécurité SHA-256** : `JetBrains Mono` (Rigueur géométrique, zéro barré, lisibilité absolue des codes).
-* **Interface Opérationnelle & Tableaux de Bord** : `Plus Jakarta Sans` (Clarté ergonomique moderne pour les listes, filtres et boutons).
-
-### B. Palette de Couleurs Officielles & Papier d'Apparat
-* **Fond Parchemin d'État** : Teinte ivoire antique (`#FCFBF7` / `slate-50`), bordure guillochée dorée bronze (`#B45309` / `#D97706`) et liseré républicain congolais.
-* **Typographie Encre Noire Officielle** : Noir carbone institutionnel (`#0F172A` / `#1E293B`) avec rehauts vert émeraude républicain (`#047857`) et or ambré (`#B45309`).
-* **Sceau Numérique & Filigrane** : Armoiries de la République du Congo en filigrane central anti-contrefaçon et sceau rond de la Direction Départementale des Loisirs.
+> [!IMPORTANT]
+> Suite à vos réponses aux questions de cadrage, les principes suivants sont entérinés pour l'ensemble de la plateforme :
+> - **Cycle intégré transverse** : Le cycle complet (Repérage $\to$ Convocation $\to$ Négociation $\to$ Acomptes / RDV $\to$ Solde $\to$ Autorisation) irrigue tous les modules clés (Recensement Terrain, Agenda & Brigade SAA, Régie SAF, Actes & Impressions A4).
+> - **Document officiel initial** : Édition immédiate d'une **Convocation Officielle de Régularisation (Forfait initial 50 000 FCFA)** avec QR Code de contrôle, délai de comparution (8 à 15 jours) et liste des pièces à fournir.
+> - **Négociation souple & traçabilité** : Possibilité d'ajuster librement le montant de la redevance à la baisse (ou à la hausse selon le standing réel) avec saisie obligatoire d'un motif de négociation archivé dans le journal d'audit.
 
 ---
 
-## 3. Périmètre Technique & Fichiers Concernés
+## 1. Vue d'Ensemble & Cycle de Vie du Tenancier
 
-1. **`src/types/index.ts`** :
-   * Définition de l'interface `DepartmentalAuthorization` (id, numeroAutorisation, dateDelivrance, dateExpiration, etablissementId, nomCommercial, promoteurNom, arrondissement, quartier, categorie, surfaceM2, statut, visaInspecteurChef, visaRegisseurSaf, signatureDirecteur, referenceArrete, qrCodeUrl, documentHash).
-   * Extension de `AppModuleId` pour inclure `'MOD-20'`.
-   * Extension du statut d'établissement (`'autorisation_definitive'`).
+Le cycle de régularisation s'articule autour de 4 étapes administratives interconnectées :
 
-2. **`src/services/docxGenerator.ts`** :
-   * Implémentation de la fonction `generateDepartmentalAuthorizationDocx` pour générer le fichier Word `.docx` officiel reprenant fidèlement les sceaux, visas et formules protocolaires.
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        CYCLE DE VIE DU TENANCIER                       │
+└────────────────────────────────────────────────────────────────────────┘
 
-3. **`src/services/qrService.ts`** :
-   * Ajout de `generateAuthorizationQrCode(auth: DepartmentalAuthorization)` pour coder l'URL publique de vérification.
-
-4. **`src/context/AppContext.tsx`** :
-   * État `authorizations: DepartmentalAuthorization[]` synchronisé dans le `localStorage` (`ddl_real_authorizations_v5`) et Firestore (`departmentalAuthorizations`).
-   * Méthodes `issueDepartmentalAuthorization`, `revokeDepartmentalAuthorization`, `validateDirectorSignature`.
-
-5. **`src/components/modules/DepartmentalAuthorizationModule.tsx` (NOUVEAU COMPOSANT)** :
-   * Tableau de bord d'instruction Directorale : dossiers éligibles (soldés ou dispensés), autorisations en cours d'instruction, autorisations délivrées et archivées.
-   * Console d'approbation et signature Directorale en 1-clic avec cachet officiel.
-   * Aperçu dynamique en direct du Diplôme d'Autorisation A4.
-   * Boutons d'exportation : Imprimer Diplôme A4 officiel et Télécharger Word (.docx).
-
-6. **`src/components/common/PrintModal.tsx`** :
-   * Intégration du gabarit d'impression haute définition A4 `a4_departmental_authorization`.
-
-7. **`src/components/common/PublicDocumentVerification.tsx`** & **`src/App.tsx`** :
-   * Prise en charge de `?verify=auth` et `?verify=autorisation` pour authentifier publiquement le diplôme scanné par la police ou le public.
-
-8. **`src/components/common/Sidebar.tsx`**, **`src/components/common/CommandPalette.tsx`** & **`src/components/common/MobileBottomNav.tsx`** :
-   * Ajout de l'entrée `'MOD-20'` avec icône d'autorité (`Award` / `ShieldCheck`).
+  [ ÉTAPE 1 : REPÉRAGE IN SITU ]
+  Inspecteur SAA repère l'établissement informel sur le terrain
+  └─► Création dossier & Statut: `convocation_delivree`
+  └─► Fixation du forfait initial standard : 50 000 FCFA
+  └─► Génération immédiate de la Convocation A4 / QR Code / RDV comparution
+               │
+               ▼
+  [ ÉTAPE 2 : PRÉSENTATION & NÉGOCIATION ]
+  Le promoteur se présente à la Direction (ou lors de la tournée)
+  └─► Dépôt des pièces d'identité et d'exploitation
+  └─► Option d'ajustement du forfait (ex: 50 000 ➔ 35 000 FCFA)
+  └─► Enregistrement du motif de révision + validation traçable
+               │
+               ▼
+  [ ÉTAPE 3 : PAIEMENT FRACTIONNÉ & GESTION DES RENDEZ-VOUS ]
+  Trois options opérationnelles pour le tenancier :
+  ├─► Option A : Paiement immédiat d'un Acompte (ex: 20 000 FCFA) à la Régie
+  │             └─► Quittance SAF instantanée + RDV automatique pour le reste
+  ├─► Option B : Paiement sur place / sur le terrain à la brigade mobile
+  │             └─► Quittance mobile in situ avec géolocalisation
+  └─► Option C : Accord d'échéancier avec Rendez-vous ferme
+                └─► Inscription prioritaire dans l'Agenda Google de la tournée
+               │
+               ▼
+  [ ÉTAPE 4 : SOLDE DÉFINITIF & DÉLIVRANCE DES TITRES ]
+  Reste à payer = 0 FCFA
+  └─► Statut : `en_regle`
+  └─► Délivrance de l'Attestation Provisoire ou de l'Autorisation Départementale
+  └─► Programmation automatique du renouvellement à N+1 (date anniversaire)
+```
 
 ---
 
-## 4. Étapes d'Exécution & Vérification
+## 2. Expérience Utilisateur & Nouveaux Écrans / Composants
 
-* **Étape 1** : Mise à jour des types (`index.ts`) et de la persistance centrale (`AppContext.tsx`).
-* **Étape 2** : Ajout des générateurs Word (`docxGenerator.ts`) et QR Code (`qrService.ts`).
-* **Étape 3** : Création du module complet `DepartmentalAuthorizationModule.tsx` respectant la charte graphique prestigieuse (Cinzel, EB Garamond, République du Congo).
-* **Étape 4** : Intégration dans `PrintModal.tsx`, `Sidebar.tsx`, `App.tsx` et `CommandPalette.tsx`.
-* **Étape 5** : Vérification de la compilation (`compile_applet`) et validation TypeScript (`lint_applet`).
+### A. Fiche de Recensement & Repérage Terrain (MOD-02)
+- **Forfait Informel par Défaut** : Le montant pré-rempli pour tout nouvel établissement informel ou repéré est configuré à **50 000 FCFA**.
+- **Action 1-Clic « Délivrer Convocation »** : Un bouton dédié permet d'enregistrer le repérage et d'ouvrir instantanément le document officiel de convocation au format A4 avec QR Code.
+- **Délai de comparution paramétrable** : Choix rapide de la date de présentation (sous 48h, 8 jours ou 15 jours) et du lieu (Direction Départementale ou bureau de brigade d'arrondissement).
+
+### B. Interface d'Arbitrage & Négociation de la Redevance
+- **Composant de révision financière** intégré dans la fiche établissement et dans le modal d'encaissement :
+  - *Montant initial forfaitaire* : 50 000 FCFA (affiché en référence).
+  - *Montant négocié / convenu* : Saisie libre (ex: 30 000, 35 000, 40 000 FCFA).
+  - *Motif de la révision* (champ obligatoire) : Ex. *"Petite terrasse de quartier, faible capacité d'accueil constatée in situ"*.
+  - *Agent négociateur* : Nom et matricule de l'inspecteur ou régisseur responsable.
+- **Recalcul dynamique instantané** : Mise à jour automatique du solde restant dû et des acomptes.
+
+### C. Modal d'Encaissement & Échéancier Fléchés
+- **Modes de versement adaptés** :
+  - *Au bureau (Caisse Régie SAF Trésor)* : Espèces ou virement Trésor.
+  - *Sur le terrain (In situ Brigade SAA)* : Espèces ou Télépaiement mobile (Airtel Money / MTN MoMo).
+- **Enregistrement de l'acompte + Prise de rendez-vous obligatoire** :
+  - Dès qu'un acompte est saisi (ex: 15 000 FCFA sur 35 000 FCFA révisés), l'application propose immédiatement de fixer la date et l'heure du prochain rendez-vous pour solder le reste.
+  - L'établissement est retiré des tâches du jour et basculé directement sur la date convenue dans le calendrier de tournée.
+
+### D. Document Officiel A4 : Convocation Administrative Républicaine
+Nouveau gabarit d'impression haute fidélité conforme aux standards de l'administration congolaise :
+- En-tête officiel : *République du Congo, Unité - Travail - Progrès, Ministère du Tourisme et des Loisirs, Direction Départementale de Pointe-Noire*.
+- Armoiries républicaines et ruban tricolore vert-jaune-rouge.
+- Titre : **CONVOCATION POUR RÉGULARISATION ADMINISTRATIVE ET FISCALE D'EXPLOITATION**.
+- Forfait réglementaire notifié : 50 000 FCFA (Catégorie Établissement Informel / Non immatriculé).
+- Date et heure limites de comparution à la Direction Départementale.
+- Liste des pièces à apporter :
+  1. Copie de la pièce d'identité du promoteur / gérant
+  2. Contrat de bail ou titre d'occupation des lieux
+  3. Registre du commerce (RCCM) ou déclaration d'activité (si existant)
+  4. Quittances antérieures éventuelles
+- Mentions légales d'avertissement en cas de non-présentation (mise en demeure et fermeture conservatoire selon la Loi n° 21-2019).
+- QR Code sécurisé avec vérification instantanée de l'authenticité de la convocation.
+- Bouton d'export Word (`.docx`) et Impression directe A4.
+
+---
+
+## 3. Architecture Technique & Modèle de Données
+
+### Évolution du Modèle de Données (`src/types/index.ts`)
+```typescript
+export interface NegociationRedevance {
+  montantInitialForfaitaire: number; // 50 000 FCFA par défaut
+  montantNegocieConvenu: number;     // ex: 35 000 FCFA
+  motifNegociation: string;          // justification économique/technique
+  dateNegociation: string;
+  agentId: string;
+  agentNom: string;
+}
+
+export interface ConvocationAdministrative {
+  id: string;
+  referenceConvocation: string;      // ex: CONV-2026-PN-0042
+  dateEmission: string;
+  dateComparution: string;
+  heureComparution?: string;
+  lieuComparution: string;           // "Direction Départementale (Bâtiment de la Préfecture, Centre-Ville, en face du Trésor Public, au rez-de-chaussée)"
+  montantForfaitNotifie: number;     // 50 000 FCFA
+  statut: 'remise_sur_le_terrain' | 'presente' | 'renegociee' | 'soldee' | 'echue';
+  documentsRequis: string[];
+  observationsTerrain?: string;
+}
+```
+
+### Intégration dans `Establishment`
+- Ajout du statut `'convocation_delivree'` et `'negociation_en_cours'` aux côtés de `'acompte_verse'`, `'en_regle'` et `'mise_en_demeure'`.
+- Stockage de l'historique de la négociation et de la dernière convocation émise.
+- Synchronisation automatique et transparente dans Firestore avec persistance locale souveraine.
+
+---
+
+## 4. Plan de Déploiement par Étape
+
+1. **Modèle & Types (`src/types/index.ts`)** : Déclaration des types `ConvocationAdministrative`, `NegociationRedevance` et mise à jour de `Establishment`.
+2. **Context & Logique Métier (`AppContext.tsx`)** :
+   - Initialisation du forfait informel à 50 000 FCFA lors de la création d'une fiche.
+   - Méthode `issueConvocation(establishmentId, params)` générant la convocation horodatée avec QR Code.
+   - Méthode `negotiateRedevance(establishmentId, nouveauMontant, motif)` mettant à jour le solde et créant l'entrée d'audit.
+3. **Gabarit d'Impression A4 (`PrintModal.tsx` & `printTemplates.ts`)** :
+   - Modèle officiel d'impression A4 de la Convocation de régularisation républicaine avec QR Code.
+   - Export Word `.docx` prêt à l'emploi.
+4. **Mise à jour des Vues Utilisateur** :
+   - Module Recensement de terrain (`FieldRecensementModule.tsx`) : bouton d'émission de convocation et forfait informel 50 000 FCFA.
+   - Module Agenda / Calendrier (`MobileAgentCalendarModule.tsx`) : affichage du badge Convocation, bouton d'ajustement/négociation du montant, et encaissement avec date de prochain RDV.
+   - Module Régie SAF & Tableaux de bord : filtres rapides par statut (Convoqués, En négociation, Acomptes, Soldés).
