@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan d'architecture et de mise à niveau souveraine pour la gestion des doublons d'établissements (unicité de l'agent référent par établissement, multi-établissements par tenancier), l'autocomplétion prédictive d'établissement dans le formulaire de programmation de descente, la recherche calendaire avec navigation instantanée vers le jour prévu ou déroulé de la mission avec surbrillance, et le ruban républicain d'analyse financière des recettes recouvrées (semaine, mois, trimestre, année).",
+  "updatedAt":  "2026-10-21T12:15:30.450444110Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

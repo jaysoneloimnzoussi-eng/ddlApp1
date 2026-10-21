@@ -108,6 +108,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
   // Search filter
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState<boolean>(false);
 
   // Quick Action Modal states (Encaissement d'acompte + Prochain RDV)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
@@ -335,11 +336,18 @@ export const MobileAgentCalendarModule: React.FC = () => {
         setViewMode('jour'); // Ouvre immédiatement la vue jour pour afficher la mission
         setSelectedSchedule(sch);
         setIsSearchOpen(false);
+        setIsMobileSearchOpen(false);
         setSearchQuery('');
         showNotification(
           'success',
           `📅 Descente localisée : ${sch.dateTournee} (${sch.statut === 'effectue' ? 'Déroulée / Effectuée' : 'Prévue à ' + sch.heure}) pour ${sch.etablissementNom || estName || 'Établissement'}`
         );
+        setTimeout(() => {
+          const el = document.getElementById(`schedule-item-${sch.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 200);
       }
     } catch (e) {
       console.warn('Navigation error:', e);
@@ -1056,6 +1064,15 @@ export const MobileAgentCalendarModule: React.FC = () => {
           <h2 className="text-xs sm:text-base lg:text-lg font-bold text-slate-900 dark:text-slate-100 min-w-0 truncate">
             {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
           </h2>
+
+          {/* Mobile Search Toggle */}
+          <button
+            onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+            className="md:hidden p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition shrink-0 ml-1 cursor-pointer"
+            title="Rechercher un établissement"
+          >
+            <Search className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          </button>
         </div>
 
         {/* Center: Google Search Bar for Establishments */}
@@ -1337,6 +1354,107 @@ export const MobileAgentCalendarModule: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile Search Input Bar */}
+      {isMobileSearchOpen && (
+        <div className={`p-3 border-b md:hidden ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+          <div className={`flex items-center px-3 py-2 rounded-xl border transition ${
+            isLight
+              ? 'bg-white border-slate-300 focus-within:border-blue-500'
+              : 'bg-slate-800 border-slate-700 focus-within:border-blue-400'
+          }`}>
+            <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
+            <input
+              type="text"
+              placeholder="Rechercher par nom, promoteur, quartier..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setIsSearchOpen(true);
+              }}
+              onFocus={() => setIsSearchOpen(true)}
+              className="w-full text-xs bg-transparent focus:outline-none text-slate-800 dark:text-slate-200"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setIsSearchOpen(false);
+                }}
+                className="text-slate-400 hover:text-slate-600 mr-2"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => setIsMobileSearchOpen(false)}
+              className="text-xs font-semibold text-blue-600 ml-1 cursor-pointer"
+            >
+              Fermer
+            </button>
+          </div>
+
+          {/* Mobile Autocomplete dropdown */}
+          {isSearchOpen && searchResults.length > 0 && (
+            <div className={`mt-2 rounded-xl border shadow-xl overflow-hidden max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 ${
+              isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
+            }`}>
+              <div className="p-2 bg-slate-50 dark:bg-slate-800/80 text-[10px] font-bold text-slate-500 uppercase">
+                {searchResults.length} établissement(s) trouvé(s)
+              </div>
+              {searchResults.map((est) => {
+                const estSchedules = getSchedulesForEst(est);
+                const nextPlanned = estSchedules.find((s) => s.statut === 'planifie' || s.statut === 'en_cours');
+                const lastCompleted = estSchedules.find((s) => s.statut === 'effectue');
+                return (
+                  <div key={est.id} className="p-2.5 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-bold text-xs text-slate-900 dark:text-slate-100">{est.nomCommercial}</div>
+                        <div className="text-[10px] text-slate-500">{est.arrondissement} • Quartier {est.quartier} • Gérant: {est.promoteurNom}</div>
+                        <div className="text-[10px] text-emerald-600 font-semibold">Agent dédié: {est.agentAssigneNom || 'Jacques MATOKO'}</div>
+                      </div>
+                      <span className="font-mono font-bold text-xs text-emerald-600">{formatCfa(est.soldeRestantDu)}</span>
+                    </div>
+                    {nextPlanned ? (
+                      <button
+                        type="button"
+                        onClick={() => handleNavigateToScheduleDay(nextPlanned, est.nomCommercial)}
+                        className="w-full flex items-center justify-between p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 font-bold cursor-pointer"
+                      >
+                        <span>Descente prévue : {nextPlanned.dateTournee} ({nextPlanned.heure})</span>
+                        <span>Voir ce jour →</span>
+                      </button>
+                    ) : lastCompleted ? (
+                      <button
+                        type="button"
+                        onClick={() => handleNavigateToScheduleDay(lastCompleted, est.nomCommercial)}
+                        className="w-full flex items-center justify-between p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-300 font-bold cursor-pointer"
+                      >
+                        <span>Déroulée le : {lastCompleted.dateTournee}</span>
+                        <span>Voir ce jour →</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleOpenCreateModal(undefined, undefined, est.id);
+                          setIsMobileSearchOpen(false);
+                          setIsSearchOpen(false);
+                        }}
+                        className="w-full py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs cursor-pointer"
+                      >
+                        + Programmer une descente
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 1.1 BANDEAU FINANCIER & RÉSUMÉ DES RECETTES RÉCOLTÉES (Semaine, Mois, Trimestre, Année) */}
       <div className={`px-3 sm:px-4 py-2 border-b flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 transition-colors ${
         isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/80 border-slate-800'
@@ -1348,30 +1466,64 @@ export const MobileAgentCalendarModule: React.FC = () => {
           </div>
 
           {/* Semaine en cours */}
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
+          <button
+            type="button"
+            onClick={() => {
+              setFinancialSummaryTab('semaine');
+              setIsReceiptSummaryModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 transition cursor-pointer"
+            title="Cliquer pour consulter les quittances de cette semaine"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Semaine :</span>
             <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.semaine.total)}</span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-80">({financialSummary.semaine.count})</span>
-          </div>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-90 font-semibold">({financialSummary.semaine.count})</span>
+          </button>
 
           {/* Mois en cours */}
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300">
+          <button
+            type="button"
+            onClick={() => {
+              setFinancialSummaryTab('mois');
+              setIsReceiptSummaryModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-700 dark:text-blue-300 transition cursor-pointer"
+            title="Cliquer pour consulter les quittances de ce mois"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Mois ({financialSummary.monthName}) :</span>
             <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.mois.total)}</span>
-            <span className="text-[10px] text-blue-600 dark:text-blue-400 opacity-80">({financialSummary.mois.count})</span>
-          </div>
+            <span className="text-[10px] text-blue-600 dark:text-blue-400 opacity-90 font-semibold">({financialSummary.mois.count})</span>
+          </button>
 
           {/* Trimestre */}
-          <div className="hidden lg:flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-300">
+          <button
+            type="button"
+            onClick={() => {
+              setFinancialSummaryTab('trimestre');
+              setIsReceiptSummaryModalOpen(true);
+            }}
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-700 dark:text-purple-300 transition cursor-pointer"
+            title="Cliquer pour consulter les quittances du trimestre"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">T{financialSummary.quarterNum} :</span>
             <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.trimestre.total)}</span>
-          </div>
+            <span className="text-[10px] text-purple-600 dark:text-purple-400 opacity-90 font-semibold">({financialSummary.trimestre.count})</span>
+          </button>
 
           {/* Année 2026 */}
-          <div className="hidden xl:flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+          <button
+            type="button"
+            onClick={() => {
+              setFinancialSummaryTab('annee');
+              setIsReceiptSummaryModalOpen(true);
+            }}
+            className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-700 dark:text-amber-300 transition cursor-pointer"
+            title="Cliquer pour consulter le cumul annuel des recettes"
+          >
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">{financialSummary.year} :</span>
             <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.annee.total)}</span>
-          </div>
+            <span className="text-[10px] text-amber-600 dark:text-amber-400 opacity-90 font-semibold">({financialSummary.annee.count})</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -1902,15 +2054,20 @@ export const MobileAgentCalendarModule: React.FC = () => {
                             )}
 
                             {/* Render events */}
-                            {eventsInSlot.map((sch) => (
-                              <div
-                                key={sch.id}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedSchedule(sch);
-                                }}
-                                className={`rounded-lg p-2 text-xs cursor-pointer border transition shadow-sm hover:scale-[1.02] ${getEventBadgeStyle(sch)}`}
-                              >
+                            {eventsInSlot.map((sch) => {
+                              const isSelected = selectedSchedule?.id === sch.id;
+                              return (
+                                <div
+                                  key={sch.id}
+                                  id={`schedule-item-${sch.id}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedSchedule(sch);
+                                  }}
+                                  className={`rounded-lg p-2 text-xs cursor-pointer border transition shadow-sm hover:scale-[1.02] ${
+                                    isSelected ? 'ring-2 ring-emerald-400 border-white scale-[1.04] shadow-md' : ''
+                                  } ${getEventBadgeStyle(sch)}`}
+                                >
                                 <div className="flex justify-between items-start font-bold">
                                   <span className="truncate pr-1">{sch.etablissementNom}</span>
                                   <span className="font-mono text-[9px] shrink-0">{sch.heure}</span>
@@ -1924,7 +2081,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
                                   </div>
                                 )}
                               </div>
-                            ))}
+                            );
+                          })}
                           </div>
                         );
                       })}
@@ -1970,22 +2128,35 @@ export const MobileAgentCalendarModule: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  visibleSchedules.filter(s => s.dateTournee === selectedDateKey).map((sch) => (
-                    <div
-                      key={sch.id}
-                      className={`p-4 rounded-xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                        isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getEventBadgeStyle(sch)}`}>
-                            {sch.typeMission}
-                          </span>
-                          <span className="font-mono text-xs font-bold text-blue-600">
-                            {sch.heure}
-                          </span>
-                        </div>
+                  visibleSchedules.filter(s => s.dateTournee === selectedDateKey).map((sch) => {
+                    const isSelected = selectedSchedule?.id === sch.id;
+                    return (
+                      <div
+                        key={sch.id}
+                        id={`schedule-item-${sch.id}`}
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ${
+                          isSelected
+                            ? 'ring-2 ring-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/40 border-emerald-500 shadow-md scale-[1.01]'
+                            : isLight
+                            ? 'bg-white border-slate-200'
+                            : 'bg-slate-900 border-slate-800'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getEventBadgeStyle(sch)}`}>
+                              {sch.typeMission}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-blue-600">
+                              {sch.heure}
+                            </span>
+                            {isSelected && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white flex items-center gap-1 shadow-xs animate-pulse">
+                                <Sparkles className="w-3 h-3" />
+                                <span>Descente ciblée</span>
+                              </span>
+                            )}
+                          </div>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                           {sch.etablissementNom}
                         </h4>
@@ -2074,7 +2245,8 @@ export const MobileAgentCalendarModule: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  ))
+                  );
+                })
                 )}
               </div>
             </div>
@@ -2671,42 +2843,160 @@ export const MobileAgentCalendarModule: React.FC = () => {
 
                 {!isCustomEst ? (
                   <div className="space-y-2">
-                    <select
-                      value={createEstId}
-                      onChange={(e) => setCreateEstId(e.target.value)}
-                      className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none"
-                      required={!isCustomEst}
-                    >
-                      {availableEstablishments.length === 0 && (
-                        <option value="">Aucun établissement enregistré</option>
-                      )}
-                      {availableEstablishments.map((est) => (
-                        <option key={est.id} value={est.id}>
-                          {est.nomCommercial} — {est.arrondissement} ({est.quartier || 'Centre'}) - Solde: {formatCfa(est.soldeRestantDu)}
-                        </option>
-                      ))}
-                    </select>
+                    {/* Si un établissement est sélectionné : afficher sa fiche récapitulative avec bouton de changement */}
+                    {createEstId && availableEstablishments.some((e) => e.id === createEstId) ? (
+                      (() => {
+                        const selected = availableEstablishments.find((e) => e.id === createEstId)!;
+                        return (
+                          <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 space-y-2 shadow-xs">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block tracking-wider">
+                                  Établissement lié à la descente
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 mt-0.5">
+                                  <Building className="w-4 h-4 text-blue-600 shrink-0" />
+                                  <span>{selected.nomCommercial}</span>
+                                </h4>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCreateEstId('');
+                                  setCreateEstSearch('');
+                                  setIsCreateEstDropdownOpen(true);
+                                }}
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:border-blue-500 text-blue-600 dark:text-blue-400 shadow-2xs transition cursor-pointer"
+                              >
+                                Changer d'établissement
+                              </button>
+                            </div>
 
-                    {(() => {
-                      const selected = availableEstablishments.find((e) => e.id === createEstId);
-                      if (!selected) return null;
-                      return (
-                        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
-                          <div>
-                            <span className="text-slate-400 block text-[10px]">Localisation & Quartier :</span>
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">
-                              {selected.arrondissement} • Quartier {selected.quartier || 'Centre-Ville'}
-                            </span>
+                            <div className="grid grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-blue-200/60 dark:border-blue-900/60">
+                              <div>
+                                <span className="text-slate-400 text-[10px] block">Localisation & Quartier :</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                  {selected.arrondissement} • Quartier {selected.quartier || 'Centre-Ville'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 text-[10px] block">Promoteur & Téléphone :</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 truncate block">
+                                  {selected.promoteurNom} {selected.promoteurTelephone ? `(${selected.promoteurTelephone})` : ''}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 text-[10px] block">Agent assigné exclusif :</span>
+                                <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                  <User className="w-3 h-3 text-emerald-500" />
+                                  {selected.agentAssigneNom || 'Jacques MATOKO'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 text-[10px] block">Solde exigible :</span>
+                                <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                                  {formatCfa(selected.soldeRestantDu)}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="text-slate-400 block text-[10px]">Solde exigible :</span>
-                            <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                              {formatCfa(selected.soldeRestantDu)}
-                            </span>
-                          </div>
+                        );
+                      })()
+                    ) : (
+                      /* Mode recherche / saisie assistée */
+                      <div className="relative space-y-1.5">
+                        <div className="relative">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="Rechercher par nom, promoteur, téléphone ou quartier..."
+                            value={createEstSearch}
+                            onChange={(e) => {
+                              setCreateEstSearch(e.target.value);
+                              setIsCreateEstDropdownOpen(true);
+                            }}
+                            onFocus={() => setIsCreateEstDropdownOpen(true)}
+                            className="w-full text-xs pl-9 pr-8 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                          />
+                          {createEstSearch && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCreateEstSearch('');
+                                setIsCreateEstDropdownOpen(false);
+                              }}
+                              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
-                      );
-                    })()}
+
+                        {/* Dropdown des résultats filtrés */}
+                        {isCreateEstDropdownOpen && (
+                          <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl divide-y divide-slate-100 dark:divide-slate-800 z-30">
+                            {createModalFilteredEsts.length === 0 ? (
+                              <div className="p-4 text-center text-slate-400 space-y-2">
+                                <p className="text-xs">Aucun établissement ne correspond à votre recherche.</p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsCustomEst(true);
+                                    setCustomEstNom(createEstSearch.trim());
+                                    setIsCreateEstDropdownOpen(false);
+                                  }}
+                                  className="text-xs text-blue-600 hover:underline font-bold"
+                                >
+                                  + Créer « {createEstSearch} » comme nouvel établissement
+                                </button>
+                              </div>
+                            ) : (
+                              createModalFilteredEsts.map((est) => (
+                                <button
+                                  key={est.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setCreateEstId(est.id);
+                                    setCreateMontantAPayer(est.soldeRestantDu > 0 ? est.soldeRestantDu : 50000);
+                                    setCreateArrondissement(est.arrondissement || 'Tié-Tié');
+                                    setCreateQuartier(est.quartier || 'Centre-Ville');
+                                    setIsCreateEstDropdownOpen(false);
+                                    setCreateEstSearch('');
+                                  }}
+                                  className="w-full p-2.5 text-left hover:bg-blue-50 dark:hover:bg-slate-800 transition flex items-center justify-between gap-3 cursor-pointer group"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-xs text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate">
+                                        {est.nomCommercial}
+                                      </span>
+                                      <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                        {est.arrondissement}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                                      <span>Promoteur : {est.promoteurNom}</span>
+                                      {est.promoteurTelephone && <span className="font-mono ml-1">({est.promoteurTelephone})</span>}
+                                      <span className="ml-1">• Quartier {est.quartier || 'Centre'}</span>
+                                    </div>
+                                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1">
+                                      <User className="w-3 h-3 text-emerald-500" />
+                                      <span>Agent dédié : {est.agentAssigneNom || 'Jacques MATOKO'}</span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="font-mono font-bold text-xs text-amber-600 dark:text-amber-400 block">
+                                      {formatCfa(est.soldeRestantDu)}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400">Solde exigible</span>
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3 p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">

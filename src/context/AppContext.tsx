@@ -1312,15 +1312,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Dédoublonnage et assainissement intégral de la base de données
   // Règle républicaine : 1 seul agent de terrain assigné par établissement,
-  // tandis qu'un tenancier peut posséder plusieurs établissements différents.
+  // Dédoublonnage et assainissement intégral de la base de données
+  // Règle républicaine : 1 seul agent de terrain assigné par établissement,
+  // tandis qu'un tenancier peut posséder plusieurs établissements différents (noms ou sites distincts).
   const deduplicateEstablishments = async (options?: { silent?: boolean }): Promise<{ mergedCount: number; removedCount: number }> => {
-    const groups = new Map<string, Establishment[]>();
-    
+    // Étape 1 : Regroupement robuste par code dossier, ou par nom commercial normalisé + arrondissement/téléphone
+    const groups: Establishment[][] = [];
+
+    const isSameEstablishment = (a: Establishment, b: Establishment): boolean => {
+      if (!a || !b) return false;
+      if (a.id === b.id) return true;
+
+      // 1. Code dossier officiel identique (non vide) -> même établissement
+      if (a.codeDossier && b.codeDossier && a.codeDossier.trim().toUpperCase() === b.codeDossier.trim().toUpperCase()) {
+        return true;
+      }
+
+      const cleanNomA = (a.nomCommercial || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '').trim();
+      const cleanNomB = (b.nomCommercial || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '').trim();
+
+      // Noms commerciaux complètement différents -> Établissements distincts (même si même promoteur !)
+      if (!cleanNomA || !cleanNomB || cleanNomA !== cleanNomB) {
+        return false;
+      }
+
+      // Noms identiques : vérifier si c'est le même site ou une succursale différente
+      const cleanArrA = (a.arrondissement || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '').trim();
+      const cleanArrB = (b.arrondissement || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '').trim();
+
+      const cleanTelA = (a.promoteurTelephone || '').replace(/[^0-9]/g, '');
+      const cleanTelB = (b.promoteurTelephone || '').replace(/[^0-9]/g, '');
+
+      // Même arrondissement ou arrondissement manquant dans l'un des deux -> Doublon avéré
+      if (!cleanArrA || !cleanArrB || cleanArrA === cleanArrB) {
+        return true;
+      }
+
+      // Même téléphone de contact pour le même nom commercial -> Doublon avéré
+      if (cleanTelA && cleanTelB && cleanTelA.length >= 7 && cleanTelB.length >= 7 && (cleanTelA.endsWith(cleanTelB) || cleanTelB.endsWith(cleanTelA))) {
+        return true;
+      }
+
+      return false;
+    };
+
     establishments.forEach((est) => {
       if (!est || !est.nomCommercial) return;
-      const key = normalizeEstKey(est.nomCommercial, est.arrondissement);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(est);
+      let matchedGroup = groups.find((g) => isSameEstablishment(g[0], est));
+      if (matchedGroup) {
+        matchedGroup.push(est);
+      } else {
+        groups.push([est]);
+      }
     });
 
     let removedCount = 0;
@@ -1338,14 +1381,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Doublon détecté !
       mergedCount++;
       const canonical = group.reduce((best, curr) => {
-        const bestScore = (best.historiquePaiements?.length || 0) * 10 + (best.montantEncaisse > 0 ? 5 : 0) + (best.adresseExacte ? 2 : 0);
-        const currScore = (curr.historiquePaiements?.length || 0) * 10 + (curr.montantEncaisse > 0 ? 5 : 0) + (curr.adresseExacte ? 2 : 0);
+        const bestScore =
+          (best.historiquePaiements?.length || 0) * 10 +
+          (best.montantEncaisse > 0 ? 8 : 0) +
+          (best.numeroAttestation ? 5 : 0) +
+          (best.adresseExacte ? 3 : 0) +
+          (best.agentAssigneNom ? 2 : 0);
+        const currScore =
+          (curr.historiquePaiements?.length || 0) * 10 +
+          (curr.montantEncaisse > 0 ? 8 : 0) +
+          (curr.numeroAttestation ? 5 : 0) +
+          (curr.adresseExacte ? 3 : 0) +
+          (curr.agentAssigneNom ? 2 : 0);
         return currScore > bestScore ? curr : best;
       }, group[0]);
 
       let totalEncaisse = canonical.montantEncaisse || 0;
       let totalRedevance = canonical.montantRedevanceAnnuelle || 50000;
       let contactTel = canonical.promoteurTelephone || '';
+      let contactEmail = canonical.promoteurEmail || '';
       let promoteur = canonical.promoteurNom || '';
       let quartier = canonical.quartier || '';
       let adresse = canonical.adresseExacte || '';
@@ -1357,7 +1411,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 1 SEUL agent de terrain responsable exclusif par établissement
       const assignedAgentId = canonical.agentAssigneId || group.find((g) => g.agentAssigneId)?.agentAssigneId || '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc';
       const assignedAgent = staff.find((s) => s.id === assignedAgentId);
-      const assignedAgentNom = assignedAgent?.nomComplet || canonical.agentAssigneNom || 'Jacques MATOKO';
+      const assignedAgentNom = assignedAgent?.nomComplet || canonical.agentAssigneNom || group.find((g) => g.agentAssigneNom)?.agentAssigneNom || 'Jacques MATOKO';
+
+      // Consolidation de l'historique complet des paiements
+      const allHistories = [...(canonical.historiquePaiements || [])];
 
       group.forEach((dup) => {
         if (dup.id !== canonical.id) {
@@ -1366,6 +1423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           removedCount++;
 
           if (!contactTel && dup.promoteurTelephone) contactTel = dup.promoteurTelephone;
+          if (!contactEmail && dup.promoteurEmail) contactEmail = dup.promoteurEmail;
           if (!promoteur && dup.promoteurNom) promoteur = dup.promoteurNom;
           if (!quartier && dup.quartier) quartier = dup.quartier;
           if (!adresse && dup.adresseExacte) adresse = dup.adresseExacte;
@@ -1377,14 +1435,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             attestationNum = dup.numeroAttestation;
             attestationDate = dup.dateDelivranceAttestation;
           }
+
+          if (dup.historiquePaiements && Array.isArray(dup.historiquePaiements)) {
+            dup.historiquePaiements.forEach((p) => {
+              if (!allHistories.some((h) => (h.id === p.id || (h.quittanceNumero && h.quittanceNumero === p.quittanceNumero)) && h.date === p.date)) {
+                allHistories.push(p);
+              }
+            });
+          }
         }
       });
+
+      // Recalcul du total encaissé basé sur les quittances réelles
+      const groupIds = new Set(group.map((e) => e.id));
+      const relevantReceipts = receipts.filter((r) => groupIds.has(r.etablissementId));
+      const receiptsSum = relevantReceipts.reduce((sum, r) => sum + (Number(r.montantVerse) || 0), 0);
+      if (receiptsSum > totalEncaisse) {
+        totalEncaisse = receiptsSum;
+      }
 
       const soldeRestantDu = Math.max(0, totalRedevance - totalEncaisse);
       const mergedEst: Establishment = {
         ...canonical,
         promoteurNom: promoteur,
         promoteurTelephone: contactTel,
+        promoteurEmail: contactEmail,
         quartier,
         adresseExacte: adresse,
         montantRedevanceAnnuelle: totalRedevance,
@@ -1396,6 +1471,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dateDelivranceAttestation: attestationDate,
         agentAssigneId: assignedAgentId,
         agentAssigneNom: assignedAgentNom,
+        historiquePaiements: allHistories,
       };
 
       cleanList.push(mergedEst);
