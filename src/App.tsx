@@ -16,11 +16,11 @@ import { Loader2 } from 'lucide-react';
 import { AttestationVerificationView } from './components/public/AttestationVerificationView';
 import { DashboardModule } from './components/modules/DashboardModule';
 
-// Resilient lazy loader with automatic retries for offline resilience
+// Resilient lazy loader with automatic retries and chunk recovery for offline/sandbox resilience
 function lazyWithRetry<T extends React.ComponentType<any>>(
   componentImport: () => Promise<{ default: T }>,
   retriesLeft = 3,
-  interval = 1200
+  interval = 1000
 ): React.LazyExoticComponent<T> {
   return lazy(() =>
     new Promise<{ default: T }>((resolve, reject) => {
@@ -28,7 +28,20 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
         componentImport()
           .then(resolve)
           .catch((error) => {
+            console.warn(`Dynamic module import retry (${remaining} left):`, error);
             if (remaining <= 0) {
+              const isChunkError =
+                error?.message?.includes('dynamically imported module') ||
+                error?.message?.includes('Failed to fetch') ||
+                error?.name === 'ChunkLoadError';
+              if (isChunkError && typeof window !== 'undefined') {
+                const reloadKey = 'ddl_auto_chunk_reload';
+                if (!sessionStorage.getItem(reloadKey)) {
+                  sessionStorage.setItem(reloadKey, 'true');
+                  window.location.reload();
+                  return;
+                }
+              }
               reject(error);
               return;
             }
@@ -63,6 +76,8 @@ const SupabaseDataImportModule = lazyWithRetry(() => import('./components/module
 const AdministrativeDraftingCanvaModule = lazyWithRetry(() => import('./components/modules/AdministrativeDraftingCanvaModule').then((m) => ({ default: m.AdministrativeDraftingCanvaModule })));
 const DepartmentalAuthorizationModule = lazyWithRetry(() => import('./components/modules/DepartmentalAuthorizationModule').then((m) => ({ default: m.DepartmentalAuthorizationModule })));
 const CampaignAndRelanceModule = lazyWithRetry(() => import('./components/modules/CampaignAndRelanceModule').then((m) => ({ default: m.CampaignAndRelanceModule })));
+const StatisticalServiceModule = lazyWithRetry(() => import('./components/modules/StatisticalServiceModule').then((m) => ({ default: m.StatisticalServiceModule || (m as any).default })));
+
 
 const ModuleLoader: React.FC = () => (
   <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center">
@@ -108,6 +123,7 @@ const MainContent: React.FC = () => {
           {activeModule === 'MOD-19' && <AdministrativeDraftingCanvaModule />}
           {activeModule === 'MOD-20' && <DepartmentalAuthorizationModule />}
           {activeModule === 'MOD-21' && <CampaignAndRelanceModule />}
+          {activeModule === 'MOD-22' && <StatisticalServiceModule />}
         </Suspense>
       </ErrorBoundary>
     </main>

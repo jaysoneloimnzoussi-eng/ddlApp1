@@ -4,6 +4,14 @@ import { ErrorBoundary } from './components/common/ErrorBoundary.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
+// Auto-reload on dynamic module chunk load failure (e.g. network drops or fresh dev server build)
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    window.location.reload();
+  });
+}
+
 // Register Service Worker for 100% offline access & PWA precaching
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   registerSW({

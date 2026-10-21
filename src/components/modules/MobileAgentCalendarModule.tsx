@@ -28,6 +28,9 @@ import {
   Building,
   Shield,
   Layers,
+  Coins,
+  BarChart3,
+  CalendarSearch,
   HelpCircle,
   Settings,
   MoreVertical,
@@ -92,6 +95,7 @@ export const MobileAgentCalendarModule: React.FC = () => {
     setIsCalendarFullScreen,
     setActiveModule,
     setSelectedEstablishmentForRecensement,
+    deduplicateEstablishments,
   } = useApp();
 
   const isLight = theme === 'light';
@@ -145,6 +149,14 @@ export const MobileAgentCalendarModule: React.FC = () => {
   const [createMotif, setCreateMotif] = useState<InspectionSchedule['typeMission']>('Recouvrement');
   const [createNotes, setCreateNotes] = useState<string>('Tournée de recouvrement SAA');
   const [isCreatingSchedule, setIsCreatingSchedule] = useState<boolean>(false);
+
+  // Search & Combobox states for create appointment modal
+  const [createEstSearch, setCreateEstSearch] = useState<string>('');
+  const [isCreateEstDropdownOpen, setIsCreateEstDropdownOpen] = useState<boolean>(false);
+
+  // Financial Summary Modal & Tab states
+  const [isReceiptSummaryModalOpen, setIsReceiptSummaryModalOpen] = useState<boolean>(false);
+  const [financialSummaryTab, setFinancialSummaryTab] = useState<'semaine' | 'mois' | 'trimestre' | 'annee'>('mois');
 
   // Synchronise le quartier par défaut lors du changement d'arrondissement
   const handleArrondissementChange = (newArr: Arrondissement) => {
@@ -276,10 +288,188 @@ export const MobileAgentCalendarModule: React.FC = () => {
           (e.promoteurNom || '').toLowerCase().includes(q) ||
           (e.arrondissement || '').toLowerCase().includes(q) ||
           (e.quartier || '').toLowerCase().includes(q) ||
-          (e.codeDossier || '').toLowerCase().includes(q)
+          (e.codeDossier || '').toLowerCase().includes(q) ||
+          (e.promoteurTelephone || '').toLowerCase().includes(q)
         )
     );
   }, [searchQuery, establishments, availableEstablishments]);
+
+  // Map of all schedules by establishment ID and normalized name
+  const establishmentSchedulesMap = useMemo(() => {
+    const map = new Map<string, InspectionSchedule[]>();
+    schedules.forEach((sch) => {
+      if (!sch) return;
+      if (sch.etablissementId) {
+        if (!map.has(sch.etablissementId)) map.set(sch.etablissementId, []);
+        map.get(sch.etablissementId)!.push(sch);
+      }
+      const nameKey = (sch.etablissementNom || '').toLowerCase().trim();
+      if (nameKey) {
+        if (!map.has(nameKey)) map.set(nameKey, []);
+        map.get(nameKey)!.push(sch);
+      }
+    });
+    return map;
+  }, [schedules]);
+
+  const getSchedulesForEst = (est: Establishment): InspectionSchedule[] => {
+    const byId = establishmentSchedulesMap.get(est.id) || [];
+    const byName = establishmentSchedulesMap.get((est.nomCommercial || '').toLowerCase().trim()) || [];
+    const all = [...byId];
+    byName.forEach((s) => {
+      if (!all.some((existing) => existing.id === s.id)) {
+        all.push(s);
+      }
+    });
+    return all.sort((a, b) => (b.dateTournee || '').localeCompare(a.dateTournee || ''));
+  };
+
+  // Navigation souveraine directe vers le jour où la descente est prévue ou s'est déroulée
+  const handleNavigateToScheduleDay = (sch: InspectionSchedule, estName?: string) => {
+    if (!sch.dateTournee) return;
+    try {
+      const parts = sch.dateTournee.split('-').map(Number);
+      if (parts.length === 3) {
+        const targetDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        setCurrentDate(targetDate);
+        setViewMode('jour'); // Ouvre immédiatement la vue jour pour afficher la mission
+        setSelectedSchedule(sch);
+        setIsSearchOpen(false);
+        setSearchQuery('');
+        showNotification(
+          'success',
+          `📅 Descente localisée : ${sch.dateTournee} (${sch.statut === 'effectue' ? 'Déroulée / Effectuée' : 'Prévue à ' + sch.heure}) pour ${sch.etablissementNom || estName || 'Établissement'}`
+        );
+      }
+    } catch (e) {
+      console.warn('Navigation error:', e);
+    }
+  };
+
+  // Calcul statistique des recettes récoltées (Semaine, Mois, Trimestre, Année)
+  const financialSummary = useMemo(() => {
+    const curr = new Date(currentDate);
+
+    // Semaine courante (Lundi à Dimanche)
+    const day = (curr.getDay() + 6) % 7; // Lundi = 0
+    const startOfWeek = new Date(curr);
+    startOfWeek.setDate(curr.getDate() - day);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    const startOfWeekStr = formatDateKey(startOfWeek);
+    const endOfWeekStr = formatDateKey(endOfWeek);
+
+    // Mois sélectionné (ex: "2026-10")
+    const currentMonthPrefix = `${curr.getFullYear()}-${(curr.getMonth() + 1).toString().padStart(2, '0')}`;
+    const currentQuarter = Math.floor(curr.getMonth() / 3) + 1; // 1, 2, 3 ou 4
+
+    let totalSemaine = 0;
+    let countSemaine = 0;
+    let totalMois = 0;
+    let countMois = 0;
+    let totalTrimestre = 0;
+    let countTrimestre = 0;
+    let totalAnnee = 0;
+    let countAnnee = 0;
+
+    const receiptsSemaine: CashReceipt[] = [];
+    const receiptsMois: CashReceipt[] = [];
+    const receiptsTrimestre: CashReceipt[] = [];
+    const receiptsAnnee: CashReceipt[] = [];
+
+    const modesMois: Record<string, { total: number; count: number }> = {
+      momo_mtn: { total: 0, count: 0 },
+      airtel_money: { total: 0, count: 0 },
+      especes: { total: 0, count: 0 },
+      autres: { total: 0, count: 0 },
+    };
+
+    receipts.forEach((r) => {
+      if (!r || !r.datePaiement) return;
+      const amount = Number(r.montantVerse) || 0;
+      const dateStr = r.datePaiement;
+
+      // Semaine
+      if (dateStr >= startOfWeekStr && dateStr <= endOfWeekStr) {
+        totalSemaine += amount;
+        countSemaine++;
+        receiptsSemaine.push(r);
+      }
+
+      // Mois
+      if (dateStr.startsWith(currentMonthPrefix)) {
+        totalMois += amount;
+        countMois++;
+        receiptsMois.push(r);
+        const m = r.modePaiement === 'momo_mtn' || r.modePaiement === 'airtel_money' || r.modePaiement === 'especes'
+          ? r.modePaiement
+          : 'autres';
+        modesMois[m].total += amount;
+        modesMois[m].count++;
+      }
+
+      // Trimestre
+      const parts = dateStr.split('-');
+      if (parts.length >= 2 && parts[0] === curr.getFullYear().toString()) {
+        const m = parseInt(parts[1], 10);
+        const q = Math.floor((m - 1) / 3) + 1;
+        if (q === currentQuarter) {
+          totalTrimestre += amount;
+          countTrimestre++;
+          receiptsTrimestre.push(r);
+        }
+      }
+
+      // Année
+      if (dateStr.startsWith(curr.getFullYear().toString())) {
+        totalAnnee += amount;
+        countAnnee++;
+        receiptsAnnee.push(r);
+      }
+    });
+
+    return {
+      startOfWeekStr,
+      endOfWeekStr,
+      monthName: monthNames[curr.getMonth()],
+      year: curr.getFullYear(),
+      quarterNum: currentQuarter,
+      semaine: { total: totalSemaine, count: countSemaine, list: receiptsSemaine },
+      mois: { total: totalMois, count: countMois, list: receiptsMois },
+      trimestre: { total: totalTrimestre, count: countTrimestre, list: receiptsTrimestre },
+      annee: { total: totalAnnee, count: countAnnee, list: receiptsAnnee },
+      modesMois,
+    };
+  }, [receipts, currentDate]);
+
+  // Établissements filtrés pour le sélecteur avec recherche dans le modal de création
+  const createModalFilteredEsts = useMemo(() => {
+    if (!createEstSearch.trim()) return availableEstablishments.slice(0, 50);
+    const q = createEstSearch.toLowerCase().trim();
+    return availableEstablishments.filter((e) => {
+      if (!e) return false;
+      return (
+        (e.nomCommercial || '').toLowerCase().includes(q) ||
+        (e.promoteurNom || '').toLowerCase().includes(q) ||
+        (e.arrondissement || '').toLowerCase().includes(q) ||
+        (e.quartier || '').toLowerCase().includes(q) ||
+        (e.codeDossier || '').toLowerCase().includes(q) ||
+        (e.promoteurTelephone || '').toLowerCase().includes(q)
+      );
+    });
+  }, [availableEstablishments, createEstSearch]);
+
+  // Détection en direct d'un doublon potentiel lors de la saisie manuelle d'un nouvel établissement
+  const potentialDuplicateEst = useMemo(() => {
+    if (!isCustomEst || !customEstNom.trim()) return null;
+    const q = customEstNom.toLowerCase().trim();
+    return availableEstablishments.find((e) => {
+      if (!e) return false;
+      const eNom = (e.nomCommercial || '').toLowerCase().trim();
+      return eNom === q || (q.length >= 4 && (eNom.includes(q) || q.includes(eNom)));
+    });
+  }, [isCustomEst, customEstNom, availableEstablishments]);
 
   // Execute payment & next appointment workflow
   const handleExecutePaymentWorkflow = async (e: React.FormEvent) => {
@@ -900,44 +1090,137 @@ export const MobileAgentCalendarModule: React.FC = () => {
             )}
           </div>
 
-          {/* Autocomplete dropdown */}
+          {/* Autocomplete dropdown with exact descente days & 1-click navigation */}
           {isSearchOpen && searchResults.length > 0 && (
-            <div className={`absolute left-0 right-0 top-full mt-1.5 rounded-xl border shadow-2xl z-50 overflow-hidden ${
+            <div className={`absolute left-0 right-0 top-full mt-2 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
               isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
             }`}>
-              <div className="p-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
-                {searchResults.length} établissement(s) trouvé(s)
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                <span>{searchResults.length} établissement(s) trouvé(s)</span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold normal-case">
+                  Cliquez sur une descente pour l'ouvrir à sa date
+                </span>
               </div>
-              <div className="max-h-60 overflow-y-auto">
-                {searchResults.map((est) => (
-                  <div
-                    key={est.id}
-                    onClick={() => {
-                      setTargetEstForPayment(est);
-                      setMontantAcompte(est.soldeRestantDu > 0 ? Math.min(25000, est.soldeRestantDu) : 50000);
-                      setIsPaymentModalOpen(true);
-                      setIsSearchOpen(false);
-                    }}
-                    className={`p-2.5 flex items-center justify-between cursor-pointer border-b last:border-0 transition ${
-                      isLight ? 'hover:bg-blue-50 border-slate-100' : 'hover:bg-slate-800 border-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {est.nomCommercial}
+              <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {searchResults.map((est) => {
+                  const estSchedules = getSchedulesForEst(est);
+                  const nextPlanned = estSchedules.find((s) => s.statut === 'planifie' || s.statut === 'en_cours');
+                  const lastCompleted = estSchedules.find((s) => s.statut === 'effectue');
+
+                  return (
+                    <div
+                      key={est.id}
+                      className={`p-3 transition ${
+                        isLight ? 'hover:bg-blue-50/40' : 'hover:bg-slate-800/60'
+                      }`}
+                    >
+                      {/* Entête Établissement */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
+                              {est.nomCommercial}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {est.codeDossier || est.arrondissement}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span>{est.arrondissement} • Quartier {est.quartier || 'Centre'}</span>
+                            <span>• Gérant : {est.promoteurNom}</span>
+                            {est.promoteurTelephone && <span className="font-mono">({est.promoteurTelephone})</span>}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                            <User className="w-3 h-3 text-blue-500" />
+                            <span>Agent assigné exclusif : <strong className="text-slate-600 dark:text-slate-300">{est.agentAssigneNom || 'Jacques MATOKO'}</strong></span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[11px] font-mono font-bold text-emerald-600 block">
+                            {formatCfa(est.soldeRestantDu)}
+                          </span>
+                          <span className="text-[9px] text-slate-400">Solde exigible</span>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-500">
-                        {est.arrondissement} • Promoteur : {est.promoteurNom}
+
+                      {/* Bloc Descentes / Missions associées */}
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1.5">
+                        {estSchedules.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {nextPlanned && (
+                              <button
+                                type="button"
+                                onClick={() => handleNavigateToScheduleDay(nextPlanned, est.nomCommercial)}
+                                className="w-full flex items-center justify-between p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition text-left cursor-pointer group"
+                              >
+                                <div className="flex items-center gap-2 text-xs">
+                                  <CalendarClock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                  <span className="font-bold text-blue-800 dark:text-blue-300">
+                                    Descente prévue : {nextPlanned.dateTournee} à {nextPlanned.heure}
+                                  </span>
+                                  <span className="text-[10px] text-blue-700 dark:text-blue-300 font-semibold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/80">
+                                    {nextPlanned.typeMission}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 group-hover:underline flex items-center gap-1 shrink-0">
+                                  Voir ce jour →
+                                </span>
+                              </button>
+                            )}
+
+                            {lastCompleted && lastCompleted.id !== nextPlanned?.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleNavigateToScheduleDay(lastCompleted, est.nomCommercial)}
+                                className="w-full flex items-center justify-between p-1.5 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition text-left cursor-pointer group text-xs text-slate-700 dark:text-slate-300"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>Descente déroulée le <strong>{lastCompleted.dateTournee}</strong> ({lastCompleted.typeMission})</span>
+                                </div>
+                                <span className="text-[10px] font-bold text-emerald-600 group-hover:underline shrink-0">
+                                  Consulter ce jour →
+                                </span>
+                              </button>
+                            )}
+
+                            {estSchedules.filter((s) => s.id !== nextPlanned?.id && s.id !== lastCompleted?.id).map((otherSch) => (
+                              <button
+                                key={otherSch.id}
+                                type="button"
+                                onClick={() => handleNavigateToScheduleDay(otherSch, est.nomCommercial)}
+                                className="w-full flex items-center justify-between px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-400 hover:text-blue-600 transition"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  Tournée du {otherSch.dateTournee} ({otherSch.statut})
+                                </span>
+                                <span className="text-[10px] text-blue-600 font-semibold">Afficher ce jour →</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <span className="flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              Aucune descente au planning pour cet établissement
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleOpenCreateModal(undefined, undefined, est.id);
+                                setIsSearchOpen(false);
+                              }}
+                              className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] transition shrink-0 cursor-pointer shadow-xs"
+                            >
+                              + Programmer une descente
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-mono font-bold text-emerald-600">
-                        Reste : {formatCfa(est.soldeRestantDu)}
-                      </span>
-                      <p className="text-[9px] text-blue-600 font-semibold">1-clic pour encaisser</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1051,6 +1334,64 @@ export const MobileAgentCalendarModule: React.FC = () => {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* 1.1 BANDEAU FINANCIER & RÉSUMÉ DES RECETTES RÉCOLTÉES (Semaine, Mois, Trimestre, Année) */}
+      <div className={`px-3 sm:px-4 py-2 border-b flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 transition-colors ${
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/80 border-slate-800'
+      }`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold text-xs shrink-0">
+            <Coins className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden sm:inline">Recettes Récoltées SAA :</span>
+          </div>
+
+          {/* Semaine en cours */}
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Semaine :</span>
+            <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.semaine.total)}</span>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-80">({financialSummary.semaine.count})</span>
+          </div>
+
+          {/* Mois en cours */}
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Mois ({financialSummary.monthName}) :</span>
+            <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.mois.total)}</span>
+            <span className="text-[10px] text-blue-600 dark:text-blue-400 opacity-80">({financialSummary.mois.count})</span>
+          </div>
+
+          {/* Trimestre */}
+          <div className="hidden lg:flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-300">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">T{financialSummary.quarterNum} :</span>
+            <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.trimestre.total)}</span>
+          </div>
+
+          {/* Année 2026 */}
+          <div className="hidden xl:flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">{financialSummary.year} :</span>
+            <span className="font-mono font-bold text-xs">{formatCfa(financialSummary.annee.total)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setIsReceiptSummaryModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition cursor-pointer"
+            title="Consulter le relevé et la ventilation complète des recettes par modalité et par agent"
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Bilan des Recettes</span>
+          </button>
+
+          <button
+            onClick={() => deduplicateEstablishments()}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition cursor-pointer"
+            title="Assainir la base et fusionner les doublons d'établissements"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span className="hidden sm:inline">Dédoublonner</span>
+          </button>
         </div>
       </div>
 

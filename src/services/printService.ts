@@ -4,7 +4,15 @@
  * Fonctionne avec fiabilité dans tous les navigateurs et environnements iframes.
  */
 
-export function printHtmlElement(elementId: string, documentTitle: string = 'Document Officiel DDL-PN'): void {
+export interface PrintOptions {
+  orientation?: 'portrait' | 'landscape';
+}
+
+export function printHtmlElement(
+  elementId: string,
+  documentTitle: string = 'Document Officiel DDL-PN',
+  options?: PrintOptions
+): void {
   const targetElement = document.getElementById(elementId);
   if (!targetElement) {
     console.warn(`Élément #${elementId} introuvable pour l'impression, fallback sur window.print()`);
@@ -24,7 +32,7 @@ export function printHtmlElement(elementId: string, documentTitle: string = 'Doc
   const clone = targetElement.cloneNode(true) as HTMLElement;
 
   // Retirer les attributs ou styles inline qui doubleraient les marges avec @page
-  if (clone.classList.contains('page-a4')) {
+  if (clone.classList.contains('page-a4') || clone.classList.contains('page-a4-landscape')) {
     clone.style.padding = '0';
     clone.style.margin = '0';
     clone.style.boxShadow = 'none';
@@ -33,7 +41,7 @@ export function printHtmlElement(elementId: string, documentTitle: string = 'Doc
     clone.style.maxWidth = '100%';
   }
 
-  const subPages = clone.querySelectorAll('.page-a4');
+  const subPages = clone.querySelectorAll('.page-a4, .page-a4-landscape');
   subPages.forEach((p) => {
     const el = p as HTMLElement;
     el.style.padding = '0';
@@ -52,8 +60,27 @@ export function printHtmlElement(elementId: string, documentTitle: string = 'Doc
   const originalTitle = document.title;
   document.title = documentTitle;
 
-  // 4. Activer le mode impression isolée sur le body
+  // 4. Activer le mode impression isolée sur le body et orientation dynamique
   document.body.classList.add('ddl-printing-active');
+  const isLandscape = options?.orientation === 'landscape';
+  if (isLandscape) {
+    document.body.classList.add('ddl-print-landscape');
+  }
+
+  let styleTag: HTMLStyleElement | null = null;
+  if (isLandscape) {
+    styleTag = document.createElement('style');
+    styleTag.id = 'ddl-print-orientation-style';
+    styleTag.innerHTML = `
+      @media print {
+        @page {
+          size: A4 landscape !important;
+          margin: 10mm 15mm 10mm 15mm !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleTag);
+  }
 
   // 5. Nettoyage après impression
   let isCleanedUp = false;
@@ -61,6 +88,10 @@ export function printHtmlElement(elementId: string, documentTitle: string = 'Doc
     if (isCleanedUp) return;
     isCleanedUp = true;
     document.body.classList.remove('ddl-printing-active');
+    document.body.classList.remove('ddl-print-landscape');
+    if (styleTag && styleTag.parentNode) {
+      styleTag.parentNode.removeChild(styleTag);
+    }
     document.title = originalTitle;
     if (printLayer) {
       printLayer.innerHTML = '';
@@ -83,4 +114,5 @@ export function printHtmlElement(elementId: string, documentTitle: string = 'Doc
     cleanup();
   }
 }
+
 

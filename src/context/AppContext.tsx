@@ -51,7 +51,7 @@ import {
   cleanForFirestore,
   ensureFirebaseAuth,
 } from '../services/firebase';
-import { doc, setDoc, onSnapshot, collection, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, onSnapshot, collection, writeBatch } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
 interface NotificationItem {
@@ -180,6 +180,7 @@ interface AppContextType {
     acomptesCount: number;
     totalEstablishmentsAfter: number;
   }>;
+  deduplicateEstablishments: (options?: { silent?: boolean }) => Promise<{ mergedCount: number; removedCount: number }>;
 
   // Offline status & alerts
   isOnline: boolean;
@@ -1292,17 +1293,227 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuditLogs((prev) => [newRecord, ...prev]);
   };
 
+  // Normalisation souveraine pour détecter les doublons d'établissements
+  const normalizeEstKey = (nom: string, arr?: string): string => {
+    const cleanNom = (nom || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+    const cleanArr = (arr || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+    return `${cleanNom}___${cleanArr}`;
+  };
+
+  // Dédoublonnage et assainissement intégral de la base de données
+  // Règle républicaine : 1 seul agent de terrain assigné par établissement,
+  // tandis qu'un tenancier peut posséder plusieurs établissements différents.
+  const deduplicateEstablishments = async (options?: { silent?: boolean }): Promise<{ mergedCount: number; removedCount: number }> => {
+    const groups = new Map<string, Establishment[]>();
+    
+    establishments.forEach((est) => {
+      if (!est || !est.nomCommercial) return;
+      const key = normalizeEstKey(est.nomCommercial, est.arrondissement);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(est);
+    });
+
+    let removedCount = 0;
+    let mergedCount = 0;
+    const cleanList: Establishment[] = [];
+    const idRemap = new Map<string, string>(); // oldId -> canonicalId
+    const idsToDeleteFromFirestore: string[] = [];
+
+    groups.forEach((group) => {
+      if (group.length === 1) {
+        cleanList.push(group[0]);
+        return;
+      }
+
+      // Doublon détecté !
+      mergedCount++;
+      const canonical = group.reduce((best, curr) => {
+        const bestScore = (best.historiquePaiements?.length || 0) * 10 + (best.montantEncaisse > 0 ? 5 : 0) + (best.adresseExacte ? 2 : 0);
+        const currScore = (curr.historiquePaiements?.length || 0) * 10 + (curr.montantEncaisse > 0 ? 5 : 0) + (curr.adresseExacte ? 2 : 0);
+        return currScore > bestScore ? curr : best;
+      }, group[0]);
+
+      let totalEncaisse = canonical.montantEncaisse || 0;
+      let totalRedevance = canonical.montantRedevanceAnnuelle || 50000;
+      let contactTel = canonical.promoteurTelephone || '';
+      let promoteur = canonical.promoteurNom || '';
+      let quartier = canonical.quartier || '';
+      let adresse = canonical.adresseExacte || '';
+      let decibels = canonical.niveauDecibelsMoyen || 70;
+      let limiteur = canonical.limiteurInstalle || false;
+      let attestationNum = canonical.numeroAttestation;
+      let attestationDate = canonical.dateDelivranceAttestation;
+
+      // 1 SEUL agent de terrain responsable exclusif par établissement
+      const assignedAgentId = canonical.agentAssigneId || group.find((g) => g.agentAssigneId)?.agentAssigneId || '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc';
+      const assignedAgent = staff.find((s) => s.id === assignedAgentId);
+      const assignedAgentNom = assignedAgent?.nomComplet || canonical.agentAssigneNom || 'Jacques MATOKO';
+
+      group.forEach((dup) => {
+        if (dup.id !== canonical.id) {
+          idRemap.set(dup.id, canonical.id);
+          idsToDeleteFromFirestore.push(dup.id);
+          removedCount++;
+
+          if (!contactTel && dup.promoteurTelephone) contactTel = dup.promoteurTelephone;
+          if (!promoteur && dup.promoteurNom) promoteur = dup.promoteurNom;
+          if (!quartier && dup.quartier) quartier = dup.quartier;
+          if (!adresse && dup.adresseExacte) adresse = dup.adresseExacte;
+          if (dup.limiteurInstalle) limiteur = true;
+          if (dup.niveauDecibelsMoyen && dup.niveauDecibelsMoyen > 0) decibels = dup.niveauDecibelsMoyen;
+          if (dup.montantEncaisse && dup.montantEncaisse > totalEncaisse) totalEncaisse = dup.montantEncaisse;
+          if (dup.montantRedevanceAnnuelle && dup.montantRedevanceAnnuelle > totalRedevance) totalRedevance = dup.montantRedevanceAnnuelle;
+          if (!attestationNum && dup.numeroAttestation) {
+            attestationNum = dup.numeroAttestation;
+            attestationDate = dup.dateDelivranceAttestation;
+          }
+        }
+      });
+
+      const soldeRestantDu = Math.max(0, totalRedevance - totalEncaisse);
+      const mergedEst: Establishment = {
+        ...canonical,
+        promoteurNom: promoteur,
+        promoteurTelephone: contactTel,
+        quartier,
+        adresseExacte: adresse,
+        montantRedevanceAnnuelle: totalRedevance,
+        montantEncaisse: totalEncaisse,
+        soldeRestantDu,
+        niveauDecibelsMoyen: decibels,
+        limiteurInstalle: limiteur,
+        numeroAttestation: attestationNum,
+        dateDelivranceAttestation: attestationDate,
+        agentAssigneId,
+        agentAssigneNom,
+      };
+
+      cleanList.push(mergedEst);
+    });
+
+    if (removedCount > 0) {
+      const updatedReceipts = receipts.map((r) => {
+        if (idRemap.has(r.etablissementId)) {
+          const canonicalId = idRemap.get(r.etablissementId)!;
+          const canonicalEst = cleanList.find((e) => e.id === canonicalId);
+          return {
+            ...r,
+            etablissementId: canonicalId,
+            etablissementNom: canonicalEst?.nomCommercial || r.etablissementNom,
+          };
+        }
+        return r;
+      });
+
+      const updatedSchedules = schedules.map((s) => {
+        if (idRemap.has(s.etablissementId)) {
+          const canonicalId = idRemap.get(s.etablissementId)!;
+          const canonicalEst = cleanList.find((e) => e.id === canonicalId);
+          return {
+            ...s,
+            etablissementId: canonicalId,
+            etablissementNom: canonicalEst?.nomCommercial || s.etablissementNom,
+          };
+        }
+        return s;
+      });
+
+      const updatedLegalActs = legalActs.map((a) => {
+        if (idRemap.has(a.etablissementId)) {
+          const canonicalId = idRemap.get(a.etablissementId)!;
+          const canonicalEst = cleanList.find((e) => e.id === canonicalId);
+          return {
+            ...a,
+            etablissementId: canonicalId,
+            etablissementNom: canonicalEst?.nomCommercial || a.etablissementNom,
+          };
+        }
+        return a;
+      });
+
+      setEstablishments(cleanList);
+      setReceipts(updatedReceipts);
+      setSchedules(updatedSchedules);
+      setLegalActs(updatedLegalActs);
+
+      try {
+        localStorage.setItem('ddl_real_establishments_v5', JSON.stringify(cleanList));
+        localStorage.setItem('ddl_real_receipts_v5', JSON.stringify(updatedReceipts));
+        localStorage.setItem('ddl_real_schedules_v5', JSON.stringify(updatedSchedules));
+        localStorage.setItem('ddl_real_legal_acts_v5', JSON.stringify(updatedLegalActs));
+      } catch (e) {
+        console.warn('Erreur sauvegarde locale du dédoublonnage:', e);
+      }
+
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        try {
+          const batch = writeBatch(db);
+          cleanList.forEach((est) => {
+            batch.set(doc(db, 'establishments', est.id), cleanForFirestore(est), { merge: true });
+          });
+          idsToDeleteFromFirestore.forEach((dupId) => {
+            batch.delete(doc(db, 'establishments', dupId));
+          });
+          await batch.commit();
+          console.log(`[Firestore] ${idsToDeleteFromFirestore.length} doublons supprimés dans Firebase.`);
+        } catch (fErr) {
+          console.warn('[Firestore] Batch commit error lors du dédoublonnage:', fErr);
+        }
+      }
+
+      if (!options?.silent) {
+        showNotification('success', `Assainissement réussi : ${removedCount} doublon(s) d'établissements fusionné(s). Règle d'un agent unique par établissement garantie.`);
+      }
+    } else if (!options?.silent) {
+      showNotification('info', 'Aucun doublon détecté dans la base : chaque établissement est unique et suivi par un agent dédié.');
+    }
+
+    return { mergedCount, removedCount };
+  };
+
   const addEstablishment = async (
     estData: Omit<Establishment, 'id' | 'codeDossier' | 'syncStatus' | 'historiquePaiements' | 'anneeExercice'>,
     options?: { silent?: boolean }
   ): Promise<Establishment> => {
-    const id = 'est-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+    const cleanNom = (estData.nomCommercial || 'Établissement SAA').toString().trim();
     const arr = estData.arrondissement || 'Tié-Tié';
+    const normKey = normalizeEstKey(cleanNom, arr);
+
+    // Vérifier si un établissement de même nom existe déjà dans cet arrondissement (Dédoublonnage proactif)
+    const existing = establishments.find((e) => e && normalizeEstKey(e.nomCommercial, e.arrondissement) === normKey);
+    if (existing) {
+      console.log(`[Dédoublonnage] Établissement "${cleanNom}" existe déjà (${existing.codeDossier}). Mise à jour.`);
+      const updated: Establishment = {
+        ...existing,
+        ...estData,
+        id: existing.id,
+        codeDossier: existing.codeDossier,
+        agentAssigneId: existing.agentAssigneId || estData.agentAssigneId || (staff.find((s) => s.service === 'SAA')?.id || '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc'),
+        agentAssigneNom: existing.agentAssigneNom || estData.agentAssigneNom || (staff.find((s) => s.service === 'SAA')?.nomComplet || 'Jacques MATOKO'),
+      };
+      await updateEstablishment(existing.id, updated);
+      if (!options?.silent) {
+        showNotification('info', `Établissement existant "${cleanNom}" retrouvé (${existing.codeDossier}) — Doublon évité.`);
+      }
+      return updated;
+    }
+
+    const id = 'est-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
     const arrCode = (arr || 'TIE').substring(0, 3).toUpperCase();
     const count = establishments.filter((e) => e && e.arrondissement === arr).length + 1;
     const codeDossier = `DDL-PN-2026-${arrCode}-${count.toString().padStart(4, '0')}`;
 
-    // Ensure the establishment is assigned strictly to a valid agent
+    // Ensure the establishment is assigned strictly to a single valid agent
     const defaultAgent = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
     const assignedAgentId = (estData.agentAssigneId && estData.agentAssigneId !== 'stf-002')
       ? estData.agentAssigneId
@@ -1313,7 +1524,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...estData,
       id,
       codeDossier,
-      nomCommercial: (estData.nomCommercial || 'Établissement SAA').toString().trim(),
+      nomCommercial: cleanNom,
       arrondissement: arr as any,
       agentAssigneId: assignedAgent?.id || assignedAgentId,
       agentAssigneNom: assignedAgent?.nomComplet || estData.recensePar || 'Jacques MATOKO',
@@ -2943,6 +3154,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         negotiateFee,
         reportEstablishmentClosed,
         importFromGoogleCalendar,
+        deduplicateEstablishments,
         addAuditLog,
         createSoitTransmis,
         isOnline,

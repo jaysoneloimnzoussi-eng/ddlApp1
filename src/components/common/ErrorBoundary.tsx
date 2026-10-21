@@ -33,24 +33,42 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({ errorInfo });
 
-    // En cas de micro-coupure réseau sur un import dynamique, tentative de réessai automatique instantanée
-    if (error?.message?.includes('dynamically imported module') || error?.message?.includes('Failed to fetch')) {
-      const hasRetried = sessionStorage.getItem('ddl_chunk_retry');
-      if (!hasRetried) {
-        sessionStorage.setItem('ddl_chunk_retry', 'true');
+    // En cas de micro-coupure réseau sur un import dynamique ou chunk expiré, rechargement automatique résilient
+    if (
+      error?.message?.includes('dynamically imported module') ||
+      error?.message?.includes('Failed to fetch') ||
+      error?.name === 'ChunkLoadError'
+    ) {
+      const retryKey = 'ddl_chunk_auto_reload_done';
+      if (!sessionStorage.getItem(retryKey)) {
+        sessionStorage.setItem(retryKey, '1');
         setTimeout(() => {
-          this.setState({ hasError: false, error: null, errorInfo: null });
-        }, 1200);
-      } else {
-        sessionStorage.removeItem('ddl_chunk_retry');
+          window.location.reload();
+        }, 600);
       }
     }
   }
+
+  handleRetry = () => {
+    if (
+      this.state.error?.message?.includes('dynamically imported module') ||
+      this.state.error?.message?.includes('Failed to fetch')
+    ) {
+      window.location.reload();
+    } else {
+      this.setState({ hasError: false, error: null, errorInfo: null });
+    }
+  };
 
   handleHardReset = () => {
     try {
       localStorage.clear();
       sessionStorage.clear();
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
     } catch (e) {
       console.warn('Storage clear error:', e);
     }
@@ -58,6 +76,9 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   handleReload = () => {
+    try {
+      sessionStorage.removeItem('ddl_chunk_auto_reload_done');
+    } catch {}
     window.location.reload();
   };
 
@@ -92,7 +113,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+                onClick={this.handleRetry}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />

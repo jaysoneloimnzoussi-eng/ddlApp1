@@ -36,6 +36,7 @@ import {
   Building2,
   CheckCircle2,
   FileSignature,
+  BarChart3,
 } from 'lucide-react';
 
 interface PaletteItem {
@@ -405,6 +406,21 @@ export const CommandPalette: React.FC = () => {
         showNotification('info', "Module ouvert : MOD-21 Plateforme de Relance & Messagerie Républicaine");
       },
       isActive: activeModule === 'MOD-21',
+    },
+    {
+      id: 'mod-22',
+      category: 'modules',
+      code: 'MOD-22',
+      title: 'MOD-22 • Service Statistique (SSEP)',
+      subtitle: 'Observatoire démographique, cartographique et acoustique des établissements & Impression A4',
+      icon: BarChart3,
+      badge: 'Statistiques & Études',
+      keywords: ['statistique', 'service statistique', 'repertoire', 'imprimer', 'liste etablissements', 'demographie', 'decibels', 'limiteurs', 'surfaces', 'graphiques', 'ssep', 'mod-22'],
+      action: () => {
+        setActiveModule('MOD-22');
+        showNotification('info', 'Module ouvert : MOD-22 Service Statistique');
+      },
+      isActive: activeModule === 'MOD-22',
     },
   ], [activeModule, setActiveModule, showNotification]);
 

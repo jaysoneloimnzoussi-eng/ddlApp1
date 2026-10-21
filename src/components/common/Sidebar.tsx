@@ -27,6 +27,7 @@ import {
   Crown,
   X,
   FileSignature,
+  BarChart3,
 } from 'lucide-react';
 import { FirebaseStatusModal } from './FirebaseStatusModal';
 
@@ -94,6 +95,14 @@ export const Sidebar: React.FC = () => {
       nomCourt: 'Canva Rédaction Admin',
       nomComplet: 'Rapports, TDR, Lettres & Garamond',
       icon: FileSignature,
+      section: 'Pilotage & Stratégie',
+    },
+    {
+      code: 'MOD-22',
+      nomCourt: 'Service Statistique',
+      nomComplet: 'Répertoire Démographique & Statistiques A4',
+      icon: BarChart3,
+      badge: `${establishments.length} Ets`,
       section: 'Pilotage & Stratégie',
     },
 
@@ -282,6 +291,13 @@ export const Sidebar: React.FC = () => {
           nomCourt: 'Titres & Reçus POS 58mm',
           nomComplet: 'Délivrance Quittances Immédiates',
           icon: FileCheck2,
+          section: 'Outils Mobiles & Passerelles',
+        },
+        {
+          code: 'MOD-22',
+          nomCourt: 'Service Statistique',
+          nomComplet: 'Répertoire Démographique & Impression A4',
+          icon: BarChart3,
           section: 'Outils Mobiles & Passerelles',
         },
       ]
