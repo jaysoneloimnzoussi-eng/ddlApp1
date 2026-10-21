@@ -1394,8 +1394,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         limiteurInstalle: limiteur,
         numeroAttestation: attestationNum,
         dateDelivranceAttestation: attestationDate,
-        agentAssigneId,
-        agentAssigneNom,
+        agentAssigneId: assignedAgentId,
+        agentAssigneNom: assignedAgentNom,
       };
 
       cleanList.push(mergedEst);
