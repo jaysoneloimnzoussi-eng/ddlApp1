@@ -61,6 +61,7 @@ export const AdvancedAdminAnalytics: React.FC<Props> = ({ establishments, receip
       const attestation = etabs.filter((e) => e.statut === 'attestation_provisoire').length;
       const miseEnDemeure = etabs.filter((e) => e.statut === 'mise_en_demeure').length;
       const eteintsOuFermes = etabs.filter((e) => e.estEteintOuFerme || e.statut === 'ferme_contentieux').length;
+      const actifs = etabs.length - eteintsOuFermes;
       const hseConformes = etabs.filter(
         (e) => e.controleHSE?.statutHSE === 'conforme' || e.controleHSE?.extincteursPresents
       ).length;

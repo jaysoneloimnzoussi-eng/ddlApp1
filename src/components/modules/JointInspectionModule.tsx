@@ -158,7 +158,9 @@ export const JointInspectionModule: React.FC = () => {
                         sections: [
                           {
                             titre: "I. CONSTATATIONS ACOUSTIQUES (SAA)",
-                            contenu: `Niveau de pression acoustique mesuré : ${r.conformiteAcoustique.decibels} dB(A). Observations : ${r.conformiteAcoustique.observations}. Statut : ${r.conformiteAcoustique.conforme ? 'Conforme (< 65 dB(A))' : 'Non conforme (émergence excessive)'}.`,
+                            contenu: r.conformiteAcoustique
+                              ? `Niveau de pression acoustique mesuré : ${r.conformiteAcoustique.decibels} dB(A). Observations : ${r.conformiteAcoustique.observations}. Statut : ${r.conformiteAcoustique.conforme ? 'Conforme (< 65 dB(A))' : 'Non conforme (émergence excessive)'}.`
+                              : 'Mesures acoustiques non effectuées ou non requises.',
                           },
                           {
                             titre: "II. SÉCURITÉ INCENDIE ET SALUBRITÉ (SAPEURS-POMPIERS & MAIRIE)",
