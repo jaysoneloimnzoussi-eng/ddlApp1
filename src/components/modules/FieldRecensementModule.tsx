@@ -19,6 +19,7 @@ import {
   Lock,
   UserCheck,
   Shield,
+  ShieldCheck,
   CalendarCheck,
   CalendarClock,
   Clock,
@@ -41,9 +42,10 @@ import {
   QUARTIERS_PAR_ARRONDISSEMENT,
   Establishment,
   CashReceipt,
+  OFFICIAL_LEISURE_CATEGORIES,
+  EXCLUDED_SECTORS_NOTE,
 } from '../../types';
 import { formatCfa } from '../../services/crypto';
-import { SonometerTool } from '../common/SonometerTool';
 import {
   computeOfficialFees,
   OFFICIAL_INVESTIGATION_FEE_CFA,
@@ -97,21 +99,36 @@ export const FieldRecensementModule: React.FC = () => {
   const [repereLocal, setRepereLocal] = useState('');
   const [statutInitial, setStatutInitial] = useState<ComplianceStatus>('convocation_delivree');
   const [adresseExacte, setAdresseExacte] = useState('');
-  const [categorie, setCategorie] = useState<EstablishmentCategory>('Bar Dancing / Cabaret');
+  const [categorie, setCategorie] = useState<EstablishmentCategory>('Bar');
   const [regimeFiscal, setRegimeFiscal] = useState<'informel_forfaitaire' | 'formel_proportionnel'>('informel_forfaitaire');
   const [surfaceM2, setSurfaceM2] = useState<number>(80);
   const [forfaitStandard, setForfaitStandard] = useState<number>(50000);
   const [latitude, setLatitude] = useState<number>(-4.795);
   const [longitude, setLongitude] = useState<number>(11.85);
   const [isLocating, setIsLocating] = useState<boolean>(false);
-  const [niveauDecibels, setNiveauDecibels] = useState<number>(75);
-  const [limiteurInstalle, setLimiteurInstalle] = useState<boolean>(false);
+
+  // Contrôle Hygiène, Sécurité et Environnement (HSE) - Remplace l'exigence des décibels
+  const [extincteursPresents, setExtincteursPresents] = useState<boolean>(true);
+  const [issuesSecoursDegagees, setIssuesSecoursDegagees] = useState<boolean>(true);
+  const [aerationVentilation, setAerationVentilation] = useState<boolean>(true);
+  const [hygieneSanitaires, setHygieneSanitaires] = useState<boolean>(true);
+  const [gestionDechets, setGestionDechets] = useState<boolean>(true);
+  const [trousseSecours, setTrousseSecours] = useState<boolean>(true);
+  const [observationsHSE, setObservationsHSE] = useState<string>('Dispositifs HSE et salubrité vérifiés in situ');
+
+  const statutHSE = (() => {
+    const checks = [extincteursPresents, issuesSecoursDegagees, aerationVentilation, hygieneSanitaires, gestionDechets, trousseSecours];
+    const trueCount = checks.filter(Boolean).length;
+    if (trueCount >= 5) return 'conforme';
+    if (trueCount >= 3) return 'reserves_mineures';
+    return 'non_conforme';
+  })();
+
   const [selectedAssignedAgentId, setSelectedAssignedAgentId] = useState<string>(() => {
     if (currentAgentId !== 'all') return currentAgentId;
     const defaultAgent = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
     return defaultAgent ? defaultAgent.id : '24234c2a-3c46-4f7b-b69a-c82df1c7bbfc';
   });
-  const [showSonometer, setShowSonometer] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [signatureUrl, setSignatureUrl] = useState<string>('');
@@ -426,8 +443,18 @@ export const FieldRecensementModule: React.FC = () => {
         statut: statutInitial,
         latitude,
         longitude,
-        niveauDecibelsMoyen: Number(niveauDecibels),
-        limiteurInstalle,
+        controleHSE: {
+          extincteursPresents,
+          issuesSecoursDegagees,
+          aerationVentilation,
+          hygieneSanitaires,
+          gestionDechets,
+          trousseSecours,
+          statutHSE,
+          observationsHSE,
+        },
+        niveauDecibelsMoyen: 60,
+        limiteurInstalle: false,
         dateRecensement: new Date().toISOString().substring(0, 10),
         recensePar: assignedAgent ? assignedAgent.nomComplet : 'Jacques MATOKO',
         agentAssigneId: assignedAgent ? assignedAgent.id : assignedAgentId,
@@ -968,24 +995,30 @@ export const FieldRecensementModule: React.FC = () => {
 
             {/* Catégorie & Régime Fiscal */}
             <div className="space-y-1">
-              <label className="font-semibold text-slate-700 dark:text-slate-300">Catégorie de Loisirs</label>
+              <div className="flex justify-between items-center">
+                <label className="font-semibold text-slate-700 dark:text-slate-300">
+                  Type d'Établissement de Loisirs <span className="text-red-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400 font-medium">Champ DDL-PN (Hors Hôtels & Restaurants)</span>
+              </div>
               <select
                 value={categorie}
                 onChange={(e) => setCategorie(e.target.value as EstablishmentCategory)}
-                className={`w-full px-3 py-2 rounded-lg border focus:outline-none ${
+                className={`w-full px-3 py-2 rounded-lg border focus:outline-none font-medium ${
                   isLight
                     ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-500'
                     : 'bg-slate-950 border-slate-700 text-slate-100 focus:border-emerald-500'
                 }`}
               >
-                <option value="Discothèque / Night-club">Discothèque / Night-club</option>
-                <option value="Bar Dancing / Cabaret">Bar Dancing / Cabaret</option>
-                <option value="Lounge Bar & Terrasse">Lounge Bar & Terrasse</option>
-                <option value="Espace Récréatif & Salle Polyvalente">Espace Récréatif & Salle Polyvalente</option>
-                <option value="Snack-Bar Sonorisé">Snack-Bar Sonorisé</option>
-                <option value="Complexe de Loisirs & Piscine">Complexe de Loisirs & Piscine</option>
-                <option value="Autre établissement de loisirs">Autre établissement</option>
+                {OFFICIAL_LEISURE_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
               </select>
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 italic">
+                {EXCLUDED_SECTORS_NOTE}
+              </p>
             </div>
 
             {/* Régime fiscal & Simulateur instantané Note 151/MTL-CAB */}
@@ -1157,44 +1190,97 @@ export const FieldRecensementModule: React.FC = () => {
               )}
             </div>
 
-            {/* Décibels & Sonomètre Intégré */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="font-semibold flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                  <Volume2 className="w-3.5 h-3.5 text-amber-500" />
-                  Niveau Sonore : <span className="font-mono text-amber-600 font-bold ml-1">{niveauDecibels} dB(A)</span>
+            {/* Contrôle Hygiène, Sécurité et Environnement (HSE) */}
+            <div className={`p-3.5 rounded-xl border space-y-3 ${
+              isLight ? 'bg-emerald-50/50 border-emerald-200' : 'bg-emerald-950/20 border-emerald-900/60'
+            }`}>
+              <div className="flex items-center justify-between">
+                <label className="font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200 text-xs">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Contrôle Hygiène, Sécurité & Environnement (HSE)</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowSonometer(!showSonometer)}
-                  className="text-[11px] text-emerald-600 hover:underline flex items-center gap-1 font-semibold"
-                >
-                  <Radio className="w-3 h-3" />
-                  <span>{showSonometer ? 'Masquer Sonomètre' : 'Ouvrir Sonomètre SAA'}</span>
-                </button>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  statutHSE === 'conforme'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                    : statutHSE === 'reserves_mineures'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-300'
+                }`}>
+                  {statutHSE === 'conforme' ? '✓ Conforme HSE' : statutHSE === 'reserves_mineures' ? '⚠ Réserves Mineures' : '✕ Non Conforme'}
+                </span>
               </div>
 
-              {showSonometer && (
-                <SonometerTool
-                  initialDb={niveauDecibels}
-                  onCaptureDecibels={(db) => {
-                    setNiveauDecibels(db);
-                    setShowSonometer(false);
-                  }}
-                />
-              )}
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="limiteurCheckbox"
-                  checked={limiteurInstalle}
-                  onChange={(e) => setLimiteurInstalle(e.target.checked)}
-                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-                />
-                <label htmlFor="limiteurCheckbox" className="font-medium text-[11px] text-slate-600 dark:text-slate-400">
-                  Dispositif limiteur de son homologué présent
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={extincteursPresents}
+                    onChange={(e) => setExtincteursPresents(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">Extincteurs certifiés & fonctionnels</span>
                 </label>
+
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={issuesSecoursDegagees}
+                    onChange={(e) => setIssuesSecoursDegagees(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">Issues de secours dégagées & balisées</span>
+                </label>
+
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hygieneSanitaires}
+                    onChange={(e) => setHygieneSanitaires(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">Hygiène des sanitaires & eau courante</span>
+                </label>
+
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aerationVentilation}
+                    onChange={(e) => setAerationVentilation(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">Aération, ventilation & salubrité</span>
+                </label>
+
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gestionDechets}
+                    onChange={(e) => setGestionDechets(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">Gestion des déchets & poubelles fermées</span>
+                </label>
+
+                <label className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={trousseSecours}
+                    onChange={(e) => setTrousseSecours(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-slate-700 dark:text-slate-300">Trousse de premiers secours d'urgence</span>
+                </label>
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <label className="text-[10px] text-slate-500 block font-medium">Observations de contrôle HSE (constats in situ) :</label>
+                <input
+                  type="text"
+                  value={observationsHSE}
+                  onChange={(e) => setObservationsHSE(e.target.value)}
+                  placeholder="Ex: Dispositifs de sécurité, hygiène et salubrité conformes aux normes départementales."
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                />
               </div>
             </div>
 
@@ -1718,13 +1804,11 @@ export const FieldRecensementModule: React.FC = () => {
                     onChange={(e) => setEditCategorie(e.target.value as EstablishmentCategory)}
                     className="w-full text-xs px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
                   >
-                    <option value="Bar Dancing / Cabaret">Bar Dancing / Cabaret</option>
-                    <option value="Discothèque / Night-club">Discothèque / Night-club</option>
-                    <option value="Lounge Bar & Terrasse">Lounge Bar & Terrasse</option>
-                    <option value="Snack-Bar Sonorisé">Snack-Bar Sonorisé</option>
-                    <option value="Espace Récréatif & Salle Polyvalente">Espace Récréatif</option>
-                    <option value="Complexe de Loisirs & Piscine">Complexe de Loisirs</option>
-                    <option value="Autre établissement de loisirs">Autre établissement</option>
+                    {OFFICIAL_LEISURE_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

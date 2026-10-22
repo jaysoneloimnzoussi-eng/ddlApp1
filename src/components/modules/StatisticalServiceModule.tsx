@@ -1655,8 +1655,8 @@ export const StatisticalServiceModule: React.FC = () => {
                     {printColumns.adresseExacte && <th className="py-3 px-3.5 font-bold">Adresse</th>}
                     {printColumns.categorie && <th className="py-3 px-3.5 font-bold">Catégorie</th>}
                     {printColumns.surfaceM2 && <th className="py-3 px-3.5 font-bold text-right">Surface</th>}
-                    {printColumns.niveauDecibels && <th className="py-3 px-3.5 font-bold text-center">Décibels</th>}
-                    {printColumns.limiteurInstalle && <th className="py-3 px-3.5 font-bold text-center">Limiteur</th>}
+                    {printColumns.niveauDecibels && <th className="py-3 px-3.5 font-bold text-center">Contrôle HSE</th>}
+                    {printColumns.limiteurInstalle && <th className="py-3 px-3.5 font-bold text-center">Sécurité Incendie</th>}
                     {printColumns.statut && <th className="py-3 px-3.5 font-bold">Statut</th>}
                     {printColumns.telephone && <th className="py-3 px-3.5 font-bold">Contact</th>}
                     <th className="py-3 px-3.5 font-bold text-center">Action</th>
@@ -1734,30 +1734,24 @@ export const StatisticalServiceModule: React.FC = () => {
                           )}
 
                           {printColumns.niveauDecibels && (
-                            <td className="py-3 px-3.5 text-center font-mono whitespace-nowrap">
+                            <td className="py-3 px-3.5 text-center whitespace-nowrap">
                               <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                                (est.niveauDecibelsMoyen || 0) > 85
-                                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                                  : (est.niveauDecibelsMoyen || 0) >= 80
+                                est.controleHSE?.statutHSE === 'conforme'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                  : est.controleHSE?.statutHSE === 'reserves_mineures'
                                   ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                                   : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                               }`}>
-                                {est.niveauDecibelsMoyen || 0} dB
+                                {est.controleHSE?.statutHSE === 'conforme' ? '✓ Conforme HSE' : est.controleHSE?.statutHSE === 'reserves_mineures' ? '⚠ Réserves' : '✓ Conforme'}
                               </span>
                             </td>
                           )}
 
                           {printColumns.limiteurInstalle && (
                             <td className="py-3 px-3.5 text-center whitespace-nowrap">
-                              {est.limiteurInstalle ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  <ShieldCheck className="w-3.5 h-3.5" /> Oui
-                                </span>
-                              ) : (
-                                <span className="text-[11px] font-medium text-slate-400">
-                                  Non
-                                </span>
-                              )}
+                              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                {est.controleHSE?.extincteursPresents ?? true ? '✓ Extincteurs OK' : '✕ Défaut'}
+                              </span>
                             </td>
                           )}
 

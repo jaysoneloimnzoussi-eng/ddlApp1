@@ -44,7 +44,7 @@ export const JointInspectionModule: React.FC = () => {
   ]);
 
   const [selectedEstId, setSelectedEstId] = useState(establishments[0]?.id || '');
-  const [decibels, setDecibels] = useState(72);
+  const [aerationOk, setAerationOk] = useState(true);
   const [hygieneOk, setHygieneOk] = useState(true);
   const [incendieOk, setIncendieOk] = useState(true);
   const [licenceOk, setLicenceOk] = useState(true);
@@ -72,8 +72,15 @@ export const JointInspectionModule: React.FC = () => {
         { administration: 'Mairie de Pointe-Noire', nomRepresentant: 'Agent Contrôleur Salubrité', emargement: true },
         { administration: 'Services d\'Incendie & Secours', nomRepresentant: 'Capitaine Sapeur-Pompier', emargement: true },
       ],
-      conformiteAcoustique: { conforme: decibels <= 75, decibels, observations: decibels <= 75 ? 'Conforme aux normes' : 'Dépassement nocturne' },
-      conformiteHygiene: { conforme: hygieneOk, observations: hygieneOk ? 'Normes sanitaires respectées' : 'Insuffisance sanitaire' },
+      controleHSE: {
+        conforme: incendieOk && hygieneOk && aerationOk,
+        extincteurs: incendieOk,
+        issuesSecours: incendieOk,
+        hygieneSanitaire: hygieneOk,
+        aeration: aerationOk,
+        observations: incendieOk && hygieneOk && aerationOk ? 'Dispositifs HSE et sécurité conformes' : 'Réserves signalées sur site',
+      },
+      conformiteHygiene: { conforme: hygieneOk, observations: hygieneOk ? 'Normes sanitaires et salubrité respectées' : 'Insuffisance sanitaire constatée' },
       securiteIncendie: { conforme: incendieOk, extincteursPresents: incendieOk, issueSecoursDegagee: incendieOk },
       licenceBoissons: { conforme: licenceOk, numeroLicence: licenceOk ? 'LIC-VALIDE' : 'DEFAUT' },
       decisionCommission: decision,
@@ -193,10 +200,10 @@ export const JointInspectionModule: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
                 <span className="text-slate-400 font-semibold block flex items-center gap-1">
-                  <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> Acoustique SAA
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" /> Contrôle HSE & Aération
                 </span>
-                <p className="font-bold text-slate-200">{r.conformiteAcoustique.decibels} dB(A)</p>
-                <p className="text-[11px] text-slate-400">{r.conformiteAcoustique.observations}</p>
+                <p className="font-bold text-slate-200">{r.controleHSE?.conforme ?? true ? 'Conforme HSE' : 'Réserves Notifiées'}</p>
+                <p className="text-[11px] text-slate-400">{r.controleHSE?.observations || 'Ventilation et propreté vérifiées'}</p>
               </div>
 
               <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
@@ -268,13 +275,15 @@ export const JointInspectionModule: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-slate-300 font-semibold">Décibels Mesurés (dB(A))</label>
-                  <input
-                    type="number"
-                    value={decibels}
-                    onChange={(e) => setDecibels(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-mono text-emerald-400 font-bold"
-                  />
+                  <label className="text-slate-300 font-semibold">Aération, Ventilation & Bacs Déchets</label>
+                  <select
+                    value={aerationOk ? 'ok' : 'ko'}
+                    onChange={(e) => setAerationOk(e.target.value === 'ok')}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 font-semibold text-emerald-400"
+                  >
+                    <option value="ok">✓ Conforme (Ventilation & Propreté OK)</option>
+                    <option value="ko">✕ Non conforme (Insalubrité / Aération défaillante)</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-slate-300 font-semibold">Décision de la Commission</label>

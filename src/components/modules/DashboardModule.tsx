@@ -241,7 +241,7 @@ export const DashboardModule: React.FC = () => {
     { code: 'MOD-04', title: 'Google Workspace', count: 'Passerelle Cloud', icon: CloudCog, color: 'text-sky-500' },
     { code: 'MOD-05', title: 'Police Administrative', count: `${legalActs.length} Actes`, icon: Scale, color: 'text-rose-500' },
     { code: 'MOD-06', title: 'Rapports Trimestriels', count: 'Bilans DGL', icon: FileText, color: 'text-teal-500' },
-    { code: 'MOD-07', title: 'SIG & Heatmap Décibels', count: '6 Arrond.', icon: MapPin, color: 'text-cyan-500' },
+    { code: 'MOD-07', title: 'SIG & Cartographie', count: '6 Arrond.', icon: MapPin, color: 'text-cyan-500' },
     { code: 'MOD-08', title: 'Promotion SPA', count: 'Diplômes', icon: Award, color: 'text-amber-500' },
     { code: 'MOD-09', title: 'Soit-Transmis DGL', count: `${soitTransmis.length} Bordereaux`, icon: Send, color: 'text-purple-500' },
     { code: 'MOD-10', title: 'Régie des Recettes', count: `${formatCfa(globalRecettes)}`, icon: Coins, color: 'text-emerald-600' },
@@ -936,9 +936,8 @@ export const DashboardModule: React.FC = () => {
 
                   <div className="flex items-center justify-between text-[10px]">
                     <span>{est.arrondissement}</span>
-                    <span className="font-mono font-bold text-rose-600 flex items-center gap-0.5">
-                      <Volume2 className="w-3 h-3" />
-                      {est.niveauDecibelsMoyen} dB(A)
+                    <span className="font-semibold text-[10px] text-emerald-600 dark:text-emerald-400">
+                      {est.categorie}
                     </span>
                   </div>
 

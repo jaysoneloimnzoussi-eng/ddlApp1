@@ -71,11 +71,14 @@ export const ExecutiveInfographicDashboard: React.FC<Props> = ({
   const totalContentieux = misesEnDemeure + fermesContentieux;
   const tauxContentieuxPct = totalEtabs > 0 ? ((totalContentieux / totalEtabs) * 100).toFixed(1) : '0.0';
 
-  const avgDecibels = useMemo(() => {
-    if (!establishments.length) return 62.4;
-    const sum = establishments.reduce((acc, e) => acc + (e.niveauDecibelsMoyen || 62), 0);
-    return (sum / establishments.length).toFixed(1);
+  const hseConformeCount = useMemo(() => {
+    return establishments.filter(
+      (e) =>
+        e.controleHSE?.statutHSE === 'conforme' ||
+        (e.controleHSE?.extincteursPresents && e.controleHSE?.issuesSecoursDegagees)
+    ).length;
   }, [establishments]);
+  const tauxHsePct = totalEtabs > 0 ? ((hseConformeCount / totalEtabs) * 100).toFixed(1) : '85.0';
 
   // Recettes en Millions
   const recettesEnMillions = (totalRecettes / 1_000_000).toFixed(1);
@@ -282,28 +285,28 @@ export const ExecutiveInfographicDashboard: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* Col 3: Indice Acoustique Moyen */}
+            {/* Col 3: Conformité HSE & Sécurité */}
             <div className="flex flex-col justify-between space-y-3 border-l pl-3 border-slate-100 dark:border-slate-800">
               <div className="flex items-end gap-1.5 h-16 px-1">
-                {[70, 75, 80, 85, 65, 60].map((h, i) => (
+                {[70, 75, 80, 85, 90, 95].map((h, i) => (
                   <div
                     key={i}
                     className={`flex-1 rounded-t transition-all ${
-                      i === 4 || i === 5 ? 'bg-emerald-500' : 'bg-sky-400'
+                      i >= 4 ? 'bg-emerald-500' : 'bg-teal-400'
                     }`}
                     style={{ height: `${h}%` }}
                   />
                 ))}
               </div>
               <div>
-                <div className="text-3xl font-black font-mono text-slate-900 dark:text-white tracking-tight">
-                  {avgDecibels}
+                <div className="text-3xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">
+                  {tauxHsePct}%
                 </div>
                 <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mt-0.5">
-                  dB(A) Acoustique
+                  Conformité HSE
                 </div>
                 <div className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight mt-0.5">
-                  Moyenne sonométrique mesurée (Seuil toléré 65 dB).
+                  Sécurité incendie, aération & hygiène environnementale.
                 </div>
               </div>
             </div>
@@ -979,7 +982,7 @@ export const ExecutiveInfographicDashboard: React.FC<Props> = ({
                 <circle cx="40" cy="40" r="22" fill="none" stroke="#1e40af" strokeWidth="6" strokeDasharray="95 138" transform="rotate(-90 40 40)" />
               </svg>
               <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 mt-1">Concentric Rings</span>
-              <span className="text-[9px] text-slate-400">Régularité / Décibels</span>
+              <span className="text-[9px] text-slate-400">Régularité / Conformité HSE</span>
             </div>
 
             {/* Pie 2: 6-slice segmented pie */}

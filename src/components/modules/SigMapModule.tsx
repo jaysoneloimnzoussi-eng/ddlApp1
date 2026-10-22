@@ -148,23 +148,20 @@ export const SigMapModule: React.FC = () => {
 
       // 1. Acoustic Heatmap circle
       if (showAcousticHeatmap) {
-        const dB = Number(est.niveauDecibelsMoyen) || 60;
         let circleColor = '#10b981';
-        let circleRadius = 150;
-        let fillOpacity = 0.2;
+        let circleRadius = 180;
+        let fillOpacity = 0.25;
 
-        if (dB > 90) {
-          circleColor = '#dc2626';
-          circleRadius = 400;
-          fillOpacity = 0.45;
-        } else if (dB > 75) {
-          circleColor = '#f59e0b';
-          circleRadius = 280;
-          fillOpacity = 0.35;
-        } else if (dB > 70) {
+        if (est.statut === 'en_regle') {
+          circleColor = '#10b981';
+        } else if (est.statut === 'attestation_provisoire') {
           circleColor = '#3b82f6';
-          circleRadius = 200;
-          fillOpacity = 0.25;
+        } else if (est.statut === 'acompte_verse') {
+          circleColor = '#f59e0b';
+        } else {
+          circleColor = '#e11d48';
+          circleRadius = 250;
+          fillOpacity = 0.35;
         }
 
         const circle = L.circle([lat, lng], {
@@ -176,7 +173,7 @@ export const SigMapModule: React.FC = () => {
         });
 
         circle.bindTooltip(
-          `<strong>${est.nomCommercial || 'Établissement'}</strong><br/>Zone sonore: ${dB} dB(A)`,
+          `<strong>${est.nomCommercial || 'Établissement'}</strong><br/>Type: ${est.categorie || 'Bar'}<br/>Statut: ${est.statut}`,
           { sticky: true }
         );
         circlesLayerRef.current?.addLayer(circle);
@@ -204,7 +201,7 @@ export const SigMapModule: React.FC = () => {
             font-weight: bold;
             font-size: 11px;
           ">
-            ${isInItinerary ? `#${waypointIndex + 1}` : (est.niveauDecibelsMoyen || 0) > 80 ? '🔊' : '★'}
+            ${isInItinerary ? `#${waypointIndex + 1}` : '★'}
           </div>
         `,
         iconSize: [28, 28],
@@ -224,8 +221,8 @@ export const SigMapModule: React.FC = () => {
           <div style="margin: 6px 0; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 11px;">
             <strong>Promoteur :</strong> ${est.promoteurNom || 'N/A'}<br/>
             <strong>Tél :</strong> ${est.promoteurTelephone || 'N/A'}<br/>
-            <strong>Décibels :</strong> <span style="font-weight:bold; color: ${(est.niveauDecibelsMoyen || 0) > 80 ? '#dc2626' : '#047857'};">${est.niveauDecibelsMoyen || 60} dB(A)</span><br/>
-            <strong>Limiteur :</strong> ${est.limiteurInstalle ? 'Homologué Présent' : 'Non détecté'}<br/>
+            <strong>Type :</strong> ${est.categorie || 'Bar'}<br/>
+            <strong>Contrôle HSE :</strong> <span style="font-weight:bold; color: #047857;">${est.controleHSE?.statutHSE === 'conforme' ? '✓ Conforme' : 'Régularisation HSE requise'}</span><br/>
             <strong>Statut :</strong> <span style="font-weight:bold; text-transform:uppercase;">${statutStr}</span>
           </div>
           <div style="font-size: 10px; color: #64748b; font-family: monospace;">Réf: ${est.codeDossier || 'DDL-PN-2026'}</div>

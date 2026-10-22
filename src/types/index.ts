@@ -86,6 +86,28 @@ export const QUARTIERS_PAR_ARRONDISSEMENT: Record<Arrondissement, string[]> = {
 };
 
 export type EstablishmentCategory =
+  | 'CAVE'
+  | 'VIP / Club VIP'
+  | 'Lounge Bar'
+  | 'Bar'
+  | 'Night Club'
+  | 'Bar and Grill'
+  | 'Buvette / Snack-bar'
+  | 'Maison de loisirs'
+  | 'Salle de fête'
+  | 'Piscine & Natation'
+  | 'Kermesse & Attractions'
+  | 'Ciné-foot / Vidéo club'
+  | 'Salle de billard & Bowling'
+  | 'Salle de jeux vidéo'
+  | 'Centre & Village de loisirs'
+  | 'Cirque, Carnaval & Foire'
+  | 'Festivals & Activités événementielles'
+  | 'Rallye'
+  | 'Jeux & Loisirs Récréatifs'
+  | 'Loisirs sains (Aires de jeux, Ludothèques - Exonéré)'
+  | 'Autre Établissement de Loisirs'
+  // Compatibilité historique
   | 'Discothèque / Night-club'
   | 'Bar Dancing / Cabaret'
   | 'Lounge Bar & Terrasse'
@@ -93,6 +115,49 @@ export type EstablishmentCategory =
   | 'Snack-Bar Sonorisé'
   | 'Complexe de Loisirs & Piscine'
   | 'Autre établissement de loisirs';
+
+export const OFFICIAL_LEISURE_CATEGORIES = [
+  'CAVE',
+  'VIP / Club VIP',
+  'Lounge Bar',
+  'Bar',
+  'Night Club',
+  'Bar and Grill',
+  'Buvette / Snack-bar',
+  'Maison de loisirs',
+  'Salle de fête',
+  'Piscine & Natation',
+  'Kermesse & Attractions',
+  'Ciné-foot / Vidéo club',
+  'Salle de billard & Bowling',
+  'Salle de jeux vidéo',
+  'Centre & Village de loisirs',
+  'Cirque, Carnaval & Foire',
+  'Festivals & Activités événementielles',
+  'Rallye',
+  'Loisirs sains (Aires de jeux, Ludothèques - Exonéré)',
+  'Autre Établissement de Loisirs',
+] as const;
+
+export const NOTE_151_LEGAL_REFERENCE = {
+  numero: 'Note de Service N° 151/MTL-CAB du 03 août 2022',
+  signataire: 'Ministre Destinée Hermella DOUKAGA',
+  repartition: '50% DDL (Administration des Loisirs pour étude dossier) / 50% Trésor Public',
+  exonerations: ['Aires de jeux', 'Ludothèques', 'Clubs de loisirs', 'Loteries et tombolas à but caritatif'],
+};
+
+export const EXCLUDED_SECTORS_NOTE = "Conformément aux compétences légales de la Direction Départementale des Loisirs (DDL-PN / Note 151/MTL-CAB), les hôtels et restaurants relèvent expressément du Tourisme ou du Commerce et sont exclus du champ d'imposition des loisirs.";
+
+export interface ControleHSE {
+  extincteursPresents: boolean;
+  issuesSecoursDegagees: boolean;
+  aerationVentilation: boolean;
+  hygieneSanitaires: boolean;
+  gestionDechets: boolean;
+  trousseSecours: boolean;
+  statutHSE: 'conforme' | 'reserves_mineures' | 'non_conforme';
+  observationsHSE?: string;
+}
 
 export type ComplianceStatus =
   | 'en_regle'              // Vert : Soldé / Autorisé
@@ -166,8 +231,9 @@ export interface Establishment {
   statut: ComplianceStatus;
   latitude: number;
   longitude: number;
-  niveauDecibelsMoyen: number; // dB(A)
-  limiteurInstalle: boolean;
+  controleHSE?: ControleHSE;
+  niveauDecibelsMoyen?: number; // dB(A) - Optionnel / non exigé DDL-PN
+  limiteurInstalle?: boolean;   // Optionnel
   dateRecensement: string;
   recensePar: string; // Nom de l'agent ou brigade
 
@@ -244,7 +310,7 @@ export interface CashReceipt {
 
 export interface LegalAct {
   id: string;
-  type: 'mise_en_demeure' | 'arrete_fermeture' | 'pv_sonometrie' | 'ordre_mission';
+  type: 'mise_en_demeure' | 'arrete_fermeture' | 'pv_controle_hse' | 'pv_sonometrie' | 'ordre_mission';
   referenceNumero: string;
   dateEmission: string;
   etablissementId: string;
@@ -271,7 +337,7 @@ export interface InspectionSchedule {
   brigadeAssignee: string;
   inspecteurChef: string;
   agentId: string; // ID exclusif de l'agent
-  typeMission: 'Recouvrement' | 'Contrôle Décibels' | 'Signification Mise en Demeure' | 'Vérification Agréments' | 'Renouvellement Annuel N+1';
+  typeMission: 'Recouvrement' | 'Contrôle HSE & Sécurité' | 'Contrôle Décibels' | 'Signification Mise en Demeure' | 'Vérification Agréments' | 'Renouvellement Annuel N+1';
   statut: 'planifie' | 'en_cours' | 'effectue' | 'annule';
   googleCalendarEventId?: string;
   notes?: string;
@@ -339,13 +405,21 @@ export interface JointInspectionReport {
     nomRepresentant: string;
     emargement: boolean;
   }[];
-  conformiteAcoustique: { conforme: boolean; decibels: number; observations: string };
+  controleHSE?: {
+    conforme: boolean;
+    extincteurs: boolean;
+    issuesSecours: boolean;
+    hygieneSanitaire: boolean;
+    aeration: boolean;
+    observations: string;
+  };
   conformiteHygiene: { conforme: boolean; observations: string };
   securiteIncendie: { conforme: boolean; extincteursPresents: boolean; issueSecoursDegagee: boolean };
   licenceBoissons: { conforme: boolean; numeroLicence: string };
   decisionCommission: 'Avis Favorable' | 'Avertissement avec Délai' | 'Fermeture Provisoire Proposée';
   recommandations: string;
   hash: string;
+  conformiteAcoustique?: { conforme: boolean; decibels: number; observations: string };
 }
 
 export interface SoitTransmisDgl {

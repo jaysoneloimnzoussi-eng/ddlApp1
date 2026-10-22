@@ -14,15 +14,19 @@ if (typeof window !== 'undefined') {
 
 // Register Service Worker for 100% offline access & PWA precaching
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  registerSW({
-    immediate: true,
-    onNeedRefresh() {
-      console.log('Nouvelle version de DDL-PN disponible.');
-    },
-    onOfflineReady() {
-      console.log('Application DDL-PN prête pour le fonctionnement 100% hors-ligne.');
-    },
-  });
+  try {
+    registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        console.log('Nouvelle version de DDL-PN disponible.');
+      },
+      onOfflineReady() {
+        console.log('Application DDL-PN prête pour le fonctionnement 100% hors-ligne.');
+      },
+    });
+  } catch (err) {
+    console.warn('Service worker registration skipped in dev mode:', err);
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

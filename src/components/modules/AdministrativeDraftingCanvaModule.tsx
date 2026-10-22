@@ -30,7 +30,7 @@ import { printHtmlElement } from '../../services/printService';
 import { generateUniversalAdministrativeDocx, generatePta2026Docx } from '../../services/docxGenerator';
 import { generateAttestationQrCode, getAttestationVerificationUrl } from '../../services/qrService';
 import { formatCfa } from '../../services/crypto';
-import { Arrondissement, EstablishmentCategory, QUARTIERS_PAR_ARRONDISSEMENT } from '../../types';
+import { Arrondissement, EstablishmentCategory, QUARTIERS_PAR_ARRONDISSEMENT, OFFICIAL_LEISURE_CATEGORIES } from '../../types';
 import { Pta2026CanvaEditor, Pta2026CanvaPreview } from './Pta2026CanvaSection';
 
 export type AdminDocType =
@@ -96,7 +96,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
     codeDossier: 'DDL-PN-2026-REC-042',
     arrondissement: 'Tié-Tié',
     quartier: 'Fond Tié-Tié',
-    categorie: 'Bar Dancing / Cabaret',
+    categorie: 'Bar',
   });
 
   // Mode de gestion établissement dans le Canva
@@ -110,7 +110,7 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
   const [newEstTelephone, setNewEstTelephone] = useState<string>('');
   const [newEstArrondissement, setNewEstArrondissement] = useState<Arrondissement>('Tié-Tié');
   const [newEstQuartier, setNewEstQuartier] = useState<string>('Fond Tié-Tié');
-  const [newEstCategorie, setNewEstCategorie] = useState<EstablishmentCategory>('Bar Dancing / Cabaret');
+  const [newEstCategorie, setNewEstCategorie] = useState<EstablishmentCategory>('Bar');
   const [isSavingNewEst, setIsSavingNewEst] = useState<boolean>(false);
 
   // Sections of document body (Modèle sans statut de loi non vérifié)
@@ -1085,13 +1085,11 @@ export const AdministrativeDraftingCanvaModule: React.FC = () => {
                         onChange={(e) => setNewEstCategorie(e.target.value as EstablishmentCategory)}
                         className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-xs"
                       >
-                        <option value="Bar Dancing / Cabaret">Bar Dancing / Cabaret</option>
-                        <option value="Discothèque / Night-club">Discothèque / Night-club</option>
-                        <option value="Lounge Bar & Terrasse">Lounge Bar & Terrasse</option>
-                        <option value="Snack-Bar Sonorisé">Snack-Bar Sonorisé</option>
-                        <option value="Espace Récréatif & Salle Polyvalente">Espace Récréatif & Salle Polyvalente</option>
-                        <option value="Complexe de Loisirs & Piscine">Complexe de Loisirs & Piscine</option>
-                        <option value="Autre établissement de loisirs">Autre établissement de loisirs</option>
+                        {OFFICIAL_LEISURE_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
                       </select>
                     </div>
 

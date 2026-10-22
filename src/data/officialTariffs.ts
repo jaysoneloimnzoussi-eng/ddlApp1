@@ -387,12 +387,41 @@ export function computeOfficialFees(
   surfaceM2: number = 0,
   includeEnqueteFee: boolean = true
 ): FeeCalculationResult {
+  const norm = (tariffIdOrLibelle || '').toLowerCase().trim();
+
+  // Mapping direct des catégories réelles DDL-PN vers les rubriques tarifaires officielles (Note 151/MTL-CAB)
+  let resolvedId = '';
+  if (norm === 'cave' || norm.includes('cave')) resolvedId = 'tar-cave'; // 1 000 FCFA/m²
+  else if (norm.includes('vip')) resolvedId = 'tar-night-club-vip'; // 1 500 FCFA/m²
+  else if (norm.includes('night club') || norm.includes('night-club') || norm.includes('discoth')) resolvedId = 'tar-discotheque'; // 1 500 FCFA/m²
+  else if (norm.includes('lounge')) resolvedId = 'tar-discotheque'; // 1 500 FCFA/m²
+  else if (norm.includes('bar and grill') || norm.includes('grill')) resolvedId = 'tar-bar-dancing'; // 1 000 FCFA/m²
+  else if (norm === 'bar' || norm.includes('dancing') || norm.includes('cabaret')) resolvedId = 'tar-bar-dancing'; // 1 000 FCFA/m²
+  else if (norm.includes('buvette') || norm.includes('snack')) resolvedId = 'tar-buvette'; // 1 000 FCFA/m²
+  else if (norm.includes('maison')) resolvedId = 'tar-maisons-loisirs'; // 100 000 FCFA
+  else if (norm.includes('salle de fête') || norm.includes('salle de fete')) resolvedId = 'tar-complexe-loisirs'; // 100 000 FCFA
+  else if (norm.includes('festival') || norm.includes('événementiel') || norm.includes('evenementiel')) resolvedId = 'tar-festival'; // 50 000 FCFA
+  else if (norm.includes('piscine') || norm.includes('natation') || norm.includes('aquatique')) resolvedId = 'tar-parc-aquatique'; // 100 000 FCFA
+  else if (norm.includes('kermess') || norm.includes('attraction') || norm.includes('foraine')) resolvedId = 'tar-kermesse'; // 50 000 FCFA
+  else if (norm.includes('cirque')) resolvedId = 'tar-cirque'; // 50 000 FCFA
+  else if (norm.includes('carnaval')) resolvedId = 'tar-carnaval'; // 50 000 FCFA
+  else if (norm.includes('foire')) resolvedId = 'tar-foire'; // 50 000 FCFA
+  else if (norm.includes('ciné-foot') || norm.includes('cine-foot') || norm.includes('vidéo club') || norm.includes('video club')) resolvedId = 'tar-cine-foot'; // 50 000 FCFA
+  else if (norm.includes('jeux vidéo') || norm.includes('jeux video')) resolvedId = 'tar-jeux-video'; // 5 000 FCFA/m²
+  else if (norm.includes('bowling')) resolvedId = 'tar-bowling'; // 500 000 FCFA
+  else if (norm.includes('billard')) resolvedId = 'tar-billard'; // 500 000 FCFA
+  else if (norm.includes('centre') || norm.includes('village')) resolvedId = 'tar-centre-vacances'; // 100 000 FCFA
+  else if (norm.includes('rallye')) resolvedId = 'tar-rallye'; // 50 000 FCFA
+  else if (norm.includes('exonér') || norm.includes('exoner') || norm.includes('ludoth') || norm.includes('aire de jeux')) resolvedId = 'tar-exo-aires-jeux'; // 0 FCFA
+  else if (norm.includes('jeux')) resolvedId = 'tar-billard';
+
   const item =
+    (resolvedId && OFFICIAL_TARIFFS.find((t) => t.id === resolvedId)) ||
     OFFICIAL_TARIFFS.find(
       (t) =>
         t.id === tariffIdOrLibelle ||
-        t.libelle.toLowerCase() === tariffIdOrLibelle.toLowerCase() ||
-        t.code.toLowerCase() === tariffIdOrLibelle.toLowerCase()
+        t.libelle.toLowerCase() === norm ||
+        t.code.toLowerCase() === norm
     ) ||
     OFFICIAL_TARIFFS.find((t) => t.id === 'tar-bar-dancing')!;
 

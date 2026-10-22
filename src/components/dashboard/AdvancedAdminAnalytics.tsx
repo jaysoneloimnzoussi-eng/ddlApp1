@@ -61,10 +61,10 @@ export const AdvancedAdminAnalytics: React.FC<Props> = ({ establishments, receip
       const attestation = etabs.filter((e) => e.statut === 'attestation_provisoire').length;
       const miseEnDemeure = etabs.filter((e) => e.statut === 'mise_en_demeure').length;
       const eteintsOuFermes = etabs.filter((e) => e.estEteintOuFerme || e.statut === 'ferme_contentieux').length;
-      const actifs = etabs.length - eteintsOuFermes;
-      const decibelsMoyens = etabs.length > 0
-        ? Math.round(etabs.reduce((s, e) => s + (e.niveauDecibelsMoyen || 65), 0) / etabs.length)
-        : 65;
+      const hseConformes = etabs.filter(
+        (e) => e.controleHSE?.statutHSE === 'conforme' || e.controleHSE?.extincteursPresents
+      ).length;
+      const tauxHse = etabs.length > 0 ? Math.round((hseConformes / etabs.length) * 100) : 100;
 
       return {
         arrondissement: arr,
@@ -78,7 +78,7 @@ export const AdvancedAdminAnalytics: React.FC<Props> = ({ establishments, receip
         attestation,
         miseEnDemeure,
         tauxRecouvrement: montantTotal > 0 ? Math.round((montantEncaisse / montantTotal) * 100) : 0,
-        decibelsMoyens,
+        tauxHse,
       };
     });
   }, [establishments, receipts]);
@@ -822,8 +822,8 @@ export const AdvancedAdminAnalytics: React.FC<Props> = ({ establishments, receip
                       <div className="text-xs font-bold font-mono text-rose-500">{arr.eteintsOuFermes}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-500 uppercase">Décibels</div>
-                      <div className="text-xs font-bold font-mono text-cyan-500">{arr.decibelsMoyens} dB</div>
+                      <div className="text-[10px] text-slate-500 uppercase">HSE Conforme</div>
+                      <div className="text-xs font-bold font-mono text-emerald-500">{arr.tauxHse}%</div>
                     </div>
                   </div>
                 </div>

@@ -7,18 +7,16 @@ import {
   Shield,
   FileCheck2,
   Plus,
-  Volume2,
   Printer,
   Calendar,
   Lock,
-  Radio,
   Building,
   CheckCircle2,
   Download,
+  ShieldCheck,
 } from 'lucide-react';
 import { LegalAct, Arrondissement } from '../../types';
 import { CountdownTimer72h } from '../common/CountdownTimer72h';
-import { SonometerTool } from '../common/SonometerTool';
 import { generateLegalActDocx } from '../../services/docxGenerator';
 
 export const LegalActsGeneratorModule: React.FC = () => {
@@ -40,11 +38,10 @@ export const LegalActsGeneratorModule: React.FC = () => {
   const [selectedActType, setSelectedActType] = useState<LegalAct['type']>('mise_en_demeure');
   const [selectedEstId, setSelectedEstId] = useState(establishments[0]?.id || '');
   const [motifs, setMotifs] = useState(
-    'Dépassement anormal des seuils sonores autorisés de nuit (mesure sonométrique supérieure à 85 dB(A)) et défaut d\'installation du limiteur homologué.'
+    'Défaut d\'autorisation départementale d\'exploitation et manquements graves aux normes d\'Hygiène, Sécurité et Environnement (HSE) constatés in situ.'
   );
   const [delaiHeures, setDelaiHeures] = useState<number>(72);
-  const [decibelsMesures, setDecibelsMesures] = useState<number>(88);
-  const [showSonometer, setShowSonometer] = useState<boolean>(false);
+  const [manquementHSE, setManquementHSE] = useState<string>('securite_incendie');
   const [inspecteur1, setInspecteur1] = useState('Gildas Ambetos (Inspecteur Chef SAA)');
   const [inspecteur2, setInspecteur2] = useState('Patrice Bitemo (Inspecteur SAA)');
 
@@ -66,7 +63,6 @@ export const LegalActsGeneratorModule: React.FC = () => {
       motifs,
       delaiHeures: selectedActType === 'mise_en_demeure' ? delaiHeures : undefined,
       expireAt: selectedActType === 'mise_en_demeure' ? expireDate.toISOString() : undefined,
-      decibelsMesures: Number(decibelsMesures),
       inspecteursAssermentes: [inspecteur1, inspecteur2].filter(Boolean),
       statutExecution: 'actif',
     });
@@ -186,12 +182,10 @@ export const LegalActsGeneratorModule: React.FC = () => {
                   <p className="text-slate-300 leading-relaxed text-[11px] line-clamp-3">
                     {act.motifs}
                   </p>
-                  {act.decibelsMesures && (
-                    <div className="flex items-center gap-1.5 font-mono text-red-400 font-bold text-xs pt-1 border-t border-slate-800">
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>Relevé Sonométrique : {act.decibelsMesures} dB(A)</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 font-semibold text-emerald-400 text-[11px] pt-1 border-t border-slate-800">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Contrôle Police Administrative & Régularisation HSE</span>
+                  </div>
                 </div>
 
                 {/* 72H Countdown component if active */}
@@ -295,31 +289,30 @@ export const LegalActsGeneratorModule: React.FC = () => {
                 />
               </div>
 
-              {/* Sonomètre Tool */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-slate-300 font-semibold">
-                    Mesure Sonométrique : <span className="font-mono text-red-400 font-bold">{decibelsMesures} dB(A)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowSonometer(!showSonometer)}
-                    className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1"
-                  >
-                    <Radio className="w-3 h-3" />
-                    <span>{showSonometer ? 'Masquer' : 'Ajuster avec Sonomètre'}</span>
-                  </button>
+              {/* Motifs Rapides Hygiène, Sécurité et Réglementation */}
+              <div className="space-y-1.5 p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Insérer un motif type (Contrôle Hygiène, Sécurité & Droits) :</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: 'Défaut agrément', text: "Défaut d'agrément et d'autorisation départementale d'exploitation des loisirs malgré mise en demeure préalable." },
+                    { label: 'Sécurité Incendie', text: "Manquement grave aux normes de sécurité incendie : absence d'extincteurs en état de validité et issues de secours obstruées." },
+                    { label: 'Hygiène & Salubrité', text: "Insalubrité notoire des installations sanitaires et défaut d'évacuation conforme des déchets solides et liquides." },
+                    { label: 'Aération insuffisante', text: "Défaut de ventilation et d'aération suffisante créant un risque sanitaire pour le public et le personnel." },
+                    { label: 'Non-paiement redevances', text: "Refus caractérisé de paiement des redevances départementales d'exploitation et de comparution aux convocations." },
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setMotifs(preset.text)}
+                      className="px-2 py-1 rounded text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                    >
+                      + {preset.label}
+                    </button>
+                  ))}
                 </div>
-
-                {showSonometer && (
-                  <SonometerTool
-                    initialDb={decibelsMesures}
-                    onCaptureDecibels={(db) => {
-                      setDecibelsMesures(db);
-                      setShowSonometer(false);
-                    }}
-                  />
-                )}
               </div>
 
               {selectedActType === 'mise_en_demeure' && (

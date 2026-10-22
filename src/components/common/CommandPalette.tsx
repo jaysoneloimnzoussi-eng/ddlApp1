@@ -197,13 +197,13 @@ export const CommandPalette: React.FC = () => {
       id: 'mod-07',
       category: 'modules',
       code: 'MOD-07',
-      title: 'SIG & Heatmap Décibels',
-      subtitle: 'Cartographie interactive des 6 arrondissements & sonométrie sonore légale',
+      title: 'SIG & Cartographie Territoriale',
+      subtitle: 'Cartographie interactive des 6 arrondissements & conformité territoriale',
       icon: Map,
-      keywords: ['sig', 'carte', 'map', 'heatmap', 'decibels', 'sonometre', 'bruit', 'arrondissements', 'lumumba', 'mvoumvou', 'tie-tie', 'loandjili', 'mongo-mpoukou', 'ngoyo', 'cartographie'],
+      keywords: ['sig', 'carte', 'map', 'arrondissements', 'lumumba', 'mvoumvou', 'tie-tie', 'loandjili', 'mongo-mpoukou', 'ngoyo', 'cartographie', 'geolocalisation'],
       action: () => {
         setActiveModule('MOD-07');
-        showNotification('info', 'Module ouvert : MOD-07 SIG & Heatmap Décibels');
+        showNotification('info', 'Module ouvert : MOD-07 SIG & Cartographie Territoriale');
       },
       isActive: activeModule === 'MOD-07',
     },

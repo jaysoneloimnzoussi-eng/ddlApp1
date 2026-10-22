@@ -175,13 +175,6 @@ export const MobileAgentCalendarModule: React.FC = () => {
   }, [visibleEstablishments, establishments]);
 
   useEffect(() => {
-    if (!createEstId && availableEstablishments.length > 0) {
-      setCreateEstId(availableEstablishments[0].id);
-      setCreateMontantAPayer(availableEstablishments[0].soldeRestantDu > 0 ? availableEstablishments[0].soldeRestantDu : 50000);
-    }
-  }, [availableEstablishments, createEstId]);
-
-  useEffect(() => {
     if (createEstId) {
       const selected = availableEstablishments.find((e) => e.id === createEstId);
       if (selected && !isCustomEst) {

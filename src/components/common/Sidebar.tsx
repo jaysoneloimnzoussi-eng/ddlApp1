@@ -117,7 +117,7 @@ export const Sidebar: React.FC = () => {
     },
     {
       code: 'MOD-07',
-      nomCourt: 'SIG & Heatmap Décibels',
+      nomCourt: 'SIG & Cartographie',
       nomComplet: 'Cartographie des 6 Arrondissements',
       icon: Map,
       section: 'Opérations de Terrain & SIG',
