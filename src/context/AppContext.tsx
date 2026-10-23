@@ -2914,7 +2914,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (permissionDeniedOccurred) {
         showNotification(
           'error',
-          "Permissions insuffisantes dans Firebase : Dans l'onglet Règles (Rules) de votre console Firebase, remplacez les règles par 'allow read, write: if true;' et cliquez sur Publier, ou connectez-vous avec votre compte Google Jacks.matoko@gmail.com."
+          "Permissions Firebase insuffisantes. Vérifiez que le compte connecté possède les custom claims et le profil DDL-PN requis ; ne rendez jamais Firestore public."
         );
       }
     } catch (err: any) {
@@ -2923,7 +2923,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (isPermission) {
         showNotification(
           'error',
-          "Permissions Firebase insuffisantes : Veuillez cliquer sur Publier dans vos Règles Firestore ou vous connecter avec Jacks.matoko@gmail.com."
+          "Permissions Firebase insuffisantes. Vérifiez les custom claims du compte connecté et les règles Firestore publiées."
         );
       } else {
         showNotification('error', `Erreur de synchronisation Firestore : ${err?.message}`);
@@ -3042,7 +3042,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (isPermission && !isSilent) {
           showNotification(
             'error',
-            "Accès refusé par Firebase (Permissions insuffisantes) : Cliquez sur Publier dans vos Règles Firestore ou connectez-vous avec Jacks.matoko@gmail.com."
+            "Accès refusé par Firebase : vérifiez les custom claims et l’affectation de l’agent, sans assouplir les règles Firestore."
           );
         } else if (!isSilent) {
           showNotification(
