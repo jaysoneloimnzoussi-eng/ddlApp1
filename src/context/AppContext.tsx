@@ -42,6 +42,11 @@ import {
 import { computeSha256, formatCfa } from '../services/crypto';
 import { parseGoogleCalendarEvent } from '../services/googleWorkspace';
 import {
+  assertAuthorisationCanBeDelivered,
+  calculatePaymentState,
+  hasActiveScheduleConflict,
+} from '../services/workflow';
+import {
   initAuth,
   googleSignIn,
   logout as firebaseLogout,
@@ -1583,6 +1588,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addReceipt = async (
     recData: Omit<CashReceipt, 'id' | 'numeroQuittance' | 'quittanceHash'>
   ): Promise<CashReceipt> => {
+    let establishment = establishments.find((est) => est.id === recData.etablissementId);
+    // Imports can create an establishment and its first receipt in the same
+    // event loop.  State has not necessarily re-rendered yet, so use the
+    // persisted canonical draft as a short-lived fallback.
+    if (!establishment) {
+      try {
+        const persisted = JSON.parse(localStorage.getItem('ddl_real_establishments_v5') || '[]') as Establishment[];
+        establishment = persisted.find((est) => est.id === recData.etablissementId);
+      } catch {
+        // The regular not-found error below is clearer than a storage error.
+      }
+    }
+    if (!establishment) {
+      throw new Error('Impossible d’enregistrer un paiement pour un établissement introuvable.');
+    }
+    if (
+      recData.referenceTransaction &&
+      receipts.some(
+        (receipt) =>
+          receipt.etablissementId === recData.etablissementId &&
+          receipt.referenceTransaction === recData.referenceTransaction,
+      )
+    ) {
+      throw new Error('Cette référence de transaction a déjà été enregistrée pour cet établissement.');
+    }
+    const paymentState = calculatePaymentState(establishment, recData.montantVerse);
+
     const count = receipts.length + 1;
     const numeroQuittance = `QUIT-2026-${count.toString().padStart(5, '0')}`;
     const datePaiement = recData.datePaiement || new Date().toISOString().substring(0, 10);
@@ -1623,17 +1655,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setEstablishments((prev) =>
       prev.map((est) => {
         if (est.id === recData.etablissementId) {
-          const nouveauTotal = (est.montantEncaisse || 0) + recData.montantVerse;
-          const redevance = est.montantRedevanceAnnuelle || 60000;
-          const solde = Math.max(0, redevance - nouveauTotal);
-          // L'attestation n'est pas automatique : seul le solde complet confère 'en_regle', sinon conserve le statut actuel
-          const statut = solde === 0 ? 'en_regle' : (est.statut === 'attestation_provisoire' ? 'attestation_provisoire' : est.statut || 'mise_en_demeure');
+          const { montantEncaisse, soldeRestantDu, statut } = paymentState;
           const premierAcompte = est.premierAcompteDate || (recData.datePaiement ? recData.datePaiement.substring(0, 10) : new Date().toISOString().substring(0, 10));
 
           // Logique d'autorisation annuelle renouvelable (Loi N° 21-2019) :
           // L'échéance du prochain paiement est exactement 1 an après le jour du 1er acompte ou du solde
           let renouvellementAnnuelDate = est.renouvellementAnnuelDate;
-          if (solde === 0 && !renouvellementAnnuelDate) {
+          if (soldeRestantDu === 0 && !renouvellementAnnuelDate) {
             const baseDate = new Date(premierAcompte);
             baseDate.setFullYear(baseDate.getFullYear() + 1);
             renouvellementAnnuelDate = baseDate.toISOString().substring(0, 10);
@@ -1646,17 +1674,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             quittanceNumero: numeroQuittance,
             modePaiement: recData.modePaiement,
             agentNom: recData.inspecteurOuCaissier,
-            observations: `Paiement ${formatCfa(recData.montantVerse)} enregistré. Reste dû : ${formatCfa(solde)}.`,
+            observations: `Paiement ${formatCfa(recData.montantVerse)} enregistré. Reste dû : ${formatCfa(soldeRestantDu)}.`,
           };
 
           return {
             ...est,
-            montantEncaisse: nouveauTotal,
-            soldeRestantDu: solde,
+            montantEncaisse,
+            soldeRestantDu,
             statut,
             premierAcompteDate: premierAcompte,
             renouvellementAnnuelDate,
-            prochainRdvDate: solde === 0 ? (renouvellementAnnuelDate || est.prochainRdvDate) : est.prochainRdvDate,
+            prochainRdvDate: soldeRestantDu === 0 ? (renouvellementAnnuelDate || est.prochainRdvDate) : est.prochainRdvDate,
             historiquePaiements: [historyItem, ...(est.historiquePaiements || [])],
           };
         }
@@ -1716,6 +1744,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!est) {
       throw new Error("Établissement non trouvé");
     }
+    const paymentState = calculatePaymentState(est, montantVerse);
 
     const activeAgent = currentAgent || staff.find((s) => s.id === est.agentAssigneId) || staff[1];
 
@@ -1727,7 +1756,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       promoteurNom: est.promoteurNom,
       arrondissement: est.arrondissement,
       montantVerse,
-      resteAPayer: Math.max(0, est.soldeRestantDu - montantVerse),
+      resteAPayer: paymentState.soldeRestantDu,
       modePaiement,
       referenceTransaction: `ACPT-${Date.now().toString().slice(-4)}`,
       inspecteurOuCaissier: activeAgent.nomComplet,
@@ -1744,11 +1773,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    const soldeApresPaiement = Math.max(0, est.soldeRestantDu - montantVerse);
-    const nouveauMontantEncaisse = (est.montantEncaisse || 0) + montantVerse;
-    const nouveauStatut: ComplianceStatus = soldeApresPaiement === 0
-      ? 'en_regle'
-      : (est.statut === 'attestation_provisoire' ? 'attestation_provisoire' : est.statut || 'mise_en_demeure');
+    const soldeApresPaiement = paymentState.soldeRestantDu;
 
     let nextSchedule: InspectionSchedule | undefined = undefined;
 
@@ -1774,9 +1799,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prochainRdvDate: nextRdvDate,
         prochainRdvHeure: nextRdvHeure,
         prochainRdvMotif: nextRdvMotif,
-        montantEncaisse: nouveauMontantEncaisse,
-        soldeRestantDu: soldeApresPaiement,
-        statut: nouveauStatut,
       });
 
       showNotification(
@@ -1814,9 +1836,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         prochainRdvDate: nextYearDate,
         prochainRdvHeure: '10:00',
         prochainRdvMotif: `Reconduction annuelle exercice N+1`,
-        montantEncaisse: nouveauMontantEncaisse,
-        soldeRestantDu: 0,
-        statut: 'en_regle',
       });
 
       showNotification(
@@ -2206,6 +2225,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addSchedule = async (schData: Omit<InspectionSchedule, 'id'>): Promise<InspectionSchedule> => {
+    const duplicate = schedules.find((schedule) =>
+      (schedule.statut === 'planifie' || schedule.statut === 'en_cours') &&
+      schedule.etablissementId === schData.etablissementId &&
+      schedule.dateTournee === schData.dateTournee &&
+      schedule.heure === schData.heure &&
+      schedule.typeMission === schData.typeMission,
+    );
+    if (duplicate) {
+      return duplicate;
+    }
+
     // Resolve agent properly so schedule is NEVER orphaned
     const fallbackAgent = staff.find((s) => s.service === 'SAA') || staff[1] || staff[0];
     const resolvedAgentId = (schData.agentId && schData.agentId !== 'stf-002')
@@ -2251,6 +2281,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSchedule = async (id: string, updates: Partial<InspectionSchedule>) => {
+    const existing = schedules.find((schedule) => schedule.id === id);
+    if (existing) {
+      const candidate = { ...existing, ...updates };
+      if (hasActiveScheduleConflict(schedules, candidate, id)) {
+        throw new Error('Un rendez-vous actif identique existe déjà pour cet établissement.');
+      }
+    }
+
     setSchedules((prev) => {
       const updated = prev.map((sch) => (sch.id === id ? { ...sch, ...updates } : sch));
       try {
@@ -2413,11 +2451,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         // Create NEW Establishment -> GROWS THE GENERAL DATABASE!
         // L'attestation n'est pas automatique : par défaut 'mise_en_demeure' (en attente de dépôt de dossier physique)
-        const status: ComplianceStatus = parsed.estFerme
-          ? 'ferme_contentieux'
-          : (parsed.soldeRestantDu === 0 && parsed.montantAcompte > 0
-              ? 'en_regle'
-              : 'mise_en_demeure');
+        const initialRedevance = parsed.montantRedevanceAnnuelle || 60000;
+        // The payment is inserted below through addReceipt.  Starting with a
+        // zero balance avoids counting the same imported deposit twice.
+        const status: ComplianceStatus = parsed.estFerme ? 'ferme_contentieux' : 'mise_en_demeure';
 
         const newEst = await addEstablishment({
           nomCommercial: (parsed.nomCommercial || 'Établissement SAA').toString().trim(),
@@ -2430,9 +2467,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           categorie: parsed.categorie || 'Bar Dancing / Cabaret',
           regimeFiscal: 'informel_forfaitaire',
           surfaceM2: 80,
-          montantRedevanceAnnuelle: parsed.montantRedevanceAnnuelle || 60000,
-          montantEncaisse: parsed.montantAcompte || 0,
-          soldeRestantDu: parsed.soldeRestantDu || 0,
+          montantRedevanceAnnuelle: initialRedevance,
+          montantEncaisse: 0,
+          soldeRestantDu: initialRedevance,
           statut: status,
           latitude: -4.78 + (Math.random() - 0.5) * 0.05,
           longitude: 11.87 + (Math.random() - 0.5) * 0.05,
@@ -2542,6 +2579,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const issueDepartmentalAuthorization = async (
     authData: Omit<DepartmentalAuthorization, 'id' | 'numeroAutorisation' | 'documentHash'>
   ): Promise<DepartmentalAuthorization> => {
+    const establishment = establishments.find((item) => item.id === authData.etablissementId);
+    if (!establishment) {
+      throw new Error('L’établissement lié à cette autorisation est introuvable.');
+    }
+    assertAuthorisationCanBeDelivered(establishment);
+    if (authorizations.some((item) => item.etablissementId === establishment.id && item.statut !== 'revoque')) {
+      throw new Error('Un dossier d’autorisation existe déjà pour cet établissement.');
+    }
+    const canDeliverImmediately = authData.signatureDirecteur.typeSignataire === 'chef_saa_po'
+      ? currentUserRole === 'directeur' || currentUserRole === 'administrateur' || currentUserRole === 'inspecteur_saa'
+      : currentUserRole === 'directeur' || currentUserRole === 'administrateur';
+    if (authData.statut === 'delivre' && !canDeliverImmediately) {
+      throw new Error('Votre rôle ne permet pas de délivrer cette autorisation signée.');
+    }
+
     const count = authorizations.length + 1;
     const numeroAutorisation = `AUT-2026/DDL-PN/${String(count).padStart(3, '0')}`;
     const hash = await computeSha256(
@@ -2565,8 +2617,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Firestore departmental authorization error:', e);
     }
 
-    // Mettre à jour le statut de l'établissement
-    if (authData.etablissementId) {
+    // A draft does not regularise an establishment.  The title becomes active
+    // only when it is actually delivered with a valid signature.
+    if (authData.statut === 'delivre' && authData.signatureDirecteur.signe) {
       updateEstablishment(authData.etablissementId, {
         statut: 'en_regle',
         numeroAttestation: numeroAutorisation,
@@ -2595,6 +2648,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     typeSignature: 'directeur' | 'chef_saa_po' = 'directeur',
     qualitePersonnalisee?: string
   ) => {
+    const authorization = authorizations.find((item) => item.id === authId);
+    if (!authorization) {
+      throw new Error('Autorisation introuvable.');
+    }
+    const establishment = establishments.find((item) => item.id === authorization.etablissementId);
+    if (!establishment) {
+      throw new Error('Établissement lié à cette autorisation introuvable.');
+    }
+    assertAuthorisationCanBeDelivered(establishment);
+    if (authorization.statut === 'revoque') {
+      throw new Error('Une autorisation révoquée ne peut pas être signée.');
+    }
+    const canSign = typeSignature === 'directeur'
+      ? currentUserRole === 'directeur' || currentUserRole === 'administrateur'
+      : currentUserRole === 'directeur' || currentUserRole === 'administrateur' || currentUserRole === 'inspecteur_saa';
+    if (!canSign) {
+      throw new Error('Votre rôle ne permet pas d’apposer cette signature.');
+    }
+
     const today = new Date().toISOString().substring(0, 10);
     let targetNom = '';
     let targetNum = '';
@@ -2645,6 +2717,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('Firestore update sign authorization error:', e);
     }
+
+    await updateEstablishment(authorization.etablissementId, {
+      statut: 'en_regle',
+      numeroAttestation: authorization.numeroAutorisation,
+      dateDelivranceAttestation: authorization.dateDelivrance,
+    });
 
     const logDetails = isPo
       ? `Approbation et signature par ordre (P.O.) par le Chef de Service Assistance et Autorisation (${nomSignataire || 'Gildas Ambetos'}) pour ${targetNom}.`

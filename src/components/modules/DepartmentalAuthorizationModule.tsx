@@ -78,14 +78,14 @@ export const DepartmentalAuthorizationModule: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedLinkAuthId, setCopiedLinkAuthId] = useState<string | null>(null);
 
-  // Établissements éligibles (soldés ou ayant versé un acompte significatif)
+  // Only fully settled, active files can enter the signature circuit.
   const eligibleEstablishments = useMemo(() => {
     return establishments.filter((est) => {
       // Exclure ceux qui ont déjà une autorisation délivrée active
       const hasActive = authorizations.some(
         (a) => a.etablissementId === est.id && (a.statut === 'delivre' || a.statut === 'approuve_directeur')
       );
-      return !hasActive;
+      return !hasActive && !est.estEteintOuFerme && est.soldeRestantDu === 0 && est.statut === 'en_regle';
     });
   }, [establishments, authorizations]);
 
