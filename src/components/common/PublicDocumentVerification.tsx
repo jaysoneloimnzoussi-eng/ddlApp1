@@ -27,83 +27,11 @@ export const PublicDocumentVerification: React.FC<PublicDocumentVerificationProp
   const foundAct = ref ? legalActs.find((a) => a.referenceNumero.toLowerCase() === ref.toLowerCase() || (a.documentHash && a.documentHash === ref)) : null;
   const foundAuth = num ? (authorizations || []).find((a) => a.numeroAutorisation.toLowerCase() === num.toLowerCase() || (a.documentHash && a.documentHash === num)) : null;
 
-  // Fallback receipt or act if verified directly with signature parameters
-  const effectiveReceipt = foundReceipt || (num && (num.startsWith('QC-') || num.startsWith('Q-')) && queryEtab ? {
-    id: 'query-' + num,
-    numeroQuittance: num,
-    datePaiement: queryDate,
-    etablissementId: 'est-query',
-    etablissementNom: queryEtab,
-    promoteurNom: searchParams.get('prom') || 'Promoteur Enregistré',
-    arrondissement: (queryArr as any) || 'Tié-Tié',
-    montantVerse: queryMontant || 50000,
-    modePaiement: 'momo_mtn' as const,
-    resteAPayer: 0,
-    anneeFiscale: 2026,
-    inspecteurOuCaissier: 'Régie SAF Pointe-Noire',
-    quittanceHash: 'CERTIFIED-DDL-PN-2026',
-  } : null);
-
-  const effectiveAct = foundAct || (ref && ref.includes('2026') && queryEtab ? {
-    id: 'query-act-' + ref,
-    referenceNumero: ref,
-    type: 'mise_en_demeure' as const,
-    etablissementId: 'est-query',
-    etablissementNom: queryEtab,
-    motifs: searchParams.get('motif') || 'Mise en demeure pour régularisation administrative et respect des normes acoustiques',
-    dateEmission: queryDate,
-    delaiHeures: 72,
-    inspecteursAssermentes: ['Inspecteurs SAA'],
-    statutExecution: 'actif' as const,
-    documentHash: 'CERTIFIED-DDL-PN-2026',
-  } : null);
-
-  const effectiveAuth = foundAuth || ((verifyType === 'auth' || verifyType === 'autorisation' || num.startsWith('AUT-')) && (queryEtab || num) ? {
-    id: 'query-auth-' + (num || '2026'),
-    numeroAutorisation: num || 'AUT-2026/DDL-PN/001',
-    referenceArrete: 'Arrêté N° 042/MID-DGL/DDL-PN-2026',
-    anneeExercice: 2026,
-    dateDelivrance: queryDate,
-    dateExpiration: '2027-02-14',
-    etablissementId: 'est-query',
-    codeDossier: 'DDL-PN-2026-VALIDE',
-    nomCommercial: queryEtab || 'Établissement Homologué',
-    promoteurNom: searchParams.get('prom') || 'Promoteur Enregistré',
-    arrondissement: (queryArr as any) || 'Lumumba',
-    quartier: 'Centre-Ville',
-    adresseExacte: 'Pointe-Noire',
-    categorie: 'Établissement de Loisirs Homologué' as any,
-    surfaceM2: 180,
-    montantRedevanceAcquittee: queryMontant || 250000,
-    quittanceReference: searchParams.get('quit') || 'QUIT-2026-REGIE',
-    quittanceDate: queryDate,
-    visaInspecteurChef: {
-      signe: true,
-      nomInspecteur: 'Gildas Ambetos',
-      dateVisa: queryDate,
-      observationsConformite: 'Conformité acoustique < 85 dB(A) validée',
-    },
-    visaRegisseurSaf: {
-      signe: true,
-      nomRegisseur: 'Patrice Bitemo',
-      dateVisa: queryDate,
-      quittanceNumero: 'QUIT-2026-REGIE',
-    },
-    signatureDirecteur: {
-      signe: true,
-      nomDirecteur: 'NTSEKE NGOUAKA Jean Richard',
-      qualite: searchParams.get('po') === 'true'
-        ? 'Pour le Directeur Départemental et par ordre (P.O.), Le Chef de Service Assistance et Autorisation'
-        : 'Le Directeur Départemental des Loisirs de Pointe-Noire',
-      dateSignature: queryDate,
-      parapheOfficiel: searchParams.get('po') === 'true' ? 'Signé P.O. • Chef SAA • 2026' : 'Approuvé • DDL-PN • 2026',
-      typeSignataire: searchParams.get('po') === 'true' ? ('chef_saa_po' as const) : ('directeur' as const),
-      signataireNom: searchParams.get('sign') || (searchParams.get('po') === 'true' ? 'Gildas Ambetos' : 'NTSEKE NGOUAKA Jean Richard'),
-      mentionPo: searchParams.get('po') === 'true' ? 'Pour le Directeur Départemental et par ordre (P.O.)' : undefined,
-    },
-    statut: 'delivre' as const,
-    documentHash: searchParams.get('hash') || 'c7e8a9f24b5d3e12a45c7890bfe1d45892147321e90ab4c3ef1287654321abcd',
-  } as DepartmentalAuthorization : null);
+  // Public verification must only display a record that exists in Firestore.
+  // Never derive a certified document from URL-controlled values.
+  const effectiveReceipt = foundReceipt;
+  const effectiveAct = foundAct;
+  const effectiveAuth = foundAuth;
 
   const relatedEst = effectiveReceipt
     ? establishments.find((e) => e.id === effectiveReceipt.etablissementId || (e.nomCommercial && e.nomCommercial.toLowerCase() === effectiveReceipt.etablissementNom.toLowerCase()))

@@ -1,7 +1,13 @@
 import firebaseConfig from '../firebase-applet-config.json' with { type: 'json' };
 
 const SUPABASE_URL = 'https://nbpcecsnivfggyitpxdn.supabase.co';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5icGNlY3NuaXZmZ2d5aXRweGRuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODI4OTI2NiwiZXhwIjoyMTAzODY1MjY2fQ.PVU6ZECng32GvVrB-XqJAw6CVVqwqjm66nYfnyYJNeY';
+// This script must only run in a trusted environment. Never expose this value
+// through VITE_* variables or client-side code.
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SERVICE_KEY) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required to run this migration.');
+}
 
 const PROJECT_ID = firebaseConfig.projectId;
 const DATABASE_ID = firebaseConfig.firestoreDatabaseId;

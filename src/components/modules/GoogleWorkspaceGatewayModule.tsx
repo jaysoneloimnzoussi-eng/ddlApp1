@@ -426,10 +426,12 @@ Jean Richard NTSEKE NGOUAKA`;
 
               <div className="space-y-1">
                 <label className="text-slate-300 font-semibold">Aperçu du Corps HTML du Message</label>
-                <div
-                  className="p-4 rounded-lg bg-white text-slate-950 text-xs max-h-60 overflow-y-auto border border-slate-300 leading-relaxed font-sans"
-                  dangerouslySetInnerHTML={{ __html: emailContent }}
-                />
+                <pre className="p-4 rounded-lg bg-white text-slate-950 text-xs max-h-60 overflow-y-auto border border-slate-300 leading-relaxed font-mono whitespace-pre-wrap break-words">
+                  {emailContent}
+                </pre>
+                <p className="text-[10px] text-slate-400">
+                  L’aperçu affiche le code source afin d’empêcher l’exécution de HTML saisi dans le navigateur.
+                </p>
               </div>
 
               <button

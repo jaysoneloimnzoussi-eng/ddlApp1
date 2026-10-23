@@ -2,7 +2,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
   signInWithPopup,
-  signInAnonymously,
   GoogleAuthProvider,
   onAuthStateChanged,
   User,
@@ -102,7 +101,6 @@ standardGoogleProvider.addScope('email');
 export const workspaceGoogleProvider = new GoogleAuthProvider();
 workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/calendar.events');
 workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
-workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 workspaceGoogleProvider.addScope('https://www.googleapis.com/auth/documents');
 
 export const googleProvider = standardGoogleProvider;
@@ -251,11 +249,7 @@ export const logout = async () => {
 };
 
 export const ensureFirebaseAuth = async (): Promise<User | null> => {
-  if (auth.currentUser) return auth.currentUser;
-  try {
-    const cred = await signInAnonymously(auth);
-    return cred.user;
-  } catch (err) {
-    return null;
-  }
+  // Anonymous users must never receive database access. All Firestore access
+  // is governed by authenticated Firebase users and server-issued custom claims.
+  return auth.currentUser;
 };

@@ -1,49 +1,80 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Custom claims must be assigned with the Firebase Admin SDK:
+    // { role: 'administrateur' | 'directeur' | 'inspecteur_saa',
+    //   agentId: '<staff id>' }
+    function signedIn() {
+      return request.auth != null;
+    }
 
-    // Établissements de loisirs : Consultation et synchronisation terrain souveraine
+    function role() {
+      return signedIn() ? request.auth.token.role : null;
+    }
+
+    function isAdmin() {
+      return role() == 'administrateur' || role() == 'directeur';
+    }
+
+    function isFieldAgent() {
+      return role() == 'inspecteur_saa';
+    }
+
+    function isAssignedAgent() {
+      return isFieldAgent()
+        && request.auth.token.agentId != null
+        && request.auth.token.agentId == request.resource.data.agentAssigneId;
+    }
+
     match /establishments/{establishmentId} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow create, update: if isAdmin() || isAssignedAgent();
+      allow delete: if isAdmin();
     }
 
-    // Quittances de régie SAF Trésor (Contrôle d'authenticité et synchronisation régie)
-    match /receipts/{receiptId} {
-      allow read, write: if true;
-    }
-
-    // Planning et tournées de terrain des inspecteurs SAA
     match /schedules/{scheduleId} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow create, update: if isAdmin() || isAssignedAgent();
+      allow delete: if isAdmin();
     }
 
-    // Actes de police administrative et sanctions
+    match /receipts/{receiptId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /legalActs/{legalActId} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Autorisations d'exploitation départementales
     match /departmentalAuthorizations/{authId} {
-      allow read, write: if true;
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Campagnes de relance et vœux 2026-2027
     match /campaignBatches/{batchId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
 
     match /campaignMessages/{msgId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
 
-    // Journal d'audit certifié SHA-256
+    // Logs are append-only. A privileged service should be used for any
+    // correction, rather than permitting client-side mutation.
     match /auditLogs/{logId} {
-      allow read, write: if true;
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
     }
 
-    // Test de connectivité
     match /test/{docId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

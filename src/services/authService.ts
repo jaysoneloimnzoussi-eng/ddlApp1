@@ -1,6 +1,5 @@
 import { StaffPersonnel, UserRole } from '../types';
 import { INITIAL_STAFF } from '../data/seedData';
-import { hashPin } from './crypto';
 
 export interface AuthAccount {
   id: string;
@@ -102,72 +101,17 @@ export function findAccountByIdentifier(identifier: string): AuthAccount | undef
 }
 
 // Verify credentials securely
-export function verifyCredentials(identifier: string, pin: string): {
+/**
+ * Legacy local credential verification is intentionally disabled. Credentials
+ * must be verified by Firebase Auth; authorization comes from custom claims.
+ */
+export function verifyCredentials(_identifier: string, _pin: string): {
   success: boolean;
   message: string;
   account?: AuthAccount;
 } {
-  const cleanPin = (pin || '').trim();
-  if (!cleanPin) {
-    return {
-      success: false,
-      message: 'Veuillez saisir votre mot de passe ou code PIN.',
-    };
-  }
-
-  const account = findAccountByIdentifier(identifier);
-  if (!account) {
-    return {
-      success: false,
-      message: 'Identifiant non reconnu. Veuillez vérifier votre nom, matricule ou e-mail.',
-    };
-  }
-
-  // Check custom pins in localStorage (handles hashed or plaintext)
-  let isCustomMatch = false;
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const customPins = localStorage.getItem('ddl_custom_pins_v4');
-      if (customPins) {
-        const parsed = JSON.parse(customPins);
-        const stored = parsed[account.id];
-        if (stored) {
-          const hashedAttempt = hashPin(cleanPin, account.id);
-          if (stored === hashedAttempt || stored === cleanPin) {
-            isCustomMatch = true;
-          }
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Error reading custom PINs:', e);
-  }
-
-  // Find staff in seed data to check their specific password if present
-  const seedStaff = INITIAL_STAFF.find((s) => s.id === account.id || s.matricule === account.matricule);
-  const isSeedPasswordMatch =
-    seedStaff?.password &&
-    (seedStaff.password === cleanPin || seedStaff.password.toLowerCase() === cleanPin.toLowerCase());
-  const isSeedPinMatch = seedStaff?.pin && seedStaff.pin === cleanPin;
-
-  // Universal official PINs
-  const isUniversalPinMatch =
-    cleanPin === '2026' ||
-    cleanPin === '1234' ||
-    cleanPin === 'Admin2026@DDL' ||
-    cleanPin.toLowerCase() === 'admin2026' ||
-    cleanPin === 'Matoko#2026';
-
-  if (isCustomMatch || isUniversalPinMatch || isSeedPasswordMatch || isSeedPinMatch) {
-    return {
-      success: true,
-      message: `Connexion réussie : Bienvenue ${account.nomComplet} (${account.isSuperAdmin ? 'Super-Administrateur' : 'Agent de Terrain'}).`,
-      account,
-    };
-  }
-
   return {
     success: false,
-    message: 'Identifiant ou mot de passe incorrect.',
+    message: 'Connexion locale désactivée. Utilisez Firebase Authentication.',
   };
 }

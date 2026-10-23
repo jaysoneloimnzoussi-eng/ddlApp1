@@ -258,33 +258,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Dedicated Agent Authentication (Phone + PIN & Auto-detection)
-  const [authenticatedUser, setAuthenticatedUser] = useState<StaffPersonnel | null>(() => {
-    try {
-      const saved = localStorage.getItem('ddl_auth_session');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  // Last Authenticated User memory for 1-click offline unlock
-  const [lastAuthenticatedUser, setLastAuthenticatedUser] = useState<StaffPersonnel | null>(() => {
-    try {
-      const saved = localStorage.getItem('ddl_last_authenticated_user');
-      if (saved) return JSON.parse(saved);
-      const session = localStorage.getItem('ddl_auth_session');
-      return session ? JSON.parse(session) : null;
-    } catch {
-      return null;
-    }
-  });
+  // Do not restore an application session from browser storage: it is editable
+  // by the user. Firebase Auth is the sole source of authentication.
+  const [authenticatedUser, setAuthenticatedUser] = useState<StaffPersonnel | null>(null);
+  const [lastAuthenticatedUser, setLastAuthenticatedUser] = useState<StaffPersonnel | null>(null);
 
   const isAuthenticated = !!authenticatedUser;
 
   // Role & Siloing initialized from authenticated session
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>(() => {
-    return authenticatedUser?.role || 'directeur';
+    return authenticatedUser?.role || 'inspecteur_saa';
   });
 
   // Agent Siloing: 'all' for admin/directeur, or specific agent id
@@ -752,136 +735,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [schedules, currentUserRole, currentAgentId, staff, authenticatedUser, establishments]);
 
-  // Login with Credentials (Identifier + Password/PIN) + Automatic Role Detection
-  const loginWithPhoneAndPin = (phoneOrMatricule: string, pin: string) => {
-    const rawInput = (phoneOrMatricule || '').trim().toLowerCase();
-    const cleanInput = rawInput.replace(/[\s\-\+\(\)\.]/g, '');
-    const secret = (pin || '').trim();
+  // Browser-side passwords and offline “quick unlock” are intentionally disabled.
+  // Authentication and authorization now depend on Firebase Auth custom claims.
+  const loginWithPhoneAndPin = (_phoneOrMatricule: string, _pin: string) => ({
+    success: false,
+    message: 'Connexion par code local désactivée. Utilisez un compte Google Workspace autorisé.',
+  });
 
-    if (!rawInput) {
-      return { success: false, message: 'Veuillez saisir votre identifiant ou matricule.' };
-    }
-    if (!secret) {
-      return { success: false, message: 'Veuillez saisir votre mot de passe ou code PIN.' };
-    }
-
-    // Normalisation flexible des numéros de téléphone (+242, suppression des 0 initiaux, etc.)
-    const normalizeDigits = (val: string) => (val || '').replace(/[^\d]/g, '').replace(/^242/, '').replace(/^0/, '');
-    const inputDigits = normalizeDigits(rawInput);
-
-    // Match in staff directory
-    const matched = staff.find((s) => {
-      const loginClean = (s.loginId || '').trim().toLowerCase();
-      const matClean = s.matricule.trim().toLowerCase();
-      const matNoDash = matClean.replace(/[\s\-\+\(\)\.]/g, '');
-      const sDigits = normalizeDigits(s.telephone);
-      const emailClean = (s.email || '').trim().toLowerCase();
-      const nameClean = s.nomComplet.trim().toLowerCase();
-
-      // Direct matches on ID, Matricule, Email, or Telephone
-      if (loginClean && (loginClean === rawInput || loginClean === cleanInput)) return true;
-      if (matClean === rawInput || matNoDash === cleanInput) return true;
-      if (emailClean && (emailClean === rawInput || emailClean.startsWith(rawInput))) return true;
-      if (inputDigits && sDigits && (inputDigits === sDigits || sDigits.endsWith(inputDigits) || inputDigits.endsWith(sDigits))) return true;
-
-      // Match on name or name parts (ex: "Jacques", "Matoko", "Jacques Matoko")
-      if (rawInput.length >= 3) {
-        if (nameClean.includes(rawInput) || rawInput.includes(nameClean)) return true;
-        const nameParts = nameClean.split(/\s+/);
-        if (nameParts.some((p) => p.length >= 3 && (p === rawInput || rawInput.includes(p)))) return true;
-      }
-
-      // Special handling for admin keywords and developer email
-      if (
-        (s.role === 'directeur' || s.role === 'administrateur') &&
-        (rawInput === 'admin' ||
-          rawInput === 'directeur' ||
-          rawInput === 'direction' ||
-          rawInput === 'ddl-dir-001' ||
-          rawInput === 'liameloimnzoussi@gmail.com')
-      ) {
-        return true;
-      }
-
-      return false;
-    });
-
-    if (!matched) {
-      return {
-        success: false,
-        message: 'Identifiant non reconnu. Vous pouvez utiliser votre nom, matricule, téléphone ou email.',
-      };
-    }
-
-    // Validate secret against user's specific credentials
-    const cleanSecret = secret.trim();
-    if (!cleanSecret) {
-      return {
-        success: false,
-        message: 'Veuillez saisir votre mot de passe ou code PIN.',
-      };
-    }
-
-    const isPrivileged = matched.role === 'directeur' || matched.role === 'administrateur';
-    const isSecretValid =
-      cleanSecret === '2026' || // Universal official direction unlock PIN
-      cleanSecret === '1234' ||
-      cleanSecret === 'Admin2026@DDL' ||
-      cleanSecret.toLowerCase() === 'admin2026' ||
-      cleanSecret === 'Matoko#2026' ||
-      (matched.password && (matched.password === cleanSecret || matched.password.toLowerCase() === cleanSecret.toLowerCase())) ||
-      (matched.pin && (matched.pin === cleanSecret || matched.pin.trim() === cleanSecret));
-
-    if (!isSecretValid) {
-      return {
-        success: false,
-        message: 'Identifiant ou code secret incorrect.',
-      };
-    }
-
-    // Authentication Success!
-    setAuthenticatedUser(matched);
-    setLastAuthenticatedUser(matched);
-    setCurrentUserRole(matched.role);
-    setCurrentAgentId(isPrivileged ? 'all' : matched.id);
-
-    try {
-      localStorage.setItem('ddl_auth_session', JSON.stringify(matched));
-      localStorage.setItem('ddl_last_authenticated_user', JSON.stringify(matched));
-    } catch (e) {
-      console.warn('Storage save failed:', e);
-    }
-
-    return {
-      success: true,
-      message: `Connexion réussie : Bienvenue ${matched.nomComplet} (${matched.fonction}).`,
-      user: matched,
-    };
-  };
-
-  // Quick Unlock for offline / field use
-  const quickUnlockSession = (pin: string) => {
-    const cleanPin = (pin || '').trim();
-    if (!cleanPin) {
-      return { success: false, message: 'Code PIN requis pour le déverrouillage.' };
-    }
-    const candidate = lastAuthenticatedUser || staff.find((s) => s.email?.toLowerCase() === 'jacks.matoko@gmail.com') || staff[0];
-    if (!candidate) {
-      return { success: false, message: 'Aucun profil mémorisé sur ce terminal.' };
-    }
-    return loginWithPhoneAndPin(candidate.matricule, cleanPin);
-  };
+  const quickUnlockSession = (_pin: string) => ({
+    success: false,
+    message: 'Déverrouillage hors-ligne désactivé. Connectez-vous avec un compte autorisé.',
+  });
 
   // Logout Session
   const logoutAgentSession = () => {
-    try {
-      localStorage.removeItem('ddl_auth_session');
-    } catch (e) {
-      console.warn('Storage remove failed:', e);
-    }
     setAuthenticatedUser(null);
-    setCurrentUserRole('directeur');
-    setCurrentAgentId('all');
+    setLastAuthenticatedUser(null);
+    setCurrentUserRole('inspecteur_saa');
+    setCurrentAgentId('');
   };
 
   // Update Agent PIN
@@ -1223,8 +1094,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const res = await googleSignIn();
       if (res) {
+        const tokenResult = await res.user.getIdTokenResult(true);
+        const claimedRole = tokenResult.claims.role;
+        const claimedAgentId = tokenResult.claims.agentId;
+        const allowedRoles = ['administrateur', 'directeur', 'inspecteur_saa', 'caissier_saf', 'agent_spa'];
+
+        if (typeof claimedRole !== 'string' || !allowedRoles.includes(claimedRole)) {
+          throw new Error('Ce compte ne possède aucun rôle DDL-PN autorisé.');
+        }
+
+        const profile = staff.find(
+          (member) => member.email?.toLowerCase() === res.user.email?.toLowerCase()
+        );
+        if (!profile) {
+          throw new Error('Ce compte n’est pas rattaché à un profil DDL-PN.');
+        }
+        if (
+          claimedRole !== 'administrateur' &&
+          claimedRole !== 'directeur' &&
+          claimedAgentId !== profile.id
+        ) {
+          throw new Error('Le profil Firebase ne correspond pas à l’agent déclaré.');
+        }
+
+        const authorisedUser: StaffPersonnel = {
+          ...profile,
+          role: claimedRole as UserRole,
+        };
         setGoogleUser(res.user);
         setGoogleAccessToken(res.accessToken);
+        setAuthenticatedUser(authorisedUser);
+        setLastAuthenticatedUser(authorisedUser);
+        setCurrentUserRole(authorisedUser.role);
+        setCurrentAgentId(
+          claimedRole === 'administrateur' || claimedRole === 'directeur'
+            ? 'all'
+            : profile.id
+        );
         showNotification('success', `Connecté avec succès : ${res.user.displayName || res.user.email}`);
         setTimeout(() => {
           syncOfflineQueue();
@@ -1256,6 +1162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await firebaseLogout();
       setGoogleUser(null);
       setGoogleAccessToken(null);
+      logoutAgentSession();
       showNotification('info', 'Session déconnectée.');
     } catch (err: any) {
       console.error('Erreur déconnexion:', err);
@@ -1263,17 +1170,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const activateDemoGoogleSession = () => {
-    const demoUser = {
-      uid: 'demo-google-user',
-      displayName: 'Directeur Général (Session Active)',
-      email: 'directeur.ddlpn@gmail.com',
-      photoURL: null,
-      emailVerified: true,
-    } as unknown as User;
-    setGoogleUser(demoUser);
-    setGoogleAccessToken('demo-token-active-ddlpn');
-    setShowDomainAuthModal(false);
-    showNotification('success', 'Session Google Workspace activée ! Vous avez accès à l\'ensemble des fonctions.');
+    showNotification(
+      'error',
+      'Les sessions de démonstration sont désactivées. Utilisez un compte Google Workspace autorisé.'
+    );
   };
 
   const addAuditLog = async (action: string, typeEntite: string, referenceId: string, details: string) => {

@@ -4,8 +4,6 @@ import { DdlLogo } from '../common/DdlLogo';
 import {
   Lock,
   User,
-  Eye,
-  EyeOff,
   Sun,
   Moon,
   ArrowRight,
@@ -20,20 +18,16 @@ import { FirebaseStatusModal } from '../common/FirebaseStatusModal';
 
 export const AgentLoginConsole: React.FC = () => {
   const {
-    loginWithPhoneAndPin,
     theme,
     toggleTheme,
     showNotification,
     isOnline,
     lastAuthenticatedUser,
     quickUnlockSession,
+    handleGoogleSignIn,
+    isSigningIn,
   } = useApp();
 
-  const [identifier, setIdentifier] = useState(() => {
-    return lastAuthenticatedUser?.matricule || lastAuthenticatedUser?.nomComplet || '';
-  });
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [quickPin, setQuickPin] = useState('');
@@ -43,41 +37,15 @@ export const AgentLoginConsole: React.FC = () => {
 
   const isLight = theme === 'light';
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-
-    const cleanId = identifier.trim();
-    const cleanPass = password.trim();
-
-    if (!cleanId) {
-      setErrorMessage('Veuillez renseigner votre identifiant officiel.');
-      return;
-    }
-
-    if (!cleanPass) {
-      setErrorMessage('Veuillez renseigner votre mot de passe ou code PIN.');
-      return;
-    }
-
     setIsLoading(true);
-    setTimeout(() => {
-      const result = loginWithPhoneAndPin(cleanId, cleanPass);
+    try {
+      await handleGoogleSignIn();
+    } finally {
       setIsLoading(false);
-
-      if (!result.success) {
-        setErrorMessage(result.message);
-      } else {
-        const userRole = result.user?.role;
-        const isAdmin = userRole === 'administrateur' || userRole === 'directeur';
-        showNotification(
-          'success',
-          isAdmin
-            ? `Session Administrateur ouverte. Bienvenue ${result.user?.nomComplet}.`
-            : `Session Agent de Terrain ouverte. Bienvenue ${result.user?.nomComplet}.`
-        );
-      }
-    }, 150);
+    }
   };
 
   const handleQuickUnlock = (e: React.FormEvent) => {
@@ -319,10 +287,10 @@ export const AgentLoginConsole: React.FC = () => {
               {/* Standard Secure Login Form */}
               {(showFullLogin || !lastAuthenticatedUser) && (
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
-                  {/* Champ 1 : Identifiant */}
+                  {/* Firebase Auth only: no local password is accepted. */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                      Identifiant
+                      Compte Google Workspace
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -330,13 +298,9 @@ export const AgentLoginConsole: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        value={identifier}
-                        onChange={(e) => {
-                          setIdentifier(e.target.value);
-                          setErrorMessage(null);
-                        }}
-                        placeholder="Matricule, nom ou e-mail"
-                        autoComplete="username"
+                        value="Connexion sécurisée via Firebase Authentication"
+                        readOnly
+                        aria-label="Connexion sécurisée via Google Workspace"
                         className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 transition ${
                           isLight
                             ? 'bg-slate-50 border-slate-300 text-slate-900 focus:ring-emerald-500/30 focus:border-emerald-600'
@@ -344,41 +308,6 @@ export const AgentLoginConsole: React.FC = () => {
                         }`}
                         autoFocus
                       />
-                    </div>
-                  </div>
-
-                  {/* Champ 2 : Mot de passe / Code PIN */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                      Mot de passe ou Code PIN
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          setErrorMessage(null);
-                        }}
-                        placeholder="••••••••••••"
-                        autoComplete="current-password"
-                        className={`w-full pl-10 pr-12 py-2.5 rounded-xl border text-sm font-medium focus:outline-none focus:ring-2 transition ${
-                          isLight
-                            ? 'bg-slate-50 border-slate-300 text-slate-900 focus:ring-emerald-500/30 focus:border-emerald-600'
-                            : 'bg-slate-950 border-slate-700 text-slate-100 focus:ring-emerald-500/30 focus:border-emerald-500'
-                        }`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                        title={showPassword ? 'Masquer' : 'Afficher'}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
                     </div>
                   </div>
 
@@ -393,14 +322,14 @@ export const AgentLoginConsole: React.FC = () => {
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || isSigningIn}
                     className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
                   >
                     {isLoading ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <>
-                        <span>Se connecter</span>
+                        <span>Continuer avec Google Workspace</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
